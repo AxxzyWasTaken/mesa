@@ -190,7 +190,9 @@ static const struct drm_asahi_params_global params_g16s_as = {
  * shader and command-stream paths can be exercised without hardware.
  */
 static const struct drm_asahi_params_global params_g17p = {
-   .features = DRM_ASAHI_FEATURE_SOFT_FAULTS,
+   .features = DRM_ASAHI_FEATURE_SOFT_FAULTS |
+               DRM_ASAHI_FEATURE_PER_COMMAND_INPUT_SYNCS |
+               DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS,
    .gpu_generation = 17,
    .gpu_variant = 'P',
    .gpu_revision = 0,
@@ -308,14 +310,16 @@ static const struct drm_asahi_params_global params_g15s = {
  * T6031 / M3 Max: the same G15 generation as T6030 with twice the clusters.
  * One die, four clusters of ten cores (the 40-core part, every core present),
  * revision B2 (0x12), AGX3 shaders on the legacy firmware interface, and the
- * top GPU clock of the J516C, 1380 MHz. No optional feature is reported, so
+ * top GPU clock of the J516C, 1380 MHz. Only the native ABI contract bits are
+ * reported by default, so
  * the driver takes its baseline submission paths; the ASAHI_SHIM_* feature
  * switches add bits on top. Submissions go through the same packet rules and
  * stream gate as G15S, and the same per-VM kernel range is refused for binds.
  * Select with ASAHI_SHIM_CHIP=g15c.
  */
 static const struct drm_asahi_params_global params_g15c = {
-   .features = 0,
+   .features = DRM_ASAHI_FEATURE_PER_COMMAND_INPUT_SYNCS |
+               DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS,
    .gpu_generation = 15,
    .gpu_variant = 'C',
    .gpu_revision = 0x12,

@@ -718,6 +718,10 @@ bool agx_params_g18g_bringup_supported(
 bool agx_params_m5_supported(
    const struct drm_asahi_params_global *params);
 
+/* Reject the known incompatible legacy feature/payload contract on AGX3. */
+bool agx_params_native_kernel_abi_supported(
+   const struct drm_asahi_params_global *params);
+
 bool agx_params_fixup_upstream_uapi(struct drm_asahi_params_global *params);
 
 /* Exact product name when the chip identity maps to one unambiguous SoC.

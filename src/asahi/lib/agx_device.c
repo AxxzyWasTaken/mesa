@@ -979,10 +979,20 @@ agx_open_device(void *memctx, struct agx_device *dev)
       goto fail;
    }
 
+   if (!agx_params_native_kernel_abi_supported(&dev->params)) {
+      fprintf(stderr,
+              "Incompatible native AGX3 kernel ABI (features %#llx); "
+              "use the matched SiliconForest experimental driver or a "
+              "documented compatibility branch\n",
+              (unsigned long long)dev->params.features);
+      goto fail;
+   }
+
    /* The M4 Pro runs as G17P too; it takes the M-series name below. */
    const char *product = dev->params.chip_id == 0x8140
                             ? agx_chip_exact_product_name(dev->chip)
                             : NULL;
+
    if (product) {
       /* Match the M-series format with the exact GPU codename and revision. */
       snprintf(dev->name, sizeof(dev->name), "Apple %s (%s %02X)", product,

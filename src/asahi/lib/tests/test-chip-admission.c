@@ -226,6 +226,29 @@ main(void)
    assert(agx_chip_usc_helper_table_slots(AGX_CHIP_G17P, 0) == 6);
    assert(agx_chip_usc_helper_table_slots(AGX_CHIP_G17P, 6) == 6);
    assert(agx_chip_usc_helper_table_slots(AGX_CHIP_G17P, 10) == 10);
+   /* The same GPU identity must not admit the incompatible legacy payloads. */
+   assert(!agx_params_native_kernel_abi_supported(NULL));
+   assert(!agx_params_native_kernel_abi_supported(&g15s));
+   const uint64_t native = DRM_ASAHI_FEATURE_PER_COMMAND_INPUT_SYNCS |
+                           DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS;
+   g15s.features = native;
+   g15c.features = native;
+   assert(agx_params_native_kernel_abi_supported(&g15s));
+   assert(agx_params_native_kernel_abi_supported(&g15c));
+   for (unsigned bit = 10; bit <= 15; ++bit) {
+      bad = g15c;
+      bad.features |= UINT64_C(1) << bit;
+      assert(!agx_params_native_kernel_abi_supported(&bad));
+   }
+   bad = g15c;
+   bad.features &= ~DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS;
+   assert(!agx_params_native_kernel_abi_supported(&bad));
+   bad.features = DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS;
+   assert(!agx_params_native_kernel_abi_supported(&bad));
+   bad = (struct drm_asahi_params_global){
+      .gpu_generation = 13, .gpu_variant = 'G', .num_clusters_total = 1,
+   };
+   assert(agx_params_native_kernel_abi_supported(&bad));
 
    /* The M5 Max (T6050, G17C) is admitted on the M5 bring-up path with its
     * four clusters only. */

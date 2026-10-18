@@ -491,6 +491,29 @@ agx_params_driver_supported(const struct drm_asahi_params_global *params)
    }
 }
 
+/* The maintained legacy kernel uses a different payload layout and assigns
+ * bits 10..15 to features which this ABI places at 3..8. Never interpret its
+ * timestamp-copy fields as native prior-command barriers. This check is in
+ * addition to identity admission, before any VM or command is submitted.
+ */
+bool
+agx_params_native_kernel_abi_supported(
+   const struct drm_asahi_params_global *params)
+{
+   if (!params)
+      return false;
+
+   const enum agx_chip chip = agx_chip_from_params(params);
+   if (!agx_chip_native_agx3(chip))
+      return true;
+
+   const uint64_t required = DRM_ASAHI_FEATURE_PER_COMMAND_INPUT_SYNCS |
+                             DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS;
+   const uint64_t legacy_feature_assignments = UINT64_C(0xfc00);
+   return (params->features & required) == required &&
+          !(params->features & legacy_feature_assignments);
+}
+
 bool
 agx_params_fixup_upstream_uapi(struct drm_asahi_params_global *params)
 {
