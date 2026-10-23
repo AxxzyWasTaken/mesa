@@ -5,6 +5,8 @@
  *
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include "pool.h"
 #include "agx_bo.h"
 #include "agx_device.h"
@@ -20,6 +22,9 @@ agx_pool_alloc_backing(struct agx_pool *pool, size_t bo_sz)
 {
    struct agx_bo *bo =
       agx_bo_create(pool->dev, bo_sz, 0, pool->create_flags, pool->label);
+
+   if (unlikely(bo == NULL))
+      return NULL;
 
    util_dynarray_append(&pool->bos, bo);
    pool->transient_bo = bo;
@@ -64,8 +69,35 @@ agx_pool_alloc_aligned_with_bo(struct agx_pool *pool, size_t sz,
 
    /* If we don't fit, allocate a new backing */
    if (unlikely(bo == NULL || (offset + sz) >= POOL_SLAB_SIZE)) {
-      bo = agx_pool_alloc_backing(pool,
-                                  ALIGN_POT(MAX2(POOL_SLAB_SIZE, sz), 16384));
+      struct agx_bo *fresh = agx_pool_alloc_backing(
+         pool, ALIGN_POT(MAX2(POOL_SLAB_SIZE, sz), 16384));
+
+      if (unlikely(fresh == NULL)) {
+         /* BO creation fails once the kernel has failed this VM (a GPU
+          * recovery blamed our work: the context already reports a reset) or
+          * on real memory exhaustion. Recycle a backing that fits rather
+          * than dereferencing NULL: what is written here is never executed
+          * on a failed VM, and the application sees the reset through
+          * GL_ARB_robustness and rebuilds its context.
+          */
+         util_dynarray_foreach(&pool->bos, struct agx_bo *, it) {
+            if ((*it)->size >= sz) {
+               fresh = *it;
+               break;
+            }
+         }
+
+         if (fresh == NULL) {
+            fprintf(stderr, "agx: pool %s cannot allocate %zu bytes and has "
+                            "no backing to recycle\n",
+                    pool->label ? pool->label : "(unnamed)", sz);
+            abort();
+         }
+
+         pool->transient_bo = fresh;
+      }
+
+      bo = fresh;
       offset = 0;
    }
 
