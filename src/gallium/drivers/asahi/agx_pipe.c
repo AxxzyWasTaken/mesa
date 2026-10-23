@@ -1764,6 +1764,18 @@ agx_flush_batch(struct agx_context *ctx, struct agx_batch *batch)
    struct drm_asahi_cmd_compute compute;
    bool has_vdm = false, has_cdm = false;
 
+   /* After a GPU recovery failed this context's VM, every submission fails
+    * and the reset is already reported through robustness. Drop the batch
+    * instead of encoding it: a batch begun after the loss can be half built
+    * (Zen reached agx_build_bg_eot with a 0-sample, 0 px tile layout, which
+    * the native descriptor check aborts on).
+    */
+   if (unlikely(ctx->any_faults)) {
+      batch->initialized = false;
+      agx_batch_reset(ctx, batch);
+      return;
+   }
+
    if (batch->cdm.bo) {
       agx_flush_compute(ctx, batch, &compute);
       has_cdm = true;

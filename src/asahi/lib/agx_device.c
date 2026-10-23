@@ -432,6 +432,19 @@ agx_bo_alloc(struct agx_device *dev, size_t size, size_t align,
 
    ret = agx_bo_bind(dev, bo, bo->va->addr, bo->size, 0, bind);
    if (ret) {
+      int32_t vm_error = 0;
+
+      /* Once a GPU recovery has failed this VM, every bind is refused and
+       * every later submission fails, which the context already reports as
+       * a reset. Keep the BO, mapped for the CPU but unbound, so drivers
+       * that do not check every allocation keep running until the
+       * application notices the reset and recreates its context (Zen died
+       * in agx_batch_init's encoder allocation). Nothing that references it
+       * can execute on this VM.
+       */
+      if (agx_drm_vm_status(dev, &vm_error) && vm_error != 0)
+         return bo;
+
       agx_bo_free(dev, bo);
       return NULL;
    }
