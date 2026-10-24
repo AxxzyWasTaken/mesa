@@ -947,7 +947,6 @@ agx_open_device(void *memctx, struct agx_device *dev)
       fprintf(stderr, "Experimental M6 G18G integration enabled (M5 paths, agx3d code); rendering is unqualified\n");
    if (!agx_params_driver_supported(&dev->params) && !m5 && !m5_bringup &&
        !g18g_bringup) {
-
       if (dev->chip == AGX_CHIP_UNKNOWN) {
          fprintf(stderr,
                  "Unsupported Apple GPU architecture G%u (variant 0x%x, %u "
@@ -1217,7 +1216,6 @@ agx_open_device(void *memctx, struct agx_device *dev)
          ? AGX_M5_DATA_END
          : agx_va_user_limit(dev->chip, heap_below_usc,
                              vm_create.kernel_start);
-
    uint64_t user_size = user_limit - user_start;
 
    int ret = dev->ops.simple_ioctl(dev, DRM_IOCTL_ASAHI_VM_CREATE, &vm_create);
