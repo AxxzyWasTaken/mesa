@@ -920,6 +920,17 @@ agx_open_device(void *memctx, struct agx_device *dev)
     * is implemented; otherwise a newly-recognised chip can silently reach an
     * encoder from the wrong generation.
     */
+   /* G15G (T8122) runs on the native path only on explicit request. */
+   if (dev->chip == AGX_CHIP_G15G && agx_params_driver_supported(&dev->params)) {
+      if (!agx_chip_experimental_admitted(dev->chip)) {
+         fprintf(stderr, "Apple G15G (T8122) is recognised but not admitted: "
+                         "set ASAHI_M3_EXPERIMENTAL=1 to run it\n");
+         goto fail;
+      }
+      fprintf(stderr, "WARNING: experimental G15G/T8122 admission "
+                      "(ASAHI_M3_EXPERIMENTAL=1)\n");
+   }
+
    const bool m5 = agx_params_m5_supported(&dev->params);
    const bool m5_bringup =
       !m5 && debug_get_bool_option("ASAHI_M5_BRINGUP", false) &&
@@ -936,6 +947,7 @@ agx_open_device(void *memctx, struct agx_device *dev)
       fprintf(stderr, "Experimental M6 G18G integration enabled (M5 paths, agx3d code); rendering is unqualified\n");
    if (!agx_params_driver_supported(&dev->params) && !m5 && !m5_bringup &&
        !g18g_bringup) {
+
       if (dev->chip == AGX_CHIP_UNKNOWN) {
          fprintf(stderr,
                  "Unsupported Apple GPU architecture G%u (variant 0x%x, %u "
@@ -1340,6 +1352,9 @@ agx_open_device(void *memctx, struct agx_device *dev)
       /* Compiled as G17G and re-encoded as agx3d (asahi_clc), launched
        * through the M5 compute profile (agx_launch_precomp). */
       dev->libagx_programs = libagx_g18g;
+   } else if (dev->chip == AGX_CHIP_G15G) {
+      /* Its own build: G15G needs the scheduling stalls G15S does not. */
+      dev->libagx_programs = libagx_g15g;
    } else if (dev->chip == AGX_CHIP_G15S || dev->chip == AGX_CHIP_G15C) {
       /* G15C executes the same AGX3B encoding as G15S with no extra
        * scheduling rules, so it runs the G15S build of the programs. */

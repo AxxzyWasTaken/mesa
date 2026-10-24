@@ -7,10 +7,13 @@
 #undef NDEBUG
 
 #include <assert.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "agx_chip.h"
+#include "agx_va_runtime_hole.h"
+#include "util/macros.h"
 
 static struct drm_asahi_params_global
 g15_params(char variant, uint32_t chip_id, uint32_t clusters)
@@ -31,6 +34,29 @@ g15_params(char variant, uint32_t chip_id, uint32_t clusters)
    return params;
 }
 
+static bool
+overlaps(uint64_t a0, uint64_t a1, uint64_t b0, uint64_t b1)
+{
+   return a0 < b1 && b0 < a1;
+}
+
+/* The main heap and sparse alias agx_open_device derives for a native chip
+ * below the USC window (the same split and halving). */
+static void
+native_user_window(enum agx_chip chip, uint64_t *start, uint64_t *end)
+{
+   const uint64_t limit = agx_va_user_limit(chip, true, UINT64_C(0x2f7ffff8000));
+   uint64_t base = MAX2(UINT64_C(0x100000000), AGX_G17P_USER_LIMIT / 2);
+   uint64_t size = limit - base;
+
+   assert(agx_va_split_user_window(base, size, &base, &size));
+   while (size > 0 && base + 2 * size > limit)
+      size /= 2;
+   assert(size > 0);
+   *start = base;
+   *end = base + 2 * size;
+}
+
 static void
 check_native_g15(enum agx_chip chip)
 {
@@ -47,11 +73,10 @@ main(void)
 {
    check_native_g15(AGX_CHIP_G15S);
    check_native_g15(AGX_CHIP_G15C);
+   check_native_g15(AGX_CHIP_G15G);
 
    /* The other M3 parts stay off the native path. */
-   assert(!agx_chip_native_agx3(AGX_CHIP_G15G));
    assert(!agx_chip_native_agx3(AGX_CHIP_G15D));
-   assert(!agx_chip_driver_supported(AGX_CHIP_G15G));
    assert(!agx_chip_driver_supported(AGX_CHIP_G15D));
 
    /* T6030 and T6031 are each admitted with their own identity only. */
@@ -303,6 +328,59 @@ main(void)
    m5.gpu_hal_generation = DRM_ASAHI_GPU_HAL_200;
    assert(!agx_params_m5_supported(&m5));
    assert(!agx_params_m5_supported(NULL));
+
+   /* T8122 (G15G) by its own identity only; the device additionally needs
+    * ASAHI_M3_EXPERIMENTAL=1 (agx_open_device). */
+   struct drm_asahi_params_global g15g = g15_params('G', 0x8122, 1);
+   assert(agx_chip_from_params(&g15g) == AGX_CHIP_G15G);
+   assert(agx_params_driver_supported(&g15g));
+
+   bad = g15g;
+   bad.chip_id = 0x6030;
+   assert(!agx_params_driver_supported(&bad));
+
+   bad = g15g;
+   bad.num_clusters_total = 2;
+   assert(!agx_params_driver_supported(&bad));
+
+   bad = g15g;
+   bad.gpu_hal_generation = DRM_ASAHI_GPU_HAL_200;
+   assert(!agx_params_driver_supported(&bad));
+
+   bad = g15g;
+   bad.usc_generation = 2;
+   assert(!agx_params_driver_supported(&bad));
+
+   /* G15G opens only with ASAHI_M3_EXPERIMENTAL=1; other chips always. */
+   unsetenv("ASAHI_M3_EXPERIMENTAL");
+   assert(!agx_chip_experimental_admitted(AGX_CHIP_G15G));
+   assert(agx_chip_experimental_admitted(AGX_CHIP_G15S));
+   assert(agx_chip_experimental_admitted(AGX_CHIP_G17P));
+   setenv("ASAHI_M3_EXPERIMENTAL", "0", 1);
+   assert(!agx_chip_experimental_admitted(AGX_CHIP_G15G));
+   setenv("ASAHI_M3_EXPERIMENTAL", "1", 1);
+   assert(agx_chip_experimental_admitted(AGX_CHIP_G15G));
+   unsetenv("ASAHI_M3_EXPERIMENTAL");
+
+   /* T8122 (G15G): the heap and its sparse alias stay below 2^39, the
+    * absolute USC Texture/Sampler bound, and clear of every per-VM
+    * reservation of the kernel's T8122 runtime. */
+   uint64_t start, end;
+   native_user_window(AGX_CHIP_G15G, &start, &end);
+   assert(start == UINT64_C(0x4000000000) && end == UINT64_C(0x6000000000));
+   assert(end <= UINT64_C(1) << 39);
+   assert(!overlaps(start, end, AGX_T8122_RUNTIME_RESERVED_START,
+                    AGX_T8122_RUNTIME_RESERVED_END));
+   assert(!overlaps(start, end, UINT64_C(0x1000000000),
+                    UINT64_C(0x1008000000)));
+   assert(!overlaps(start, end, UINT64_C(0x1074000000),
+                    UINT64_C(0x1074028000)));
+   assert(!overlaps(start, end, AGX_T8122_RUNTIME_WINDOW_HIGH,
+                    AGX_T8122_RUNTIME_WINDOW_END));
+
+   /* G15S keeps the G17P-derived limit, and non-native chips the kernel's. */
+   assert(agx_va_user_limit(AGX_CHIP_G15S, true, 1) == AGX_G17P_USER_LIMIT);
+   assert(agx_va_user_limit(AGX_CHIP_G13G, false, 1234) == 1234);
 
    printf("chip admission: ok\n");
    return 0;

@@ -627,8 +627,8 @@ agx3_cdm_barrier_wide_visibility_grounded(enum agx_chip chip)
 {
    /* G15C (M3 Max) is G15S's generation with more clusters and takes the
     * same forms. */
-   return chip == AGX_CHIP_G15S || chip == AGX_CHIP_G15C ||
-          chip == AGX_CHIP_G16G;
+   return chip == AGX_CHIP_G15G || chip == AGX_CHIP_G15S ||
+          chip == AGX_CHIP_G15C || chip == AGX_CHIP_G16G;
 }
 
 #define AGX3_CDM_BARRIER_WIDE_VISIBILITY UINT32_C(0x0002009e)

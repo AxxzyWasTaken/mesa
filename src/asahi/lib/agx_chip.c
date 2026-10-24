@@ -4,6 +4,7 @@
  */
 
 #include "agx_chip.h"
+#include "util/u_debug.h"
 
 #include <stddef.h>
 
@@ -423,6 +424,7 @@ agx_chip_driver_supported(enum agx_chip chip)
              agx_chip_sampler_generation(chip) ==
                 AGX_SAMPLER_GENERATION_GEN4_HAL200 &&
              agx_chip_submission_model(chip) == AGX_SUBMISSION_MODEL_DUAL;
+   case AGX_CHIP_G15G:
    case AGX_CHIP_G15S:
    case AGX_CHIP_G15C:
       return agx_chip_command_stream_generation(chip) ==
@@ -466,6 +468,14 @@ agx_params_driver_supported(const struct drm_asahi_params_global *params)
              params->usc_generation == AGX_ISA_AGX3 &&
              params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_200;
    }
+   case AGX_CHIP_G15G:
+      /* T8122/M3: one die, one cluster, AGX3 shaders on the legacy firmware
+       * interface (14.8.3), through the kernel's T8122 runtime. agx_open_device
+       * admits it only with ASAHI_M3_EXPERIMENTAL=1. */
+      return params->chip_id == 0x8122 && params->num_dies == 1 &&
+             params->num_clusters_total == 1 &&
+             params->usc_generation == AGX_ISA_AGX3 &&
+             params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_LEGACY;
    case AGX_CHIP_G15S:
       /* T6030/M3 Pro: one die, two clusters, AGX3 shaders on the legacy
        * (pre-HAL200) firmware interface. */
@@ -689,4 +699,11 @@ agx_command_stream_generation_name(
    default:
       return "unknown";
    }
+}
+
+bool
+agx_chip_experimental_admitted(enum agx_chip chip)
+{
+   return chip != AGX_CHIP_G15G ||
+          debug_get_bool_option("ASAHI_M3_EXPERIMENTAL", false);
 }
