@@ -501,10 +501,10 @@ agx_params_driver_supported(const struct drm_asahi_params_global *params)
    }
 }
 
-/* The maintained legacy kernel uses a different payload layout and assigns
- * bits 10..15 to features which this ABI places at 3..8. Never interpret its
- * timestamp-copy fields as native prior-command barriers. This check is in
- * addition to identity admission, before any VM or command is submitted.
+/* G15G uses the separately admitted T8122 runtime: its baseline advertises
+ * VM_STATUS and SCHEDULED_QUEUES, not exact-prior barriers. Other native
+ * profiles use the unified high-bit prior-command contract. Refuse a known
+ * mismatch before VM creation; these checks are not general ABI negotiation.
  */
 bool
 agx_params_native_kernel_abi_supported(
@@ -516,6 +516,12 @@ agx_params_native_kernel_abi_supported(
    const enum agx_chip chip = agx_chip_from_params(params);
    if (!agx_chip_native_agx3(chip))
       return true;
+
+   if (chip == AGX_CHIP_G15G) {
+      const uint64_t required = DRM_ASAHI_FEATURE_VM_STATUS |
+                                DRM_ASAHI_FEATURE_SCHEDULED_QUEUES;
+      return (params->features & required) == required;
+   }
 
    const uint64_t required = DRM_ASAHI_FEATURE_PER_COMMAND_INPUT_SYNCS |
                              DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS;

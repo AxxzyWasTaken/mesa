@@ -388,8 +388,20 @@ main(void)
    assert(agx_chip_from_params(&g15g) == AGX_CHIP_G15G);
    assert(agx_params_driver_supported(&g15g));
    assert(!agx_params_native_kernel_abi_supported(&g15g));
-   g15g.features = native;
+   /* m3_drm.rs Backend::feature_flags: the Air runtime does not advertise
+    * PER_COMMAND_INPUT_SYNCS or EXACT_PRIOR_BARRIERS. */
+   g15g.features = DRM_ASAHI_FEATURE_VM_STATUS |
+                   DRM_ASAHI_FEATURE_SCHEDULED_QUEUES;
    assert(agx_params_native_kernel_abi_supported(&g15g));
+   bad = g15g;
+   bad.features &= ~DRM_ASAHI_FEATURE_VM_STATUS;
+   assert(!agx_params_native_kernel_abi_supported(&bad));
+   bad = g15g;
+   bad.features &= ~DRM_ASAHI_FEATURE_SCHEDULED_QUEUES;
+   assert(!agx_params_native_kernel_abi_supported(&bad));
+   bad = g15g;
+   bad.features |= DRM_ASAHI_FEATURE_COMPUTE_WIDE_VISIBILITY;
+   assert(agx_params_native_kernel_abi_supported(&bad));
    bad = g15g;
    bad.features = (UINT64_C(1) << 3) | (UINT64_C(1) << 5);
    assert(!agx_params_native_kernel_abi_supported(&bad));
