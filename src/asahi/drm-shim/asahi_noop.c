@@ -339,6 +339,30 @@ static const struct drm_asahi_params_global params_g15c = {
    .gpu_hal_generation = DRM_ASAHI_GPU_HAL_LEGACY,
 };
 
+/* Synthetic G15G contract for host-only device/allocator checks. The feature
+ * baseline matches Aurora m3_drm.rs; this is not a hardware execution model. */
+static const struct drm_asahi_params_global params_g15g = {
+   .features = DRM_ASAHI_FEATURE_VM_STATUS |
+               DRM_ASAHI_FEATURE_SCHEDULED_QUEUES,
+   .gpu_generation = 15,
+   .gpu_variant = 'G',
+   .gpu_revision = 0x20,
+   .chip_id = 0x8122,
+   .num_dies = 1,
+   .num_clusters_total = 1,
+   .num_cores_per_cluster = 10,
+   .core_masks = {0x3ff},
+   .vm_start = 0x4000,
+   .vm_end = 0x2ffffff8000ull,
+   .vm_kernel_min_size = 0x20000000,
+   .max_commands_per_submission = 64,
+   .max_attachments = 16,
+   .max_frequency_khz = 618000,
+   .command_timestamp_frequency_hz = 1000000000,
+   .usc_generation = 3,
+   .gpu_hal_generation = DRM_ASAHI_GPU_HAL_LEGACY,
+};
+
 /* QUEUE_LIMITS (group 2) of the M3 kernel. */
 static const struct drm_asahi_queue_limits queue_limits_g15s = {
    .max_queues = 58,
@@ -486,6 +510,8 @@ shim_params(void)
       return &params_g17p;
    if (chip && !strcmp(chip, "g15s"))
       return &params_g15s;
+   if (chip && !strcmp(chip, "g15g"))
+      return &params_g15g;
    if (chip && !strcmp(chip, "g15c"))
       return &params_g15c;
    if (chip && !strcmp(chip, "g16g"))
@@ -1586,6 +1612,19 @@ asahi_ioctl_vm_bind_unlocked(int fd, unsigned long request, void *arg)
                  (unsigned long long)start, (unsigned long long)end,
                  (unsigned long long)SHIM_G17P_RENDER_AUX_ALIAS_START,
                  (unsigned long long)SHIM_G17P_RENDER_AUX_ALIAS_END);
+         return -EINVAL;
+      }
+
+      if (params == &params_g15g &&
+          (range_overlaps(start, op->range, UINT64_C(0x7000000000),
+                          UINT64_C(0x1000000000)) ||
+           range_overlaps(start, op->range, UINT64_C(0x10080000000),
+                          UINT64_C(0x80000000)) ||
+           range_overlaps(start, op->range, UINT64_C(0x1000000000),
+                          UINT64_C(0x8000000)) ||
+           range_overlaps(start, op->range, UINT64_C(0x1074000000),
+                          UINT64_C(0x28000)))) {
+         fprintf(stderr, "shim: gem_bind overlaps a T8122 runtime reservation\n");
          return -EINVAL;
       }
 
