@@ -926,11 +926,11 @@ hk_hash_graphics_state(struct vk_physical_device *device,
    enum hk_feature_key feature_key = hk_make_feature_key(features);
    _mesa_blake3_update(&blake3_ctx, &feature_key, sizeof(feature_key));
 
-   /* Whether G17P shaders compile the custom-border emulation in
+   /* Whether G17P and M5 shaders compile the custom-border emulation in
     * (hk_compile_shader_impl): a cached shader was compiled the same way. */
    struct hk_physical_device *pdev =
       container_of(device, struct hk_physical_device, vk);
-   if (agx_native_graphics(&pdev->dev)) {
+   if (agx_native_graphics(&pdev->dev) || agx_chip_g17_m5(pdev->dev.chip)) {
       const uint32_t border = p_atomic_read(&pdev->border_emulation);
       _mesa_blake3_update(&blake3_ctx, &border, sizeof(border));
    }
@@ -5930,14 +5930,15 @@ hk_compile_shader_impl(struct hk_device *dev, struct vk_shader_compile_info *inf
       NIR_PASS(_, nir, agx_nir_lower_m5_mesh_fragment);
 
 
-   /* G17P compiles the custom-border emulation in only once the physical
-    * device has a sampler that needs it (hk_CreateSampler). Until then, drop
-    * its branches and keep this NIR to compile the emulating twin from. A
-    * shader whose emulation lost the shape it was built with keeps it. */
+   /* G17P and M5 compile the custom-border emulation in only once the
+    * physical device has a sampler that needs it (hk_CreateSampler). Until
+    * then, drop its branches and keep this NIR to compile the emulating twin
+    * from. A shader whose emulation lost the shape it was built with keeps
+    * it. */
    void *border_nir = NULL;
    size_t border_nir_size = 0;
    bool border_emulating = false;
-   if (agx_native_graphics(&dev->dev)) {
+   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) {
       struct hk_physical_device *pdev = hk_device_physical(dev);
       struct util_dynarray ifs;
       util_dynarray_init(&ifs, NULL);
