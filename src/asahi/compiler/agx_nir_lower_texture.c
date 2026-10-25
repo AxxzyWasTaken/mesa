@@ -842,8 +842,16 @@ lower_regular_texture(nir_builder *b, nir_instr *instr, void *data)
                         coord);
    }
 
+   /* Without image robustness an out-of-range layer only has to stay memory
+    * safe. The Gen9/10 texture unit bounds the 16-bit layer to the view
+    * itself (G17G returns zero past the view's last layer, see the sample
+    * layer clamp below), so the layer check is only needed for robust images
+    * there. */
+   const bool check_txf_layer =
+      tex->is_array && (!native_bounds || robust_texel_fetch);
+
    if (is_txf && !g17p_txf_oob &&
-       (has_nonzero_lod(tex) || tex->is_array ||
+       (has_nonzero_lod(tex) || check_txf_layer ||
         nir_tex_instr_src_index(tex, nir_tex_src_min_lod) >= 0) &&
        !(tex->backend_flags & AGX_TEXTURE_FLAG_NO_CLAMP)) {
 
@@ -872,7 +880,7 @@ lower_regular_texture(nir_builder *b, nir_instr *instr, void *data)
          b, texture_descriptor_ptr(b, tex),
          nir_imm_bool(b, has_nonzero_lod(tex)), lod,
          nir_imm_bool(b, min_lod != NULL), min_lod ?: nir_undef(b, 1, 16),
-         nir_imm_bool(b, tex->is_array), layer, nir_channel(b, coord, 0));
+         nir_imm_bool(b, check_txf_layer), layer, nir_channel(b, coord, 0));
 
       coord = nir_vector_insert_imm(b, coord, replaced, 0);
    }
@@ -887,6 +895,25 @@ lower_regular_texture(nir_builder *b, nir_instr *instr, void *data)
       nir_def *unclamped_layer = nir_channel(b, coord, lidx);
       coord = nir_trim_vector(b, coord, lidx);
 
+      /* G17P and G17G clamp the 16-bit hardware layer to the view in
+       * hardware, so the software clamp to the layer count is dead weight
+       * there. nir_get_texture_size() lowers to loading and DECODING the
+       * packed descriptor -- once per indexed array sample -- purely to learn
+       * the layer count, and on the CTS 4-lookup array-shadow shape that is
+       * most of the shader: 1812 bytes with 17 device loads and ~79
+       * iadd/isel, where Apple's compiler emits 316 bytes with ZERO device
+       * loads from the same source. Dropping it takes that shader to 990.
+       *
+       * Verified on hardware with reproducers that read a distinct texel per
+       * layer, so they detect which layer was sampled. G17P: 4- and 8-layer
+       * images, requested layers 0/1/3/4/7/100/100000. G17G: a 12-layer 2D
+       * array view, a 2-layer view at base layer 1, cube array views of 2
+       * cubes and of 1 cube at base layer 6, layers 0..9/100/4095/65535/
+       * 100000/1e9 and negative ones. All return the correctly clamped layer.
+       * The clamp only sees the 16-bit layer, though: layer 65536 reads layer
+       * 0, so saturate to 0xFFFF before the truncation. */
+      const bool skip_layer_clamp = options && (options->gen9 || options->gen10);
+
       /* Round layer to nearest even */
       if (!is_txf) {
          unclamped_layer = nir_fround_even(b, unclamped_layer);
@@ -894,8 +921,14 @@ lower_regular_texture(nir_builder *b, nir_instr *instr, void *data)
          /* Explicitly round negative to avoid undefined behaviour when constant
           * folding. This is load bearing on x86 builds.
           */
-         unclamped_layer =
-            nir_f2u32(b, nir_fmax(b, unclamped_layer, nir_imm_float(b, 0.0f)));
+         unclamped_layer = nir_fmax(b, unclamped_layer, nir_imm_float(b, 0.0f));
+
+         if (skip_layer_clamp) {
+            unclamped_layer =
+               nir_fmin(b, unclamped_layer, nir_imm_float(b, 65535.0f));
+         }
+
+         unclamped_layer = nir_f2u32(b, unclamped_layer);
       }
 
       /* For a cube array, the layer is zero-indexed component 3 of the
@@ -912,22 +945,6 @@ lower_regular_texture(nir_builder *b, nir_instr *instr, void *data)
        * For txf, we drop out-of-bounds components rather than clamp, see the
        * above txf robustness workaround.
        */
-      /* G17P clamps the array layer in hardware, so the software clamp is
-       * dead weight there. nir_get_texture_size() lowers to loading and
-       * DECODING the packed descriptor -- once per indexed array sample --
-       * purely to learn the layer count, and on the CTS 4-lookup array-shadow
-       * shape that is most of the shader: 1812 bytes with 17 device loads and
-       * ~79 iadd/isel, where Apple's compiler emits 316 bytes with ZERO device
-       * loads from the same source. Dropping it takes that shader to 990.
-       *
-       * Verified on hardware with a multi-layer reproducer that reads a
-       * distinct texel per layer, so it detects which layer was sampled:
-       * 4- and 8-layer images, requested layers 0/1/3/4/7/100/100000, all
-       * return the correctly clamped layer with this disabled. An unclamped
-       * read would wrap or read out of bounds; layer 9 of 4 returns layer 3,
-       * not layer 1. */
-      const bool skip_layer_clamp = options && options->gen9;
-
       if (!(tex->backend_flags & AGX_TEXTURE_FLAG_NO_CLAMP) && !is_txf &&
           !skip_layer_clamp) {
          nir_def *txs = nir_get_texture_size(b, tex);
