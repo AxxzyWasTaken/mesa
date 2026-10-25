@@ -107,6 +107,8 @@ instrs_equal(const void *_i1, const void *_i2)
       return false;
    if (i1->no_signed_zero != i2->no_signed_zero)
       return false;
+   if (i1->memory_byte_offset != i2->memory_byte_offset)
+      return false;
    if (i1->saturate != i2->saturate)
       return false;
    if (i1->mask != i2->mask)

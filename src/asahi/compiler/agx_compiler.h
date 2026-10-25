@@ -453,6 +453,8 @@ typedef struct {
    /* Raw subword memory elements use packed payloads (device loads use
     * 32-bit SSA words; byte stores and shared loads use 16-bit halves). */
    bool memory_is_packed : 1;
+   /* AGX3C device memory: signed byte offset added after scaling the index. */
+   int16_t memory_byte_offset;
 
    /* Explicit AGX3 SCS load semantics.  These stay on the internal SCS pseudo
     * and are never inferred from generic memory IR. */

@@ -1667,7 +1667,12 @@ agx_emit_load(agx_builder *b, agx_index dest, nir_intrinsic_instr *instr)
                                  AGX_NIR_MEMORY_PACKED_COUNT_SHIFT;
    assert(packed_count <= 4);
    assert(!packed_count || b->shader->key->dev.encoding != AGX_ISA_ENCODING_AGX2);
-   shift &= ~(AGX_NIR_MEMORY_INDEX_BYTES | AGX_NIR_MEMORY_PACKED_COUNT_MASK);
+   const int16_t byte_offset =
+      (int16_t)(shift >> AGX_NIR_MEMORY_BYTE_OFFSET_SHIFT);
+   assert(!byte_offset ||
+          b->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3C);
+   shift &= ~(AGX_NIR_MEMORY_INDEX_BYTES | AGX_NIR_MEMORY_PACKED_COUNT_MASK |
+              AGX_NIR_MEMORY_BYTE_OFFSET_MASK);
 
    assert(shift <= 3);
 
@@ -1695,6 +1700,7 @@ agx_emit_load(agx_builder *b, agx_index dest, nir_intrinsic_instr *instr)
          b, packed, addr, offset, norm8 ? AGX_FORMAT_I8 : AGX_FORMAT_I16,
          BITFIELD_MASK(nr), shift, nir_is_coherent(instr));
       load->memory_index_is_bytes = index_bytes;
+      load->memory_byte_offset = byte_offset;
       load->memory_is_packed = norm8 && nr > 1;
 
       agx_index halves[4] = {agx_null()};
@@ -1727,6 +1733,7 @@ agx_emit_load(agx_builder *b, agx_index dest, nir_intrinsic_instr *instr)
       agx_instr *load = agx_device_load_to(b, packed, addr, offset,
          AGX_FORMAT_I32, 1, shift, nir_is_coherent(instr));
       load->memory_index_is_bytes = index_bytes;
+      load->memory_byte_offset = byte_offset;
       agx_unpack_rgb10a2_agx3_to(b, dest, packed);
       agx_emit_cached_split(b, dest, 4);
       return;
@@ -1742,6 +1749,7 @@ agx_emit_load(agx_builder *b, agx_index dest, nir_intrinsic_instr *instr)
       agx_instr *load = agx_device_load_to(b, packed, addr, offset,
          AGX_FORMAT_I32, 1, shift, nir_is_coherent(instr));
       load->memory_index_is_bytes = index_bytes;
+      load->memory_byte_offset = byte_offset;
       agx_unpack_rgb10a2_agx3_to(b, dest, packed)->format = fmt;
       agx_emit_cached_split(b, dest, 3);
       return;
@@ -1761,6 +1769,7 @@ agx_emit_load(agx_builder *b, agx_index dest, nir_intrinsic_instr *instr)
                                            BITFIELD_MASK(nr), shift,
                                            nir_is_coherent(instr));
       load->memory_index_is_bytes = index_bytes;
+      load->memory_byte_offset = byte_offset;
 
       if (nr == 1 && dest.size == AGX_SIZE_16) {
          agx_subdivide_to(b, dest, payload, 0);
@@ -1775,6 +1784,7 @@ agx_emit_load(agx_builder *b, agx_index dest, nir_intrinsic_instr *instr)
                       BITFIELD_MASK(packed_count ? packed_count : instr->def.num_components), shift,
                       nir_is_coherent(instr));
    load->memory_index_is_bytes = index_bytes;
+      load->memory_byte_offset = byte_offset;
    load->memory_is_packed = packed_count != 0;
    agx_emit_cached_split(b, dest, instr->def.num_components);
 }
@@ -1788,7 +1798,11 @@ agx_emit_store(agx_builder *b, nir_intrinsic_instr *instr)
    unsigned shift = nir_intrinsic_base(instr);
    const bool index_bytes = shift & AGX_NIR_MEMORY_INDEX_BYTES;
    assert(!index_bytes || b->shader->key->dev.encoding != AGX_ISA_ENCODING_AGX2);
-   shift &= ~AGX_NIR_MEMORY_INDEX_BYTES;
+   const int16_t byte_offset =
+      (int16_t)(shift >> AGX_NIR_MEMORY_BYTE_OFFSET_SHIFT);
+   assert(!byte_offset ||
+          b->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3C);
+   shift &= ~(AGX_NIR_MEMORY_INDEX_BYTES | AGX_NIR_MEMORY_BYTE_OFFSET_MASK);
 
    assert(shift <= 3);
 
@@ -1835,6 +1849,7 @@ agx_emit_store(agx_builder *b, nir_intrinsic_instr *instr)
    agx_instr *store = agx_device_store(b, value, addr, offset, fmt, mask,
                                       shift, nir_is_coherent(instr));
    store->memory_index_is_bytes = index_bytes;
+   store->memory_byte_offset = byte_offset;
    store->memory_is_packed =
       (b->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3B ||
        b->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3C) &&
@@ -8227,7 +8242,7 @@ agx_optimize_nir(nir_shader *nir, bool soft_fault, bool uniform_atomics,
     * want to vectorize first since nir_opt_load_store_vectorize doesn't know
     * how to handle our loads. Likewise for uniform atomic optimization.
     */
-   NIR_PASS(_, nir, agx_nir_lower_address, byte_indices);
+   NIR_PASS(_, nir, agx_nir_lower_address, byte_indices, m5);
 
    /* Now that loads carry an index, a select between two of them can choose
     * the index instead of the loaded data. Run it to a fixed point with the
@@ -13236,7 +13251,7 @@ agx_compile_shader_nir(nir_shader *nir, struct agx_shader_key *key,
       if (guarded) {
          /* Address/ALU/phi lowering and dead-code cleanup do not move loads
           * out of these arms. No speculation, LICM or if-flattening follows. */
-         NIR_PASS(_, nir, agx_nir_lower_address, true);
+         NIR_PASS(_, nir, agx_nir_lower_address, true, true);
          NIR_PASS(_, nir, nir_lower_int64);
          NIR_PASS(_, nir, nir_opt_constant_folding);
          NIR_PASS(_, nir, nir_lower_alu_to_scalar, NULL, NULL);

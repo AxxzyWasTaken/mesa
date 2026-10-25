@@ -54,7 +54,7 @@ struct agx3_mem_desc {
    bool idx_scaled;
    int32_t byte_off;  /* byte form: -32768..32767 */
    uint32_t elem_idx; /* scaled form: 0..65535 */
-   /* Register index. */
+   /* Register index, plus byte_off added after scaling it. */
    uint16_t idx_reg;
    bool idx_signed;
    bool idx_kill;

@@ -27,13 +27,11 @@ common_ok(enum agx_isa_encoding enc, const struct agx3_mem_desc *d)
    if (d->idx_kind == AGX3_MEM_IDX_REG &&
        ((d->idx_reg & 1) != 0 || d->idx_reg > (enc == AGX_ISA_ENCODING_AGX3C ? 254 : 191)))
       return false;
-   if (d->idx_kind == AGX3_MEM_IDX_IMM) {
-      if (d->idx_scaled) {
-         if (d->elem_idx > 0xffff)
-            return false;
-      } else if (d->byte_off < -32768 || d->byte_off > 32767) {
+   if (d->idx_kind == AGX3_MEM_IDX_IMM && d->idx_scaled) {
+      if (d->elem_idx > 0xffff)
          return false;
-      }
+   } else if (d->byte_off < -32768 || d->byte_off > 32767) {
+      return false;
    }
    return true;
 }
@@ -70,6 +68,8 @@ common_overrides(const struct agx3_mem_desc *d, uint16_t off_field,
       ov[n++] = (struct agx3_field_kv)KV(27, d->idx_kill ? 1 : 0);
       ov[n++] = (struct agx3_field_kv)KV(28, d->idx_signed ? 1 : 0);
       ov[n++] = (struct agx3_field_kv)KV(shift_field, d->shift);
+      /* The byte offset is added after the index is scaled. */
+      ov[n++] = (struct agx3_field_kv)KV(off_field, (uint16_t)d->byte_off);
    }
 
    /* Base. */

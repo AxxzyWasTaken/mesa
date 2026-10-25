@@ -18,7 +18,13 @@ struct nir_def;
 /* BASE bits4..6 carry the native packed element count (1..4). */
 #define AGX_NIR_MEMORY_PACKED_COUNT_SHIFT 4u
 #define AGX_NIR_MEMORY_PACKED_COUNT_MASK (7u << AGX_NIR_MEMORY_PACKED_COUNT_SHIFT)
-bool agx_nir_lower_address(struct nir_shader *shader, bool byte_indices);
+/* BASE bits16..31 carry a signed byte offset that AGX3C adds to the address
+ * after scaling the index (the lddev/stdev immediate offset). */
+#define AGX_NIR_MEMORY_BYTE_OFFSET_SHIFT 16u
+#define AGX_NIR_MEMORY_BYTE_OFFSET_MASK (0xffffu << AGX_NIR_MEMORY_BYTE_OFFSET_SHIFT)
+/* byte_offsets: fold constant index addends into that byte offset. */
+bool agx_nir_lower_address(struct nir_shader *shader, bool byte_indices,
+                           bool byte_offsets);
 bool agx_nir_preserve_position_order(struct nir_shader *shader);
 bool agx_nir_scalarize_int64(struct nir_shader *shader);
 bool agx_nir_lower_divmod64(struct nir_shader *shader, bool native_add64);
