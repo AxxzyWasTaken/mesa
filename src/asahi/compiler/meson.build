@@ -15,6 +15,7 @@ libasahi_agx_files = files(
   'agx_nir_lower_divmod64.c',
   'agx_nir_lower_atomics.c',
   'agx_nir_opt_select_load.c',
+  'agx_nir_opt_licm.c',
   'agx_nir_opt_sink_loop_sample_uses.c',
   'agx_nir_lower_cull_distance.c',
   'agx_nir_lower_fminmax.c',

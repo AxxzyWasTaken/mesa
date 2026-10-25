@@ -13330,8 +13330,21 @@ agx_compile_shader_nir(nir_shader *nir, struct agx_shader_key *key,
       assign_coefficient_regs(nir, &info->varyings.fs);
    }
 
-   if (key->dev.encoding == AGX_ISA_ENCODING_AGX3C)
-      NIR_PASS(_, nir, nir_opt_licm, NULL);
+   if (key->dev.encoding == AGX_ISA_ENCODING_AGX3C) {
+      /* Hoist only what the register file can hold through the loop: the
+       * file a workgroup allows (agx_ra), less what spilling reserves.
+       */
+      unsigned regs = ROUND_DOWN_TO(AGX3C_NUM_REGS, 8);
+      if (mesa_shader_stage_is_compute(nir->info.stage)) {
+         const unsigned threads = nir->info.workgroup_size_variable
+            ? 1024
+            : nir->info.workgroup_size[0] * nir->info.workgroup_size[1] *
+                 nir->info.workgroup_size[2];
+         regs = MIN2(regs, agx_max_registers_for_occupancy(threads));
+      }
+
+      NIR_PASS(_, nir, agx_nir_opt_licm, regs - 8);
+   }
 
    if (key->dev.encoding == AGX_ISA_ENCODING_AGX3C &&
        debug_get_bool_option("ASAHI_M5_SHARED_OFFSETS", true)) {
