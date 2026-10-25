@@ -7367,7 +7367,8 @@ hk_deserialize_api_shader_impl(struct vk_device *vk_dev,
          (agx_chip_g17_m5(dev->dev.chip) ? !m5_sample_variants
                                         : !agx_native_graphics(&dev->dev)))) ||
        (has_mono && (stage != MESA_SHADER_FRAGMENT ||
-                    !agx_native_graphics(&dev->dev))))
+                    (!agx_native_graphics(&dev->dev) &&
+                     !agx_chip_g17_m5(dev->dev.chip)))))
       return vk_error(dev, VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT);
 
    /* Compiled with a custom-border emulation that this GPU, with no sampler
