@@ -1450,6 +1450,10 @@ hk_image_init(struct hk_device *dev, struct hk_image *image,
               const VkImageCreateInfo *pCreateInfo)
 {
    vk_image_init(&dev->vk, &image->vk, pCreateInfo);
+   image->swapchain_memory =
+      vk_find_struct_const(pCreateInfo->pNext, WSI_IMAGE_CREATE_INFO_MESA) ||
+      vk_find_struct_const(pCreateInfo->pNext,
+                           IMAGE_SWAPCHAIN_CREATE_INFO_KHR);
 
    if ((image->vk.usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) &&

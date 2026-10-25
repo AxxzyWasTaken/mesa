@@ -4829,9 +4829,13 @@ hk_begin_rendering(VkCommandBuffer commandBuffer,
       }
       for (unsigned i = 0; i < 4 + 2 * render->color_att_count; ++i) {
          const struct vk_image *image = views[i] ? views[i]->vk.image : NULL;
-         if (image && ((image->create_flags &
-                        (VK_IMAGE_CREATE_ALIAS_BIT |
-                         VK_IMAGE_CREATE_SPARSE_BINDING_BIT)) ||
+         /* Swapchain memory aliases images only (hk_image::swapchain_memory),
+          * which later work reads through an image. */
+         const VkImageCreateFlags aliasing =
+            image && container_of(image, struct hk_image, vk)->swapchain_memory
+               ? VK_IMAGE_CREATE_SPARSE_BINDING_BIT
+               : VK_IMAGE_CREATE_ALIAS_BIT | VK_IMAGE_CREATE_SPARSE_BINDING_BIT;
+         if (image && ((image->create_flags & aliasing) ||
                        image->tiling == VK_IMAGE_TILING_LINEAR))
             render->m5_attachments_reach_memory = true;
       }

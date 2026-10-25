@@ -753,8 +753,12 @@ hk_sync_stream_created(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
    }
 
    cs->sync.kind = stream_kind(cmd, slot, compute);
-   if (cs->sync.kind != HK_SYNC_GFX || slot == &cmd->current_cs.pre_gfx ||
-       slot == &cmd->current_cs.post_gfx)
+   /* A transfer render writes its attachments, like any render; the draws
+    * it records mark it if they write other memory
+    * (hk_m5_note_render_resources). */
+   const bool xfer_render = !compute && cs->sync.kind == HK_SYNC_XFER;
+   if ((cs->sync.kind != HK_SYNC_GFX && !xfer_render) ||
+       slot == &cmd->current_cs.pre_gfx || slot == &cmd->current_cs.post_gfx)
       cs->sync.kind |= HK_SYNC_GFX_MEM;
    cs->sync.prev_mem =
       st->last[util_logbase2(HK_SYNC_GFX_MEM)][hk_sync_sq(cs)];
