@@ -186,12 +186,12 @@ struct spill_ctx {
     */
    agx_instr **remat;
 
-   /* M5 device loads the program may repeat (see can_remat_load), indexed by
-    * the node holding their result or one component of it, and that
-    * component. NULL for other nodes.
+   /* M5 instructions the spiller may repeat to reload a value (see
+    * can_repeat_alu and can_remat_load), indexed by the node holding their
+    * result or one component of it, and that component. NULL for other nodes.
     */
-   agx_instr **load_remat;
-   uint8_t *load_remat_comp;
+   agx_instr **repeat;
+   uint8_t *repeat_comp;
 
    /* Maximum register pressure allowed */
    unsigned k;
@@ -338,14 +338,17 @@ remat_to(agx_builder *b, agx_index dst, struct spill_ctx *ctx, unsigned node)
 }
 
 /*
- * A spilled value that an M5 device load produced can usually be loaded again
- * instead of filled from its spill slot: one load replaces a fill per
- * component, and once no fill reads the slot, DCE removes the spill stores too.
- * The load must read memory that nothing writes (memory_can_reorder, from
- * nir_opt_access, which allows rematerializing such reads), so repeating it
- * anywhere its result is live yields the same value. Its register sources must
- * be in the register file at the reload; the spiller's register file sets
- * decide that, so the reload never extends a live range.
+ * On M5, a spilled value can often be computed again instead of filled from
+ * its spill slot: by repeating the device load that produced it, where one
+ * load replaces a fill per component, or the arithmetic instruction that did.
+ * Once no fill reads the slot, DCE removes the spill stores too.
+ *
+ * Repeating must yield the same value anywhere the value is live. Arithmetic
+ * qualifies if it reads nothing but its operands. A load qualifies if it reads
+ * memory that nothing writes (memory_can_reorder, from nir_opt_access, which
+ * allows rematerializing such reads). Register operands must be in the
+ * register file at the reload; the spiller's register file sets decide that,
+ * so the reload never extends a live range.
  */
 static unsigned
 remat_load_elem_bytes(const agx_instr *L)
@@ -391,10 +394,60 @@ can_remat_load(const agx_context *ctx, const agx_instr *L)
    return true;
 }
 
+static bool
+can_repeat_alu(const agx_context *ctx, const agx_instr *I)
+{
+   switch (I->op) {
+   case AGX_OPCODE_FADD:
+   case AGX_OPCODE_FMUL:
+   case AGX_OPCODE_FFMA:
+   case AGX_OPCODE_FCMPSEL:
+   case AGX_OPCODE_ICMPSEL:
+   case AGX_OPCODE_IADD:
+   case AGX_OPCODE_IMAD:
+   case AGX_OPCODE_ASR:
+   case AGX_OPCODE_BFEIL:
+   case AGX_OPCODE_BITOP:
+   case AGX_OPCODE_CONVERT:
+      break;
+   default:
+      return false;
+   }
+
+   /* A texture coordinate producer is paired with its sample */
+   if (ctx->key->dev.encoding != AGX_ISA_ENCODING_AGX3C || ctx->is_preamble ||
+       I->nr_dests != 1 || I->dest[0].type != AGX_INDEX_NORMAL ||
+       I->dest[0].memory || I->agx3_tex_coord_stage ||
+       I->agx3_tex_coord_component || I->agx3_tex_coord_start)
+      return false;
+
+   agx_foreach_src(I, s) {
+      const agx_index src = I->src[s];
+
+      if (src.type == AGX_INDEX_UNIFORM) {
+         if (ctx->uniforms_written)
+            return false;
+      } else if (src.type == AGX_INDEX_NORMAL) {
+         if (src.memory)
+            return false;
+      } else if (src.type != AGX_INDEX_IMMEDIATE &&
+                 src.type != AGX_INDEX_NULL) {
+         return false;
+      }
+   }
+
+   return true;
+}
+
 /* Byte offset of a load of `comp` onwards, if it is still encodable */
 static bool
 remat_load_offset(const agx_instr *L, unsigned comp, int16_t *offset)
 {
+   if (L->op != AGX_OPCODE_DEVICE_LOAD) {
+      *offset = 0;
+      return true;
+   }
+
    const unsigned bytes = remat_load_elem_bytes(L);
    const int32_t off = L->memory_byte_offset + (int32_t)(comp * bytes);
 
@@ -415,15 +468,17 @@ remat_load_offset(const agx_instr *L, unsigned comp, int16_t *offset)
    return true;
 }
 
-/* Whether node can be reloaded by its load with the registers in regs */
+/* Whether node can be reloaded by repeating its instruction with the
+ * registers in regs
+ */
 static bool
-can_reload_by_load(struct spill_ctx *ctx, unsigned node,
-                   const BITSET_WORD *regs)
+can_reload_by_repeat(struct spill_ctx *ctx, unsigned node,
+                     const BITSET_WORD *regs)
 {
-   agx_instr *L = ctx->load_remat[node];
+   agx_instr *L = ctx->repeat[node];
    int16_t offset;
 
-   if (!L || !remat_load_offset(L, ctx->load_remat_comp[node], &offset))
+   if (!L || !remat_load_offset(L, ctx->repeat_comp[node], &offset))
       return false;
 
    agx_foreach_ssa_src(L, s) {
@@ -435,13 +490,12 @@ can_reload_by_load(struct spill_ctx *ctx, unsigned node,
 }
 
 static void
-reload_by_load(agx_builder *b, struct spill_ctx *ctx, unsigned node)
+reload_by_repeat(agx_builder *b, struct spill_ctx *ctx, unsigned node)
 {
-   const agx_instr *L = ctx->load_remat[node];
+   const agx_instr *L = ctx->repeat[node];
    const agx_index dst = reconstruct_index(ctx, node);
    int16_t offset;
-   ASSERTED bool ok =
-      remat_load_offset(L, ctx->load_remat_comp[node], &offset);
+   ASSERTED bool ok = remat_load_offset(L, ctx->repeat_comp[node], &offset);
    assert(ok);
 
    agx_instr *I = agx_alloc_instr(b, L->op, 1, L->nr_srcs);
@@ -454,12 +508,15 @@ reload_by_load(agx_builder *b, struct spill_ctx *ctx, unsigned node)
 
    /* Sources are renamed to their reaching copies by SSA repair */
    dest[0] = dst;
-   I->mask = BITFIELD_MASK(agx_channels(dst));
-   I->memory_byte_offset = offset;
    agx_builder_insert(&b->cursor, I);
 
-   /* Fragment loads at immediate indices may need reordering after RA */
-   ctx->shader->spilled_by_load = true;
+   if (L->op == AGX_OPCODE_DEVICE_LOAD) {
+      I->mask = BITFIELD_MASK(agx_channels(dst));
+      I->memory_byte_offset = offset;
+
+      /* Fragment loads at immediate indices may need reordering after RA */
+      ctx->shader->spilled_by_load = true;
+   }
 }
 
 static void
@@ -490,7 +547,7 @@ insert_spill(agx_builder *b, struct spill_ctx *ctx, unsigned node)
 
 static void
 insert_reload(struct spill_ctx *ctx, agx_block *block, agx_cursor cursor,
-              unsigned node, bool by_load)
+              unsigned node, bool by_repeat)
 {
    agx_builder b = agx_init_builder(ctx->shader, cursor);
    agx_index idx = reconstruct_index(ctx, node);
@@ -498,8 +555,8 @@ insert_reload(struct spill_ctx *ctx, agx_block *block, agx_cursor cursor,
    /* Reloading breaks SSA, but agx_repair_ssa will repair */
    if (ctx->remat[node]) {
       remat_to(&b, idx, ctx, node);
-   } else if (by_load) {
-      reload_by_load(&b, ctx, node);
+   } else if (by_repeat) {
+      reload_by_repeat(&b, ctx, node);
    } else {
       agx_mov_to(&b, idx, agx_index_as_mem(idx, ctx->spill_base));
    }
@@ -769,7 +826,7 @@ insert_coupling_code(struct spill_ctx *ctx, agx_block *pred, agx_block *succ)
       /* Otherwise, inserting a reload defines the variable along the edge */
       agx_block *reload_block = agx_edge_to_block(pred, succ);
       insert_reload(ctx, reload_block, agx_along_edge(pred, succ), node,
-                    can_reload_by_load(ctx, node, edge_regs));
+                    can_reload_by_repeat(ctx, node, edge_regs));
    }
 
    agx_foreach_phi_in_block(succ, I) {
@@ -803,7 +860,7 @@ insert_coupling_code(struct spill_ctx *ctx, agx_block *pred, agx_block *succ)
          agx_block *reload_block = agx_edge_to_block(pred, succ);
          insert_reload(ctx, reload_block, agx_along_edge(pred, succ),
                        I->src[s].value,
-                       can_reload_by_load(ctx, I->src[s].value, edge_regs));
+                       can_reload_by_repeat(ctx, I->src[s].value, edge_regs));
       }
 
       /* Leave as-is for the GPR version */
@@ -968,19 +1025,19 @@ min_algorithm(struct spill_ctx *ctx)
       /* Limit W to make space for the destinations. */
       limit(ctx, I, ctx->k - dest_size);
 
-      /* W now holds what is in registers at I. A reload by load may read
-       * anything there except another such reload, which it would have to
-       * follow.
+      /* W now holds what is in registers at I. A repeated instruction may
+       * read anything there except another repeated reload, which it would
+       * have to follow.
        */
-      bool by_load[AGX_MAX_NORMAL_SOURCES];
+      bool by_repeat[AGX_MAX_NORMAL_SOURCES];
       for (unsigned i = 0; i < nR; ++i)
-         by_load[i] = can_reload_by_load(ctx, R[i], ctx->W);
+         by_repeat[i] = can_reload_by_repeat(ctx, R[i], ctx->W);
 
       for (unsigned i = 0; i < nR; ++i) {
-         for (unsigned j = 0; j < nR && by_load[i]; ++j) {
-            agx_foreach_ssa_src(ctx->load_remat[R[i]], s) {
-               if (by_load[j] && ctx->load_remat[R[i]]->src[s].value == R[j])
-                  by_load[i] = false;
+         for (unsigned j = 0; j < nR && by_repeat[i]; ++j) {
+            agx_foreach_ssa_src(ctx->repeat[R[i]], s) {
+               if (by_repeat[j] && ctx->repeat[R[i]]->src[s].value == R[j])
+                  by_repeat[i] = false;
             }
          }
       }
@@ -1028,10 +1085,10 @@ min_algorithm(struct spill_ctx *ctx)
        */
       for (unsigned pass = 0; pass < 2; ++pass) {
          for (unsigned i = 0; i < nR; ++i) {
-            if (by_load[i] == (pass == 1)) {
+            if (by_repeat[i] == (pass == 1)) {
                insert_reload(ctx, ctx->block,
                              agx_before_instr_logical(ctx->block, I), R[i],
-                             by_load[i]);
+                             by_repeat[i]);
             }
          }
       }
@@ -1700,8 +1757,8 @@ agx_spill(agx_context *ctx, unsigned k, bool remat_only)
    dist_t *next_uses = rzalloc_array(memctx, dist_t, ctx->alloc);
    enum agx_size *sizes = rzalloc_array(memctx, enum agx_size, ctx->alloc);
    agx_instr **remat = rzalloc_array(memctx, agx_instr *, ctx->alloc);
-   agx_instr **load_remat = rzalloc_array(memctx, agx_instr *, ctx->alloc);
-   uint8_t *load_remat_comp = rzalloc_array(memctx, uint8_t, ctx->alloc);
+   agx_instr **repeat = rzalloc_array(memctx, agx_instr *, ctx->alloc);
+   uint8_t *repeat_comp = rzalloc_array(memctx, uint8_t, ctx->alloc);
 
    agx_foreach_instr_global(ctx, I) {
       if (can_remat(ctx, I))
@@ -1710,18 +1767,18 @@ agx_spill(agx_context *ctx, unsigned k, bool remat_only)
       /* Definitions precede uses in block order, so a split of a load sees
        * the load first.
        */
-      if (can_remat_load(ctx, I)) {
-         load_remat[I->dest[0].value] = I;
+      if (can_remat_load(ctx, I) || can_repeat_alu(ctx, I)) {
+         repeat[I->dest[0].value] = I;
       } else if (I->op == AGX_OPCODE_SPLIT &&
                  I->src[0].type == AGX_INDEX_NORMAL && !I->src[0].memory &&
-                 load_remat[I->src[0].value] &&
-                 load_remat[I->src[0].value]->dest[0].value ==
-                    I->src[0].value) {
+                 repeat[I->src[0].value] &&
+                 repeat[I->src[0].value]->op == AGX_OPCODE_DEVICE_LOAD &&
+                 repeat[I->src[0].value]->dest[0].value == I->src[0].value) {
          agx_foreach_ssa_dest(I, d) {
             if (I->dest[d].size == I->src[0].size &&
                 agx_channels(I->dest[d]) == 1) {
-               load_remat[I->dest[d].value] = load_remat[I->src[0].value];
-               load_remat_comp[I->dest[d].value] = d;
+               repeat[I->dest[d].value] = repeat[I->src[0].value];
+               repeat_comp[I->dest[d].value] = d;
             }
          }
       }
@@ -1761,8 +1818,8 @@ agx_spill(agx_context *ctx, unsigned k, bool remat_only)
          .channels = channels,
          .size = sizes,
          .remat = remat,
-         .load_remat = load_remat,
-         .load_remat_comp = load_remat_comp,
+         .repeat = repeat,
+         .repeat_comp = repeat_comp,
          .next_uses = next_uses,
          .block = block,
          .blocks = blocks,
@@ -1787,8 +1844,8 @@ agx_spill(agx_context *ctx, unsigned k, bool remat_only)
          .channels = channels,
          .size = sizes,
          .remat = remat,
-         .load_remat = load_remat,
-         .load_remat_comp = load_remat_comp,
+         .repeat = repeat,
+         .repeat_comp = repeat_comp,
          .block = block,
          .blocks = blocks,
          .k = k,
