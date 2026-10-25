@@ -713,6 +713,19 @@ hk_frame_anatomy_render(struct hk_frame_anatomy_submit *s,
    if (cs->anatomy_api_barriers)
       HK_FA_APPEND(" apibar_n=m%u:b%u:i%u", cs->anatomy_api_mem,
                    cs->anatomy_api_buf, cs->anatomy_api_img);
+
+   /* The vertex (tiling) half's own requirement, resolved for this ioctl
+    * like bar=/prior=, the stream's sync kinds and whether they differ. */
+   HK_FA_APPEND(" tak=%x/%x", cs->sync.dep_ta[HK_SYNC_VDM].prior,
+                cs->sync.dep_ta[HK_SYNC_CDM].prior);
+   HK_FA_APPEND(" ta=%c:v%d,c%d:pv%" PRIu64 ",pc%" PRIu64 " kind=0x%x",
+                cs->sync.ta_split ? 'S' : '=',
+                cs->sync.barrier_ta[HK_SYNC_VDM] == DRM_ASAHI_BARRIER_NONE
+                   ? -1 : (int)cs->sync.barrier_ta[HK_SYNC_VDM],
+                cs->sync.barrier_ta[HK_SYNC_CDM] == DRM_ASAHI_BARRIER_NONE
+                   ? -1 : (int)cs->sync.barrier_ta[HK_SYNC_CDM],
+                cs->sync.prior_ta[HK_SYNC_VDM], cs->sync.prior_ta[HK_SYNC_CDM],
+                cs->sync.kind);
 }
 
 void
