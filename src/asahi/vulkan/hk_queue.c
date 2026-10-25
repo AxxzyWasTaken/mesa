@@ -319,6 +319,14 @@ asahi_fill_vdm_command(struct hk_device *dev, struct hk_cs *cs,
    if (cs->cr.process_empty_tiles)
       c->flags |= DRM_ASAHI_RENDER_PROCESS_EMPTY_TILES;
 
+   /* Only a render that is its whole API pass: the streams hk splits one
+    * pass into carry no barrier between them and rely on the kernel's
+    * attachment ordering. */
+   if (cs->cr.whole_attachments && cs->g17p_pass_begins &&
+       cs->g17p_pass_ends && !cs->m5_continued_pass &&
+       (dev->dev.params.features & DRM_ASAHI_FEATURE_WHOLE_ATTACHMENT_RENDERS))
+      c->flags |= DRM_ASAHI_RENDER_WHOLE_ATTACHMENTS;
+
    if (cs->scratch.vs.main || cs->scratch.vs.preamble) {
       c->flags |= DRM_ASAHI_RENDER_VERTEX_SCRATCH;
       c->vertex_helper.data = dev->scratch.vs.buf->va->addr;

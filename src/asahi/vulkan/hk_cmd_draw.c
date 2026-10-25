@@ -4649,6 +4649,25 @@ hk_begin_rendering(VkCommandBuffer commandBuffer,
       (render->view_mask &&
        render->view_mask != BITFIELD64_MASK(render->cr.layers));
 
+   render->cr.whole_attachments = !incomplete_render_area;
+   for (unsigned i = 0; i < render->color_att_count + 2; ++i) {
+      const struct hk_attachment *att =
+         i < render->color_att_count ? &render->color_att[i]
+         : i == render->color_att_count ? &render->depth_att
+                                        : &render->stencil_att;
+      const struct hk_image_view *views[] = {att->iview, att->resolve_iview};
+      for (unsigned v = 0; v < ARRAY_SIZE(views); ++v) {
+         if (!views[v])
+            continue;
+         const unsigned level = views[v]->vk.base_mip_level;
+         if (u_minify(views[v]->vk.image->extent.width, level) !=
+                render->cr.width ||
+             u_minify(views[v]->vk.image->extent.height, level) !=
+                render->cr.height)
+            render->cr.whole_attachments = false;
+      }
+   }
+
    perf_debug(cmd, "Rendering %ux%ux%u@%u %s%s", render->cr.width,
               render->cr.height, render->cr.layers,
               render->tilebuffer.nr_samples,

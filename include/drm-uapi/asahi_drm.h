@@ -356,6 +356,12 @@ enum drm_asahi_feature {
 	 * drm_asahi_cmd_render_with_stage_prefixes).
 	 */
 	DRM_ASAHI_FEATURE_RENDER_STAGE_PREFIXES = (1UL) << 25,
+
+	/**
+	 * @DRM_ASAHI_FEATURE_WHOLE_ATTACHMENT_RENDERS: Render commands accept
+	 * DRM_ASAHI_RENDER_WHOLE_ATTACHMENTS.
+	 */
+	DRM_ASAHI_FEATURE_WHOLE_ATTACHMENT_RENDERS = (1UL) << 27,
 	/** @DRM_ASAHI_FEATURE_M5_STENCIL_MSAA_COMPRESSION: single-layer 2x/4x compressed stencil in the native ZLS form. */
 	DRM_ASAHI_FEATURE_M5_STENCIL_MSAA_COMPRESSION = (1UL) << 26,
 	/** @DRM_ASAHI_FEATURE_COMPUTE_RESOURCES: Per-dispatch storage declarations. */
@@ -1236,6 +1242,16 @@ enum drm_asahi_render_flags {
 	 * DRM_ASAHI_FEATURE_RENDER_STAGE_PREFIXES.
 	 */
 	DRM_ASAHI_RENDER_STAGE_PREFIXES = (1U << 23),
+
+	/**
+	 * @DRM_ASAHI_RENDER_WHOLE_ATTACHMENTS: The render area covers the full
+	 * extent of every attachment, so the render's tile stores write no pixel
+	 * outside it. The kernel need not order such a render against another
+	 * one that writes the same attachments without a dependency between
+	 * them: any overlap is the application's own race. Requires
+	 * DRM_ASAHI_FEATURE_WHOLE_ATTACHMENT_RENDERS.
+	 */
+	DRM_ASAHI_RENDER_WHOLE_ATTACHMENTS = (1U << 24),
 };
 
 /**

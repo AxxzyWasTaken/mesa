@@ -487,6 +487,9 @@ struct hk_render_registers {
    struct agx_zls_control_packed zls_control, zls_control_partial;
    uint32_t depth_dimensions;
    bool process_empty_tiles;
+   /* The render area is every attachment's full extent: the tile stores
+    * write no pixel outside it. */
+   bool whole_attachments;
    enum u_tristate dbias_is_int;
 
    struct {
