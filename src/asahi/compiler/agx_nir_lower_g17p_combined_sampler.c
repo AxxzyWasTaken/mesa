@@ -759,7 +759,9 @@ g17p_indexed_image_fetch_shape(const nir_intrinsic_instr *intr)
     * qualified fetch as an ordinary array image; rejecting the original NIR
     * dimension here only leaves its unencodable software descriptor handle in
     * place. Multisample uses the emitter's native sample/layer packing and
-    * may have a nonzero or dynamic sample index. */
+    * may have a nonzero or dynamic sample index. 1D is also a 2D fetch:
+    * lower_1d_image() rewrites the dimension before emit, so the indexed
+    * handle feeds the same 2D/2D-array encoding. */
    const enum glsl_sampler_dim image_dim = nir_intrinsic_image_dim(intr);
    const bool ms = image_dim == GLSL_SAMPLER_DIM_MS;
    /* OpImageSparseRead arrives as bindless_image_sparse_load: the same fetch
@@ -769,10 +771,11 @@ g17p_indexed_image_fetch_shape(const nir_intrinsic_instr *intr)
    const bool sparse = intr->intrinsic == nir_intrinsic_bindless_image_sparse_load;
    if ((intr->intrinsic != nir_intrinsic_bindless_image_load && !sparse) ||
        (sparse && ms) ||
-       !(ms || image_dim == GLSL_SAMPLER_DIM_2D ||
-         image_dim == GLSL_SAMPLER_DIM_CUBE ||
-         (image_dim == GLSL_SAMPLER_DIM_3D &&
-          !nir_intrinsic_image_array(intr))) ||
+      !(ms || image_dim == GLSL_SAMPLER_DIM_2D ||
+        image_dim == GLSL_SAMPLER_DIM_1D ||
+        image_dim == GLSL_SAMPLER_DIM_CUBE ||
+        (image_dim == GLSL_SAMPLER_DIM_3D &&
+         !nir_intrinsic_image_array(intr))) ||
        intr->def.num_components < 1 ||
        intr->def.num_components > (sparse ? 5u : 4u) ||
        (sparse && intr->def.num_components != 5) ||
@@ -781,12 +784,17 @@ g17p_indexed_image_fetch_shape(const nir_intrinsic_instr *intr)
        nir_src_bit_size(intr->src[1]) != 32 ||
        (!ms && (!nir_src_is_const(intr->src[2]) ||
                 nir_src_as_uint(intr->src[2]) != 0)) ||
-       !nir_src_is_const(intr->src[3]) ||
-       nir_src_as_uint(intr->src[3]) != 0 ||
-       (nir_intrinsic_access(intr) & ACCESS_NON_READABLE))
+      !nir_src_is_const(intr->src[3]) ||
+      nir_src_as_uint(intr->src[3]) != 0)
       return false;
 
-   /* Coherent and volatile reads take the same fetch.  G17P's texture read
+   /* A load cannot be truly non-readable: nir_opt_access stamps
+    * ACCESS_NON_READABLE on loads of write-only-declared images (the meta
+    * copy's destination read-back) and on a module's only buffer read, and
+    * reading a write-only image is undefined-behavior-legal to compile. The
+    * fetch rewrite is access-agnostic, so such loads lower like any other.
+    *
+    * Coherent and volatile reads take the same fetch.  G17P's texture read
     * has no coherency field: metal-nt -arch applegpu_g17p compiles a
     * read_write texture's read() after a write() to the same smp form as an
     * access::read texture's read(), differing only in the staged coordinate

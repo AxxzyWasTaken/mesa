@@ -543,6 +543,8 @@ hk_preprocess_nir_internal(struct vk_physical_device *vk_pdev, nir_shader *nir)
    if (agx_native_graphics(&((struct hk_physical_device *)vk_pdev)->dev) &&
        nir->info.stage != MESA_SHADER_MESH)
       agx_preprocess_nir_g17p(nir);
+   else if (((struct hk_physical_device *)vk_pdev)->dev.chip == AGX_CHIP_G18G)
+      agx_preprocess_nir_g18g(nir);
    else if (agx_chip_g17_m5(((struct hk_physical_device *)vk_pdev)->dev.chip))
       agx_preprocess_nir_m5(nir);
    else
@@ -3430,6 +3432,8 @@ hk_lower_nir(struct hk_device *dev, nir_shader *nir,
        !(nir->info.stage == MESA_SHADER_TASK && agx_chip_g17_m5(dev->dev.chip))) {
       if (agx_native_graphics(&dev->dev))
          agx_preprocess_nir_g17p(nir);
+      else if (dev->dev.chip == AGX_CHIP_G18G)
+         agx_preprocess_nir_g18g(nir);
       else if (agx_chip_g17_m5(dev->dev.chip))
          agx_preprocess_nir_m5(nir);
       else
@@ -4656,7 +4660,8 @@ hk_compile_nir(struct hk_device *dev, const VkAllocationCallbacks *pAllocator,
        * the same register-operand SMP form selected after this rewrite. */
       if (agx_nir_lower_g17p_indexed_samplers(nir))
          shader->info.agx3_indexed_sampler_valid = true;
-   } else if (agx_native_graphics(&dev->dev) &&
+   } else if ((agx_native_graphics(&dev->dev) ||
+               dev->dev.chip == AGX_CHIP_G18G) &&
               nir->info.stage == MESA_SHADER_FRAGMENT) {
       /* The combined-sampler lowering can refuse after changing the shader,
        * so it works on a copy -- made only for a shader it may apply to. */
@@ -4682,6 +4687,16 @@ hk_compile_nir(struct hk_device *dev, const VkAllocationCallbacks *pAllocator,
          ralloc_free(candidate);
          if (agx_nir_lower_g17p_indexed_samplers(nir))
             shader->info.agx3_indexed_sampler_valid = true;
+      }
+   } else if (dev->dev.chip == AGX_CHIP_G18G &&
+              nir->info.stage == MESA_SHADER_COMPUTE) {
+      nir_shader *candidate = nir_shader_clone(NULL, nir);
+      if (candidate && agx_nir_lower_g17p_indexed_samplers(candidate)) {
+         ralloc_free(nir);
+         nir = candidate;
+         shader->info.agx3_indexed_sampler_valid = true;
+      } else {
+         ralloc_free(candidate);
       }
    } else if (agx_native_graphics(&dev->dev) &&
               nir->info.stage == MESA_SHADER_COMPUTE) {
@@ -5132,10 +5147,12 @@ hk_compile_nir(struct hk_device *dev, const VkAllocationCallbacks *pAllocator,
        * the loop's uniform compare/early compare were lost). Descriptor
        * lowering above uses immediate native state slots, never the AGX2
        * texture/sampler-state-store protocol. Only G17P's constant program
-       * is qualified among the AGX3B chips; G15 never forms a preamble. */
+       * is qualified among the AGX3B chips; G15 never forms a preamble.
+       * G18G never forms a preamble. */
       .agx3_native_cprog = m5_compute_cprog,
-      .no_preamble = (agx_chip_g17_m5(dev->dev.chip) && !m5_compute_cprog &&
-                      !m5_fs_cprog) ||
+      .no_preamble = dev->dev.chip == AGX_CHIP_G18G ||
+         (agx_chip_g17_m5(dev->dev.chip) && !m5_compute_cprog &&
+          !m5_fs_cprog) ||
          (agx_native_graphics(&dev->dev) &&
           (!agx_chip_native_preamble(dev->dev.chip) || !fs_reads_descriptors)),
    };
@@ -5348,14 +5365,19 @@ hk_compile_nir(struct hk_device *dev, const VkAllocationCallbacks *pAllocator,
     * geometry only changes how its input vertices were produced.  Build the
     * same byte-grounded VertexProgramVariant payload from the final UVS
     * layout, while leaving compute-only GS variants untouched. */
-   if ((agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) &&
+   if ((agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+        dev->dev.chip == AGX_CHIP_G18G) &&
        hw && shader->b.info.stage == MESA_SHADER_VERTEX) {
       struct hk_agx3_g17p_vertex_compile_info compiler_info;
       hk_g17p_vertex_compile_info_init(shader, vs_cprog, &compiler_info);
       /* On failure the program info is cleared, so the draw paths see no
        * vertex program variant and refuse the shader there. */
-      hk_agx3_g17p_vertex_program_info(dev->dev.chip, &compiler_info,
-                                       &shader->agx3_vdm_state_update);
+      if (dev->dev.chip == AGX_CHIP_G18G)
+         hk_agx3_g17g_vertex_program_info(dev->dev.chip, &compiler_info,
+                                          &shader->agx3_vdm_state_update);
+      else
+         hk_agx3_g17p_vertex_program_info(dev->dev.chip, &compiler_info,
+                                          &shader->agx3_vdm_state_update);
    }
 
    if (nir->constant_data_size > 0) {

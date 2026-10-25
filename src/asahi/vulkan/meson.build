@@ -373,6 +373,30 @@ if with_tests
     suite : ['asahi'],
   )
 
+  test(
+    'hk_zls_stride',
+    executable(
+      'hk_zls_stride_test',
+      files('tests/test-hk-zls-stride.c'),
+      include_directories : [include_directories('.')],
+      c_args : [c_msvc_compat_args],
+      gnu_symbol_visibility : 'hidden',
+    ),
+    suite : ['asahi'],
+  )
+
+  test(
+    'hk_sampler_index',
+    executable(
+      'hk_sampler_index_test',
+      files('tests/test-hk-sampler-index.c'),
+      include_directories : [include_directories('.')],
+      c_args : [c_msvc_compat_args],
+      gnu_symbol_visibility : 'hidden',
+    ),
+    suite : ['asahi'],
+  )
+
     executable(
       'g17p-render-only',
       files('tests/g17p_render_only.c'),

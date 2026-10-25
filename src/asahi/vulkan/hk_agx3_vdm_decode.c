@@ -164,12 +164,18 @@ hk_agx3_g17g_vertex_program_info(
       (compiler_info->layer_viewport_off == 8 ||
        compiler_info->layer_viewport_off == 9) &&
       compiler_info->clip_off == compiler_info->layer_viewport_off;
-   if (chip != AGX_CHIP_G17G || !compiler_info ||
-       (!color && ((!position && !position_psiz) || compiler_info->user_size != 0))) {
+   if ((chip != AGX_CHIP_G17G && chip != AGX_CHIP_G18G) || !compiler_info ||
+       (chip == AGX_CHIP_G17G &&
+        (!color && ((!position && !position_psiz) ||
+                    compiler_info->user_size != 0)))) {
       if (program)
          memset(program, 0, sizeof(*program));
       return false;
    }
+   /* G18G: the M5 GL path builds the draw record from the shader's actual
+    * UVS footprint for general layouts, so admit every layout that passes
+    * the shared invariant-checked builder; the profile restriction above is
+    * the G17G witness set. */
    return hk_agx3_g17p_vertex_program_info(chip, compiler_info, program);
 }
 

@@ -223,8 +223,10 @@ asahi_fill_vdm_command(struct hk_device *dev, struct hk_cs *cs,
    static_assert(sizeof(c->zls_ctrl) == sizeof(cs->cr.zls_control));
    memcpy(&c->zls_ctrl, &cs->cr.zls_control, sizeof(cs->cr.zls_control));
 
-   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) {
-      c->isp_zls_pixels = agx_chip_g17_m5(dev->dev.chip)
+   const bool g18g = dev->dev.chip == AGX_CHIP_G18G;
+   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+       g18g) {
+      c->isp_zls_pixels = agx_chip_g17_m5(dev->dev.chip) || g18g
          ? hk_drm_m5_zls_pixels(
               cs->cr.zls_width, cs->cr.zls_height, cs->cr.depth.buffer,
               cs->cr.depth.meta, cs->cr.stencil.buffer, cs->cr.stencil.meta)
@@ -1525,6 +1527,28 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
                cmd.prior_vdm = command_prior[HK_SYNC_VDM];
                cmd.prior_cdm = command_prior[HK_SYNC_CDM];
             }
+            if (dev->dev.chip == AGX_CHIP_G18G) {
+               /* G18 kernels consume the versioned resource suffix on
+                * every compute command (agx_batch.c's extended payload).
+                * The G18 kernel never advertises
+                * DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS, so
+                * queue->sync.exact_prior is always false here and the
+                * legacy (non-prior) command carries everything the G18
+                * UAPI accepts (w7Q PR-10 finding 4). */
+               struct drm_asahi_cmd_compute_g18 g18 = {
+                  .base.legacy = cmd.legacy,
+                  .resources = cs->g18_compute_resources,
+               };
+               g18.base.legacy.flags |= DRM_ASAHI_COMPUTE_G18_RESOURCES;
+               g18.resources.version = 1;
+               struct drm_asahi_cmd_header g18_header = header;
+               g18_header.size = sizeof(g18);
+               util_dynarray_append(&payload, g18_header);
+               util_dynarray_append_array(&payload, uint8_t, &g18,
+                                          sizeof(g18));
+               nr_cdm++;
+               continue;
+            }
             util_dynarray_append(&payload, header);
             util_dynarray_append_array(&payload, uint8_t, &cmd, header.size);
             nr_cdm++;
@@ -1630,7 +1654,8 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
                hk_frame_anatomy_render(anatomy, dev, cs, &cmd.legacy, i,
                                        nr_vdm + nr_cdm, payload.size);
             header.size = hk_drm_render_command_size(
-               agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip),
+               agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+                  dev->dev.chip == AGX_CHIP_G18G,
                queue->sync.exact_prior);
             if (queue->sync.exact_prior) {
                cmd.prior_vdm = command_prior[HK_SYNC_VDM];

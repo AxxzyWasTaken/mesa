@@ -1041,8 +1041,11 @@ hk_get_device_properties(const struct agx_device *dev,
 
    /* Note: update nir_shader_compiler_options.max_samples when changing this. */
    const VkSampleCountFlagBits sample_counts =
-      VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_2_BIT | VK_SAMPLE_COUNT_4_BIT |
-      (agx_chip_g17_m5(dev->chip) ? VK_SAMPLE_COUNT_8_BIT : 0);
+      dev->chip == AGX_CHIP_G18G
+         ? VK_SAMPLE_COUNT_1_BIT
+         : (VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_2_BIT |
+            VK_SAMPLE_COUNT_4_BIT |
+            (agx_chip_g17_m5(dev->chip) ? VK_SAMPLE_COUNT_8_BIT : 0));
 
    /* Integer colour attachments and sampled multisample images use the same
     * native tile store/reload and texel-fetch paths as other colour formats.

@@ -2456,9 +2456,11 @@ test_indexed_storage_image_read(void)
     * same encoder already takes. Storage cube and cube-array descriptors are
     * also 2D arrays, matching agx_emit_image_load()'s existing dimension
     * transform. Mode 2 is a coherent, volatile read, which takes the same
-    * native fetch; mode 7 keeps the negative coverage on non-readable
-    * access. */
-   for (unsigned mode = 0; mode < 8; ++mode) {
+    * native fetch. Mode 7 keeps the negative coverage on a runtime LOD
+    * operand. Mode 8 is the 1D-array shape of the meta image-copy kernel:
+    * lower_1d_image() maps it onto the 2D-array fetch before emit. Mode 9 is
+    * the nir_opt_access NON_READABLE stamp the meta copy puts on loads. */
+   for (unsigned mode = 0; mode < 10; ++mode) {
       const bool expect_lowered = mode != 7;
       nir_builder b = nir_builder_init_simple_shader(
          MESA_SHADER_COMPUTE, &agx_nir_options,
@@ -2479,17 +2481,19 @@ test_indexed_storage_image_read(void)
       nir_def *coord = nir_vec4(&b, nir_iand(&b, width, zero), zero,
                                 zero, zero);
       nir_def *value = nir_bindless_image_load(
-         &b, mode == 0 ? 1 : 4, 32, handle, coord, zero,
+         &b, mode == 0 ? 1 : 4, 32, handle, coord,
+         mode == 7 ? nir_channel(&b, coord, 1) : zero,
          nir_imm_intN_t(&b, 0, 16),
          .image_dim = mode == 3     ? GLSL_SAMPLER_DIM_3D
+                      : mode == 8   ? GLSL_SAMPLER_DIM_1D
                       : mode >= 5   ? GLSL_SAMPLER_DIM_CUBE
                                     : GLSL_SAMPLER_DIM_2D,
-         .image_array = mode == 4 || mode == 6,
+         .image_array = mode == 4 || mode == 6 || mode == 8,
          .format = mode == 1 ? PIPE_FORMAT_R8G8B8A8_UINT
                              : PIPE_FORMAT_R8G8B8A8_UNORM,
          .access = ACCESS_RESTRICT |
                    (mode == 2 ? ACCESS_COHERENT | ACCESS_VOLATILE
-                    : mode == 7 ? ACCESS_NON_READABLE
+                    : mode == 9 ? ACCESS_NON_READABLE
                                 : ACCESS_NON_WRITEABLE));
       nir_export_agx(&b, nir_channel(&b, value, 0), .base = 0);
 

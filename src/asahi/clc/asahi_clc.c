@@ -440,7 +440,15 @@ target_supports_program(const char *target, const nir_function *func)
            * heap allocation and one barrier -- both already qualified here by
            * libagx_unroll_restart, which allocates from the same heap with the
            * same printf-free poly_heap_try_alloc_offs(). */
-          !strcmp(func->name, "libagx_write_adj_indices_indirect");
+          !strcmp(func->name, "libagx_write_adj_indices_indirect") ||
+          /* The hardware tessellator main program: called by the Vulkan
+           * driver on every chip; qualified so the compile-omission list
+           * (not a runtime refusal) names any shape the G18G encoders cannot
+           * take yet. libagx_decompress is NOT qualified: it fails to compile
+           * even for strict g17p (spilling decoder), so it stays AGX2-only.
+           * G18G only for now; a candidate for every AGX3 target. */
+          (!strcmp(target, "g18g") &&
+           !strcmp(func->name, "libagx_tessellate"));
 }
 
 /* AGX3 has no grounded INTL instruction encoding. Expand the 16-bit Morton

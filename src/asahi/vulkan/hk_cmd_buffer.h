@@ -1132,6 +1132,10 @@ struct hk_cs {
    /* Active-context selector consumed by AGX3 VertexProgramVariant. */
    bool agx3_active_context_selector_valid;
    uint32_t agx3_raw_active_context_selector;
+   /* G18G: a terminated M5 dispatch owns this stream; no record may follow
+    * it, and the submission carries the stream's compute resources. */
+   bool g18_dispatch_sealed;
+   struct drm_asahi_g18_compute_resources g18_compute_resources;
 
    /* Whether the sampler heap is required. Although we always must maintain the
     * heap for correctness, it's often not necessary since we can push lots of
@@ -2187,6 +2191,9 @@ hk_cmd_buffer_get_cs_general(struct hk_cmd_buffer *cmd, struct hk_cs **ptr,
    if (vk_command_buffer_has_error(&cmd->vk))
       return NULL;
 
+   if (*ptr && (*ptr)->g18_dispatch_sealed)
+      *ptr = NULL;
+
    /* A recorded dependency may have ordered the open general compute stream
     * after work that follows it in the list. It is then ended, and the work
     * goes into a stream positioned after that requirement. Work of a new
@@ -2688,6 +2695,10 @@ hk_dispatch_with_local_size(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
       return;
 
    struct hk_device *dev = hk_cmd_buffer_device(cmd);
+   if (dev->dev.chip == AGX_CHIP_G18G) {
+      hk_dispatch_g17g_native(cmd, cs, s, grid, local_size);
+      return;
+   }
    if (agx_chip_g17_m5(dev->dev.chip)) {
       hk_dispatch_m5_native(cmd, cs, s, grid, local_size);
       return;

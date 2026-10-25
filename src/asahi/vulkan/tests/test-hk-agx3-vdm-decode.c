@@ -905,6 +905,24 @@ main(void)
                            UINT64_C(0x5ffff30c00), 24));
    const uint8_t relocated_ppp[] = {0x4f,6,0,0, 0,0x0c,0xf3,0xff};
    CHECK(memcmp(ppp, relocated_ppp, 8) == 0);
+   const struct {
+      uint64_t address;
+      size_t size;
+   } g18_updates[] = {
+      {UINT64_C(0x5ffe784ca0), 40},
+      {UINT64_C(0x5ffe784c8c), 20},
+   };
+   for (unsigned i = 0; i < ARRAY_SIZE(g18_updates); ++i) {
+      cursor = ppp;
+      uint64_t wire;
+      uint32_t words;
+      CHECK(hk_ppp_emit_state(AGX_CHIP_G18G, &cursor,
+                              g18_updates[i].address, g18_updates[i].size));
+      CHECK(agx_vdm_ppp_state_core_unpack(AGX_CHIP_G18G, ppp, sizeof(ppp),
+                                          &wire, &words));
+      CHECK(wire + AGX_M5_DRIVER_BASE == g18_updates[i].address);
+      CHECK(words * 4 == g18_updates[i].size);
+   }
    CHECK(test_program_cache_lifetime() == 0);
    CHECK(test_g17p_vertex_program_info() == 0);
    CHECK(test_honeykrisp_bridge() == 0);

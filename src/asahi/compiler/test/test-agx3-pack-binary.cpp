@@ -76,7 +76,8 @@ TEST(AGX3VertexExportAlu, RegisterCacheTracksFusedArithmeticConsumers)
 static void
 append(std::vector<uint8_t> &v, const uint8_t *b, unsigned n)
 {
-   v.insert(v.end(), b, b + n);
+   if (n)
+      v.insert(v.end(), b, b + n);
 }
 
 static void
@@ -127,7 +128,8 @@ class AGX3PackBinary : public testing::Test {
       bool ok = agx3_pack_binary(b->shader, &bin);
       EXPECT_EQ(ok, expect_ok);
       const uint8_t *d = (const uint8_t *)bin.data;
-      return std::vector<uint8_t>(d, d + bin.size);
+      return bin.size ? std::vector<uint8_t>(d, d + bin.size)
+                      : std::vector<uint8_t>();
    }
 };
 
@@ -11171,6 +11173,28 @@ TEST(AGX3NativeRgb10A2, NativeUnpackAndTextureDependency)
    const uint8_t want[14] = {0xa7,0x16,0x54,0,2,0,8,0x20,0x60,0xa0,0xea,0x8b,0x24,0x11};
    ASSERT_TRUE(agx3_rgb10a2_encode(&p, bytes, &length));
    EXPECT_EQ(memcmp(bytes, want, 14), 0);
+}
+
+/* AGX3C emits 16 bytes; the former 14-byte caller buffer overflowed under ASAN. */
+TEST_F(AGX3PackBinary, Rgb10TilePacksUnderAgx3C)
+{
+   agx_builder *b = builder(AGX_ISA_ENCODING_AGX3C);
+   key.fs.nr_samples = 1;
+   key.no_stop = true;
+   key.fs.ignore_tib_dependencies = true;
+   b->shader->stage = MESA_SHADER_FRAGMENT;
+   agx_index packed = agx_register(16, AGX_SIZE_32);
+   agx_pack_rgb10a2_agx3_to(b, packed, agx_register(0, AGX_SIZE_32),
+                            agx_register(2, AGX_SIZE_32),
+                            agx_register(4, AGX_SIZE_32),
+                            agx_register(6, AGX_SIZE_32));
+   agx_stop(b);
+   const std::vector<uint8_t> code = pack(b);
+   static const uint8_t want[] = {0xa7, 0x00, 0x00, 0x1a, 0x22, 0x00, 0xad,
+                                  0x02, 0x90, 0x00, 0x01, 0x0c, 0x24, 0x02,
+                                  0x00, 0x00};
+   EXPECT_EQ(code.size(), sizeof(want));
+   EXPECT_EQ(code, std::vector<uint8_t>(want, want + sizeof(want)));
 }
 
 TEST_F(AGX3PackBinary, Rgb10TileRejectsRawFloatChannels)
