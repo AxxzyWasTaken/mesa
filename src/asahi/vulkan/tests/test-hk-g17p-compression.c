@@ -565,8 +565,12 @@ check_m5_color(void)
    VkImageCreateInfo c = i;
    c.arrayLayers = 2;
    CHECK(!hk_m5_color_compression_eligible(AGX_CHIP_G17S, 0, &c));
+   /* A transfer destination is made renderable like an attachment; an
+    * image that is neither is not compressed. */
    c = i;
    c.usage &= ~VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+   CHECK(hk_m5_color_compression_eligible(AGX_CHIP_G17S, 0, &c));
+   c.usage &= ~VK_IMAGE_USAGE_TRANSFER_DST_BIT;
    CHECK(!hk_m5_color_compression_eligible(AGX_CHIP_G17S, 0, &c));
    c = i;
    c.format = VK_FORMAT_R32G32B32A32_SFLOAT;
