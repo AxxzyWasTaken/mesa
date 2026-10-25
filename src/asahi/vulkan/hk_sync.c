@@ -1986,6 +1986,16 @@ hk_sync_resolve_submit(struct hk_queue *queue,
                    sizeof(cs->sync.prior_ta));
             continue;
          }
+         /* M5: tiling whose pre-rasterization programs keep state in
+          * thread-private storage corrupts that state when it overlaps an
+          * earlier render's fragment work (Counter-Strike 2: one-frame
+          * garbage geometry and blocks, only for such renders). Such a
+          * render's vertex half keeps the whole render-subqueue prefix;
+          * its compute prefix may still be narrower. */
+         if (cs->m5_vertex_tps) {
+            cs->sync.barrier_ta[HK_SYNC_VDM] = cs->sync.barrier[HK_SYNC_VDM];
+            cs->sync.prior_ta[HK_SYNC_VDM] = cs->sync.prior[HK_SYNC_VDM];
+         }
          for (unsigned sq = 0; sq < HK_SYNC_NUM_SQ; ++sq) {
             cs->sync.ta_split |=
                cs->sync.barrier_ta[sq] != cs->sync.barrier[sq] ||

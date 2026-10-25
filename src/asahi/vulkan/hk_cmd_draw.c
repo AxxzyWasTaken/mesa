@@ -1808,6 +1808,9 @@ hk_m5_note_render_resources(struct hk_cmd_buffer *cmd, struct hk_cs *cs)
    if (linked_vs) {
       programs[0].legacy.primary_bytes = MAX2(linked_vs->b.scratch_size,
                                                linked_vs->b.agx3_spectpr_scratch_size);
+      cs->m5_vertex_tps |= programs[0].legacy.primary_bytes != 0 ||
+                           (vs && (vs->b.info.scratch_size ||
+                                   vs->b.info.preamble_scratch_size));
       programs[0].legacy.secondary_bytes = hk_m5_vertex_secondary_storage(&linked_vs->b);
    }
    if (linked_fs)
@@ -1828,6 +1831,9 @@ hk_m5_note_render_resources(struct hk_cmd_buffer *cmd, struct hk_cs *cs)
       programs[2].legacy.primary_bytes =
          MAX2(object->only_linked->b.scratch_size,
               object->only_linked->b.agx3_spectpr_scratch_size);
+      cs->m5_vertex_tps |= programs[2].legacy.primary_bytes != 0 ||
+                           object->b.info.scratch_size ||
+                           object->b.info.preamble_scratch_size;
       programs[2].legacy.secondary_bytes =
          hk_m5_vertex_secondary_storage(&object->only_linked->b);
       programs[2].threads = task ? object->b.info.workgroup_size[0] *

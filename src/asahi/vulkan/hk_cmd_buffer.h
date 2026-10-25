@@ -1122,6 +1122,11 @@ struct hk_cs {
 
    /* At least one AS-build dispatch or compute transfer is in this stream. */
    bool as_build;
+   /* M5: a pre-rasterization program recorded in this CS keeps state in
+    * thread-private storage (a spill frame or constant-program inputs), so
+    * its tiling must not overlap earlier renders' fragment work
+    * (hk_sync_resolve_submit()). */
+   bool m5_vertex_tps;
 
    /* M5: a later render pass instance continues in this stream
     * (hk_m5_pass_merge_begin()); its draws may not share the stream's
