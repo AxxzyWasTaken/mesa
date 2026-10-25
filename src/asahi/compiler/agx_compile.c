@@ -9001,6 +9001,209 @@ agx3_order_fragment_device_loads(agx_context *ctx)
    return progress;
 }
 
+/* A structure read member by member from one M5 address issues one device
+ * load per word, unless NIR vectorized them: their address arithmetic differs
+ * until the address is lowered (base + u2u64(x + c) for each member), and
+ * if-conversion may only bring them into one block afterwards. Once lowered,
+ * such loads share their base, index and scale and differ in the byte offset
+ * the hardware adds after scaling, so a vector load reads the same words at
+ * the same addresses. Merge loads of consecutive words that no memory write,
+ * atomic, barrier or discard separates into one, placed at the first.
+ */
+static bool
+agx3_m5_word_load(const agx_instr *I)
+{
+   /* Immediate indices are left to agx3_order_fragment_device_loads */
+   return I->op == AGX_OPCODE_DEVICE_LOAD && I->nr_dests == 1 &&
+          I->nr_srcs == 2 && I->src[1].type == AGX_INDEX_NORMAL &&
+          I->format == AGX_FORMAT_I32 && I->mask == 1 &&
+          !I->memory_is_packed && I->dest[0].type == AGX_INDEX_NORMAL &&
+          !I->dest[0].memory && I->dest[0].size == AGX_SIZE_32 &&
+          agx_channels(I->dest[0]) == 1;
+}
+
+static bool
+agx3_m5_same_word_address(const agx_instr *A, const agx_instr *B)
+{
+   for (unsigned s = 0; s < 2; ++s) {
+      if (!agx_is_equiv(A->src[s], B->src[s]) ||
+          A->src[s].size != B->src[s].size ||
+          A->src[s].abs != B->src[s].abs || A->src[s].neg != B->src[s].neg)
+         return false;
+   }
+
+   return A->shift == B->shift && A->coherent == B->coherent &&
+          A->memory_index_is_bytes == B->memory_index_is_bytes &&
+          A->scoreboard == B->scoreboard;
+}
+
+struct agx3_word {
+   agx_instr *load;
+   unsigned order;
+};
+
+static int
+agx3_cmp_word_offset(const void *a_, const void *b_)
+{
+   const struct agx3_word *a = a_, *b = b_;
+   const int16_t x = a->load->memory_byte_offset;
+   const int16_t y = b->load->memory_byte_offset;
+   return (x > y) - (x < y);
+}
+
+/* Merge the runs of consecutive words in a window of word loads, which no
+ * memory write or barrier separates, given in program order.
+ */
+static bool
+agx3_merge_word_window(agx_context *ctx, agx_instr **window,
+                       const unsigned *position, unsigned n)
+{
+   bool progress = false;
+   BITSET_DECLARE(done, 64) = {0};
+   assert(n <= 64);
+
+   for (unsigned i = 0; i < n; ++i) {
+      if (BITSET_TEST(done, i))
+         continue;
+
+      struct agx3_word group[64];
+      unsigned m = 0;
+      for (unsigned j = i; j < n; ++j) {
+         if (!BITSET_TEST(done, j) &&
+             agx3_m5_same_word_address(window[i], window[j])) {
+            group[m++] = (struct agx3_word){window[j], position[j]};
+            BITSET_SET(done, j);
+         }
+      }
+
+      qsort(group, m, sizeof(group[0]), agx3_cmp_word_offset);
+
+      for (unsigned a = 0; a < m;) {
+         const int base = group[a].load->memory_byte_offset;
+         unsigned count = 1, earliest = a;
+         unsigned lo = group[a].order, hi = group[a].order;
+         while (a + count < m && count < 4 &&
+                group[a + count].load->memory_byte_offset ==
+                   base + 4 * (int)count) {
+            /* Loading words far apart together would keep them all live */
+            const unsigned order = group[a + count].order;
+            if (MAX2(hi, order) - MIN2(lo, order) > 2 * (count + 1))
+               break;
+
+            lo = MIN2(lo, order);
+            hi = MAX2(hi, order);
+            if (order < group[earliest].order)
+               earliest = a + count;
+            count++;
+         }
+
+         /* Registers hold vectors in power-of-two slots: three words would
+          * occupy four.
+          */
+         if (count == 3) {
+            count = 2;
+            if (earliest == a + 2) {
+               earliest = group[a].order < group[a + 1].order ? a : a + 1;
+            }
+         }
+
+         if (count > 1) {
+            agx_instr *I = group[earliest].load;
+            agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+            agx_index vec = agx_vec_temp(ctx, AGX_SIZE_32, count);
+            agx_instr *load = agx_device_load_to(
+               &b, vec, I->src[0], I->src[1], I->format, BITFIELD_MASK(count),
+               I->shift, I->coherent);
+            load->memory_index_is_bytes = I->memory_index_is_bytes;
+            load->memory_byte_offset = base;
+            load->memory_can_reorder = true;
+            load->scoreboard = I->scoreboard;
+
+            agx_instr *split = agx_split(&b, count, vec);
+            for (unsigned c = 0; c < count; ++c) {
+               agx_instr *word = group[a + c].load;
+               split->dest[c] = word->dest[0];
+               load->memory_can_reorder &= word->memory_can_reorder;
+               agx_remove_instruction(word);
+            }
+
+            progress = true;
+         }
+
+         a += count;
+      }
+   }
+
+   return progress;
+}
+
+static bool
+agx3_merge_m5_word_loads(agx_context *ctx)
+{
+   /* Vertex and compute shaders often run just below an occupancy step,
+    * which the vectors' wider register alignment can cross.
+    */
+   if (ctx->key->dev.encoding != AGX_ISA_ENCODING_AGX3C ||
+       ctx->stage != MESA_SHADER_FRAGMENT)
+      return false;
+
+   /* A word a phi reads is better loaded alone, straight into the register
+    * the phi web wants.
+    */
+   BITSET_WORD *phi_source = BITSET_CALLOC(ctx->alloc);
+   agx_foreach_block(ctx, block) {
+      agx_foreach_phi_in_block(block, phi) {
+         agx_foreach_ssa_src(phi, s)
+            BITSET_SET(phi_source, phi->src[s].value);
+      }
+   }
+
+   bool progress = false;
+   agx_foreach_block(ctx, block) {
+      /* Word loads since the last memory write or barrier, in order */
+      agx_instr *window[64];
+      unsigned position[64];
+      unsigned n = 0, ip = 0;
+
+      agx_foreach_instr_in_block_safe(block, I) {
+         ip++;
+         const enum agx_schedule_class cls =
+            agx_opcodes_info[I->op].schedule_class;
+         const bool end = cls == AGX_SCHEDULE_CLASS_STORE ||
+                          cls == AGX_SCHEDULE_CLASS_ATOMIC ||
+                          cls == AGX_SCHEDULE_CLASS_BARRIER ||
+                          cls == AGX_SCHEDULE_CLASS_COVERAGE ||
+                          cls == AGX_SCHEDULE_CLASS_INVALID ||
+                          instr_after_logical_end(I);
+
+         const bool word = agx3_m5_word_load(I) &&
+                           !BITSET_TEST(phi_source, I->dest[0].value);
+
+         if (!end && word && n < ARRAY_SIZE(window)) {
+            position[n] = ip;
+            window[n++] = I;
+            continue;
+         }
+
+         if (!end && !word)
+            continue;
+
+         progress |= agx3_merge_word_window(ctx, window, position, n);
+         n = 0;
+
+         if (!end && word) {
+            position[n] = ip;
+            window[n++] = I;
+         }
+      }
+
+      progress |= agx3_merge_word_window(ctx, window, position, n);
+   }
+
+   free(phi_source);
+   return progress;
+}
+
 /* Spill reloads that repeat a device load (agx_spill) can leave such loads
  * adjacent again after register allocation, possibly in descending order.
  * Restore the ascending order once registers are final, where two adjacent
@@ -10519,6 +10722,8 @@ agx_compile_function_nir_attempt(nir_shader *nir, nir_function_impl *impl,
    if (native_cprog)
       AGX_PASS(ctx, agx3_lower_uniform_half_exports);
    AGX_PASS(ctx, agx3_drop_unchanged_tile_stores);
+
+   AGX_PASS(ctx, agx3_merge_m5_word_loads);
 
    /* RA correctness depends on DCE */
    AGX_PASS(ctx, agx_dce, true);
