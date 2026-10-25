@@ -903,12 +903,13 @@ agx_optimizer_copyprop(agx_context *ctx, agx_instr **defs, agx_instr *I)
          agx_instr_accepts_uniform(ctx->key->dev.encoding, I->op, s,
                                   def->src[0].value, def->src[0].size);
 
-      /* An M5 fragment SMP reads its texture and sampler handles from a
-       * pair of aligned 64-bit uniforms (native G17G compiler
+      /* An M5 fragment or compute SMP reads its texture and sampler handles
+       * from a pair of aligned 64-bit uniforms (native G17G compiler
        * argument-buffer samples); forwarded below only as a whole pair. */
       const bool m5_sample_uniform =
          ctx->key && ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3C &&
-         ctx->stage == MESA_SHADER_FRAGMENT && !ctx->is_preamble &&
+         (ctx->stage == MESA_SHADER_FRAGMENT ||
+          ctx->stage == MESA_SHADER_COMPUTE) && !ctx->is_preamble &&
          I->op == AGX_OPCODE_TEXTURE_SAMPLE && (s == 3 || s == 4) &&
          def->src[0].type == AGX_INDEX_UNIFORM;
 

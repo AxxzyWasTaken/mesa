@@ -796,14 +796,16 @@ agx_lower_uniform_sources(agx_context *ctx)
          I->op == AGX_OPCODE_TEXTURE_SAMPLE &&
          agx3_tex_uniform_pair_unwitnessed(ctx, I, I->src[3], I->src[4]);
 
-      /* M5 fragment SMP reads both its texture and its sampler handle from
-       * aligned 64-bit uniforms (f97/f103=3 and f126/f132=3) when Metal
-       * passes them through an argument buffer; the native
-       * G17G compiler compiles texture2d::sample, level and bias that way.
+      /* M5 fragment and compute SMP read both the texture and the sampler
+       * handle from aligned 64-bit uniforms (f97/f103=3 and f126/f132=3)
+       * when Metal passes them through an argument buffer; the native
+       * G17G compiler compiles texture2d::sample, level and bias that way,
+       * and so samples in compute kernels.
        * Only that pair is witnessed: keep both or copy both. */
       bool m5_tex_uniform_pair =
          ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3C &&
-         ctx->stage == MESA_SHADER_FRAGMENT && !ctx->is_preamble &&
+         (ctx->stage == MESA_SHADER_FRAGMENT ||
+          ctx->stage == MESA_SHADER_COMPUTE) && !ctx->is_preamble &&
          I->op == AGX_OPCODE_TEXTURE_SAMPLE && I->nr_srcs >= 5;
       for (unsigned j = 3; m5_tex_uniform_pair && j < 5; ++j) {
          const agx_index x = I->src[j];
