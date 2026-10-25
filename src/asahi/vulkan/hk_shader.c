@@ -3259,7 +3259,17 @@ hk_lower_nir(struct hk_device *dev, nir_shader *nir,
    } while (progress);
 
    nir_move_options opts = nir_move_load_ssbo | nir_move_load_ubo;
-   NIR_PASS(progress, nir, nir_opt_sink, opts);
+
+   /* Unbounded storage reads are load_global here. Sinking the reorderable
+    * ones to their uses keeps M5's large compute kernels from holding every
+    * loaded struct across unrelated branches, which is where they spill.
+    * nir_opt_sink never moves these into or out of a loop.
+    */
+   nir_move_options sink_opts = opts;
+   if (agx_chip_g17_m5(dev->dev.chip))
+      sink_opts |= nir_move_load_global;
+
+   NIR_PASS(progress, nir, nir_opt_sink, sink_opts);
    NIR_PASS(progress, nir, nir_opt_move, opts);
 
    if (debug_get_bool_option("ASAHI_M5_BOUNDED_VEC_PROBE", false) &&
