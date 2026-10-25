@@ -4096,14 +4096,22 @@ hk_xfer_copybuffertoimage2(VkCommandBuffer commandBuffer,
 
    if (gfx) {
       /* M5 reaches this graphics upload only for a destination the raw
-       * upload above refuses, such as a compressed depth plane. A split
-       * depth/stencil destination needs the per-plane aspect views here as
-       * well: the interleaved R32G32_UINT alias is a view of plane 0 alone. */
-      const bool m5_split_zs = agx_chip_g17_m5(dev->dev.chip) &&
-                               hk_split_depth_stencil(dst_image->vk.format);
+       * upload above refuses, such as a compressed depth plane or colour
+       * image. A split depth/stencil destination needs the per-plane aspect
+       * views here as well: the interleaved R32G32_UINT alias is a view of
+       * plane 0 alone. A colour destination is written through the same
+       * integer alias image copies and readbacks use: through its own
+       * format, a normalized view would canonicalize the bits it copies
+       * (SNORM -1.0 has two encodings). */
+      const bool m5 = agx_chip_g17_m5(dev->dev.chip);
+      const bool m5_split_zs =
+         m5 && hk_split_depth_stencil(dst_image->vk.format);
+      const bool m5_color =
+         m5 && !vk_format_is_depth_or_stencil(dst_image->vk.format);
       struct vk_meta_copy_image_properties dst_props =
          hk_meta_copy_get_image_properties(
-            dst_image, dev, agx_native_graphics(&dev->dev) || m5_split_zs,
+            dst_image, dev,
+            agx_native_graphics(&dev->dev) || m5_split_zs || m5_color,
             m5_split_zs);
 
       if (agx_native_graphics(&dev->dev)) {
