@@ -707,9 +707,3 @@ agx_command_stream_generation_name(
    }
 }
 
-bool
-agx_chip_experimental_admitted(enum agx_chip chip)
-{
-   return chip != AGX_CHIP_G15G ||
-          debug_get_bool_option("ASAHI_M3_EXPERIMENTAL", false);
-}

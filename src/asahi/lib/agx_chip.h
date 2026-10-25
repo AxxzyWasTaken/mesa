@@ -725,10 +725,6 @@ bool agx_params_m5_supported(
 bool agx_params_native_kernel_abi_supported(
    const struct drm_asahi_params_global *params);
 
-/* Whether a device of this chip may open: G15G (T8122) runs on the native path
- * only with ASAHI_M3_EXPERIMENTAL=1, every other supported chip always. */
-bool agx_chip_experimental_admitted(enum agx_chip chip);
-
 bool agx_params_fixup_upstream_uapi(struct drm_asahi_params_global *params);
 
 /* Exact product name when the chip identity maps to one unambiguous SoC.

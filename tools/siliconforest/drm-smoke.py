@@ -20,34 +20,26 @@ with tempfile.TemporaryDirectory(prefix='siliconforest-vulkan-smoke-') as direct
                     '-I' + str(root / 'include'),
                     str(root / 'tools/siliconforest/vulkan-smoke.c'),
                     '-lvulkan', '-ldl', '-o', binary], check=True)
-    for chip in ['g13g', 'g15s', 'g15c', 'g17p', 'g15g']:
+    cases = [(chip, None, False) for chip in
+             ['g13g', 'g15s', 'g15c', 'g17p', 'g15g']]
+    # The obsolete opt-in variable must not turn a supported Air off. It must
+    # not admit an unrelated, unqualified GPU either.
+    cases += [('g15g', '0', False), ('g15g', '1', False), ('g16g', '1', True)]
+    for chip, old_opt_in, refused in cases:
         env = os.environ.copy()
         env.update(LD_PRELOAD=str(shim), VK_DRIVER_FILES=str(icds[0]),
                    ASAHI_SHIM_CHIP=chip, ASAHI_SHIM_G15S_EXPECT_VALID='1')
-        env.pop('ASAHI_M3_EXPERIMENTAL', None)
-        if chip == 'g15g':
-            env['ASAHI_M3_EXPERIMENTAL'] = '1'
-        for key in ['VK_ICD_FILENAMES', 'VK_LOADER_DRIVERS_SELECT', 'VK_LOADER_DRIVERS_DISABLE']:
-            env.pop(key, None)
-        print('drm-shim profile:', chip, flush=True)
-        result = subprocess.run([binary], env=env, check=True, timeout=90,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        print(result.stdout, end='', flush=True)
-        if 'Validation Error:' in result.stdout:
-            raise RuntimeError('Vulkan validation reported an invalid regression probe')
-    for chip, gate in [('g15g', None), ('g15g', '0'), ('g16g', '1')]:
-        env = os.environ.copy()
-        env.update(LD_PRELOAD=str(shim), VK_DRIVER_FILES=str(icds[0]),
-                   ASAHI_SHIM_CHIP=chip)
         for key in ['VK_ICD_FILENAMES', 'VK_LOADER_DRIVERS_SELECT',
                     'VK_LOADER_DRIVERS_DISABLE', 'ASAHI_M3_EXPERIMENTAL']:
             env.pop(key, None)
-        if gate is not None:
-            env['ASAHI_M3_EXPERIMENTAL'] = gate
-        print('drm-shim refusal:', chip, 'opt-in:', gate, flush=True)
-        result = subprocess.run([binary, '--expect-no-device'], env=env,
-                                check=True, timeout=90, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, text=True)
+        if old_opt_in is not None:
+            env['ASAHI_M3_EXPERIMENTAL'] = old_opt_in
+        print('drm-shim profile:', chip, 'old opt-in:', old_opt_in,
+              'expected:', 'refused' if refused else 'admitted', flush=True)
+        command = [binary] + (['--expect-no-device'] if refused else [])
+        result = subprocess.run(command, env=env, check=False, timeout=90,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         print(result.stdout, end='', flush=True)
+        result.check_returncode()
         if 'Validation Error:' in result.stdout:
-            raise RuntimeError('Vulkan validation reported an invalid refusal probe')
+            raise RuntimeError('Vulkan validation reported an invalid regression probe')
