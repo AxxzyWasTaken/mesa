@@ -471,6 +471,10 @@ struct agx_shader_key {
     */
    bool no_preamble;
 
+   /* A complete, single-sample M5 uniform-colour blend variant. The packer
+    * still proves its one read/write pixel transaction before admitting it. */
+   bool m5_uniform_blend;
+
    /* AGX3B: build the preamble as a native constant program (CProg inputs
     * imported through its TPS frame, arithmetic results selected straight
     * into uniform destinations, half exports legalized) for this shader.

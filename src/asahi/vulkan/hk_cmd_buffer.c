@@ -3374,6 +3374,7 @@ static uint64_t
 hk_m5_upload_graphics_program(struct hk_cmd_buffer *cmd, struct hk_shader *s,
                               struct hk_linked_shader *linked)
 {
+   s = hk_linked_shader_source(s, linked);
    const unsigned stage = s->info.stage == MESA_SHADER_FRAGMENT ? 1 : 0;
    struct hk_g17p_graphics_ioto_cache_entry *cached =
       &cmd->state.gfx.g17p_ioto[stage];

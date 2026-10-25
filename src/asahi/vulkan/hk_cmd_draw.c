@@ -6955,6 +6955,50 @@ hk_g17p_mono_part_refusal(const struct hk_shader *shader,
  * the colour epilog key and the tile partitions (the build is part of the
  * cache's own identity). */
 static bool
+hk_m5_uniform_blend_key(const struct agx_fs_epilog_key *key)
+{
+   const unsigned mode = agx_pack_blend_standard(
+      PIPE_BLEND_ADD, PIPE_BLENDFACTOR_SRC_ALPHA, PIPE_BLENDFACTOR_INV_SRC_ALPHA,
+      PIPE_BLEND_ADD, PIPE_BLENDFACTOR_ONE, PIPE_BLENDFACTOR_INV_SRC_ALPHA);
+   if (key->nr_samples != 1 || key->link.loc_written != 1 ||
+       !(key->link.size_32 & 1) || key->link.sample_shading ||
+       key->link.broadcast_rt0 || key->link.write_z || key->link.write_s ||
+       key->link.already_ran_zs || key->link.sample_mask_after_force_early ||
+       key->native_spills || key->smooth_line_alpha || key->preserve_rt ||
+       key->blend.logicop_enable || key->blend.alpha_to_coverage ||
+       key->blend.alpha_to_one || key->defer_api_sample_mask ||
+       key->remap[0] != 0 || key->rt_formats[0] != PIPE_FORMAT_R8G8B8A8_UNORM ||
+       key->blend.rt[0].advanced_blend || key->blend.rt[0].colormask != 0xf ||
+       key->blend.rt[0].mode != mode)
+      return false;
+   for (unsigned i = 1; i < 8; ++i) {
+      if (key->rt_formats[i] != PIPE_FORMAT_NONE)
+         return false;
+   }
+   return true;
+}
+
+static bool
+hk_m5_uniform_blend_part(const struct hk_shader *shader,
+                         const struct agx_shader_part *part)
+{
+   const struct agx_shader_info *info = &part->info;
+   return info->stage == MESA_SHADER_FRAGMENT &&
+          hk_g17p_native_cprog_qualified(info) &&
+          !info->texture_state_count && !info->sampler_state_count &&
+          !info->uses_txf && !info->uses_sampler_heap &&
+          !info->uses_draw_id && !info->uses_base_param &&
+          info->early_fragment_tests == shader->b.info.early_fragment_tests &&
+          info->agx3_colour_link.entry_emitted &&
+          info->agx3_colour_link.colour_classes == 1 &&
+          /* Split read/write waits cannot be rewritten by the ray-query
+           * linker. This variant admits no query instructions or prolog. */
+          !info->agx3_colour_link.rt_query_write_acquired &&
+          !memcmp(&info->varyings.fs, &shader->b.info.varyings.fs,
+                  sizeof(info->varyings.fs));
+}
+
+static bool
 hk_g17p_mono_disk_key(struct hk_device *dev, const struct hk_shader *shader,
                       const struct agx_fs_epilog_key *ekey,
                       const BITSET_WORD *partitions, cache_key out)
@@ -7024,6 +7068,9 @@ hk_g17p_inline_epilog_part(struct hk_device *dev, struct hk_shader *shader,
       return NULL;
    const unsigned main_samples = MAX2(shader->g17p_mono_key.fs.nr_samples, 1);
    const bool inline_samples = shader->info.fs.m5_inline_sample_shading;
+   const bool uniform_blend = agx_chip_g17_m5(dev->dev.chip) && !inline_samples;
+   if (uniform_blend && !hk_m5_uniform_blend_key(ekey))
+      HK_MONO_REFUSE("uniform blend shape");
    if ((ekey->native_spills && !inline_samples) ||
        (ekey->link.sample_shading && !inline_samples) ||
        MAX2(ekey->nr_samples, 1) != main_samples)
@@ -7046,9 +7093,11 @@ hk_g17p_inline_epilog_part(struct hk_device *dev, struct hk_shader *shader,
             if (inline_samples && ekey->native_spills)
                expected.info.push_count = MAX2(expected.info.push_count,
                                                ekey->emrt_heap_base + 4);
-            if (inline_samples
-                   ? hk_g17p_mono_layout_mismatch(&expected, part, false)
-                   : hk_g17p_mono_part_refusal(shader, part))
+            if (uniform_blend
+                   ? !hk_m5_uniform_blend_part(shader, part)
+                   : inline_samples
+                   ? hk_g17p_mono_layout_mismatch(&expected, part, false) != NULL
+                   : hk_g17p_mono_part_refusal(shader, part) != NULL)
                HK_MONO_FAIL("cached program");
             ralloc_free(mem);
             return part;
@@ -7103,11 +7152,13 @@ hk_g17p_inline_epilog_part(struct hk_device *dev, struct hk_shader *shader,
       pixel.defer_monolithic_msaa = true;
       agx_nir_fs_epilog(&eb, &pixel);
       agx_nir_lower_sample_exports_to_end(nir);
+   } else if (uniform_blend) {
+      agx_nir_fs_epilog(&eb, ekey);
    } else {
       build_g17p_fs_epilog(&eb, ekey);
    }
    agx_preprocess_nir(eb.shader);
-   if (!inline_samples)
+   if (!inline_samples && !uniform_blend)
       NIR_PASS(_, eb.shader, agx_nir_lower_g17p_tile_samples, ekey->nr_samples);
 
    /* Epilog code reading uniforms (blend constants and the like) would
@@ -7117,6 +7168,10 @@ hk_g17p_inline_epilog_part(struct hk_device *dev, struct hk_shader *shader,
          if (instr->type != nir_instr_type_intrinsic)
             continue;
          const nir_intrinsic_op op = nir_instr_as_intrinsic(instr)->intrinsic;
+         if (uniform_blend && op != nir_intrinsic_load_exported_agx &&
+             op != nir_intrinsic_load_local_pixel_agx &&
+             op != nir_intrinsic_store_local_pixel_agx)
+            HK_MONO_REFUSE("uniform blend epilog has an external input or effect");
          if (inline_samples && ekey->native_spills &&
              (op == nir_intrinsic_bindless_image_agx ||
               op == nir_intrinsic_bindless_image_store ||
@@ -7183,6 +7238,12 @@ hk_g17p_inline_epilog_part(struct hk_device *dev, struct hk_shader *shader,
       key.fs.inside_sample_loop = false;
    key.no_stop = false;
    key.secondary = false;
+   if (uniform_blend) {
+      key.m5_uniform_blend = true;
+      key.no_preamble = false;
+      key.g17p_native_uniforms = true;
+      key.g17p_uniform_dma = false;
+   }
    key.g17p_emrt = inline_samples && ekey->native_spills;
    if (shader->b.info.rodata.size_16 && shader->b.binary) {
       key.g17p_rodata_hint =
@@ -7225,6 +7286,9 @@ hk_g17p_inline_epilog_part(struct hk_device *dev, struct hk_shader *shader,
       const bool compiled = agx_compile_shader_nir(nir, &key, part);
       nir = NULL; /* consumed */
       why = !compiled ? "backend refused the monolithic program"
+            : uniform_blend
+               ? (hk_m5_uniform_blend_part(shader, part) ? NULL
+                                                         : "uniform blend launch")
             : inline_samples ? hk_g17p_mono_layout_mismatch(&expected, part, false)
                              : hk_g17p_mono_part_refusal(shader, part);
       if (!why || !without)
@@ -7318,7 +7382,10 @@ hk_get_fast_linked_locked_fs(struct hk_device *dev, struct hk_shader *shader,
 
    /* Inline blend: try one monolithic fragment program first;
     * any refusal falls through to the split link below, unchanged. */
-   if ((shader->info.fs.m5_inline_sample_shading ||
+   const bool uniform_blend = agx_chip_g17_m5(dev->dev.chip) &&
+                              !shader->info.fs.m5_inline_sample_shading &&
+                              hk_m5_uniform_blend_key(&key->epilog);
+   if ((uniform_blend || shader->info.fs.m5_inline_sample_shading ||
         (agx_native_graphics(&dev->dev) &&
          (agx_get_fs_structure_flags() & AGX_FS_STRUCTURE_INLINE_BLEND))) &&
        !prolog && key->nr_samples_shaded == 0 && shader->g17p_mono_nir) {
@@ -7327,14 +7394,20 @@ hk_get_fast_linked_locked_fs(struct hk_device *dev, struct hk_shader *shader,
       if (mono) {
          struct hk_fast_link_key *mono_key_clone =
             ralloc_memdup(shader->linked.ht, key, sizeof(*key));
-         /* A program with its own constant program brings its own uniform
-          * layout; link it as the main of a shader describing that layout. */
+         /* An M5 uniform-colour blend variant links with its own launch
+          * source. Any other program with its own constant program brings
+          * its own uniform layout; link it as the main of a shader
+          * describing that layout. */
          struct hk_shader *layout =
-            mono_key_clone && hk_g17p_mono_own_layout(shader, mono)
+            !uniform_blend && mono_key_clone &&
+                  hk_g17p_mono_own_layout(shader, mono)
                ? hk_g17p_layout_shader_create(dev, shader, mono)
                : NULL;
          struct hk_linked_shader *mono_linked = NULL;
-         if (layout)
+         if (mono_key_clone && uniform_blend)
+            mono_linked = hk_fast_link_fragment_variant(dev, shader, mono,
+                                                        &key->epilog);
+         else if (layout)
             mono_linked = hk_fast_link_part(dev, true, layout, NULL, NULL,
                                             NULL, 0);
          else if (mono_key_clone && !hk_g17p_mono_own_layout(shader, mono))
@@ -8099,6 +8172,8 @@ hk_g17p_build_native_bind_tail(struct hk_cmd_buffer *cmd,
    /* The launch follows the linked program's own layout, if it has one. */
    if (linked_fs->g17p_layout)
       fs = linked_fs->g17p_layout;
+
+   fs = hk_linked_shader_source(fs, linked_fs);
 
    const uint64_t fragment_program = hk_upload_usc_words(cmd, fs, linked_fs);
    if (!fragment_program)
@@ -8922,6 +8997,7 @@ hk_flush_ppp_state(struct hk_cmd_buffer *cmd, struct hk_cs *cs, uint8_t **out)
 
    if (agx_chip_g17_m5(dev->dev.chip)) {
       struct hk_linked_shader *linked = gfx->linked[MESA_SHADER_FRAGMENT];
+      fs = hk_linked_shader_source(fs, linked);
       /* With no fragment shader, attachments, or occlusion query, only
        * vertex processing is observable. Keep the vertex program live and
        * select the inert fragment state, including for transform feedback.
@@ -9302,6 +9378,12 @@ hk_flush_ppp_state(struct hk_cmd_buffer *cmd, struct hk_cs *cs, uint8_t **out)
          pack->valid = true;
       }
       const struct agx_ppp_hal300_graphics_core state = pack->state;
+      if (linked->variant_source &&
+          (agx_get_compiler_debug() & AGX_DBG_SHADERDB)) {
+         fprintf(stderr, "M5 uniform blend PPP: spill=%u staging=%u root-reads=%u\n",
+                 fields.fragment_ti_spill_B, fields.fragment_ti_staging_B,
+                 fs->info.agx3_root_reads);
+      }
 
       /* Each record is a self-contained PPP update and the PPP keeps the
        * others, so only the records that differ from what the stream latched

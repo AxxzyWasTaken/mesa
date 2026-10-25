@@ -9393,7 +9393,11 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
     * Keep MRT, special coordinates, other formats and control flow closed.
     */
    bool g17p_blend_protocol =
-      enc == AGX_ISA_ENCODING_AGX3B && ctx->stage == MESA_SHADER_FRAGMENT &&
+      (enc == AGX_ISA_ENCODING_AGX3B ||
+       (enc == AGX_ISA_ENCODING_AGX3C && ctx->key->m5_uniform_blend &&
+        !ctx->key->secondary && !ctx->key->no_stop &&
+        ctx->key->fs.nr_samples == 1)) &&
+      ctx->stage == MESA_SHADER_FRAGMENT &&
       !ctx->key->fs.ignore_tib_dependencies && tile_loads_left == 1 &&
       tile_stores_left == 1;
    if (g17p_blend_protocol) {
@@ -9442,6 +9446,8 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
       }
       g17p_blend_protocol &= phase == 4;
    }
+   if (ctx->key->m5_uniform_blend && !ctx->is_preamble && !g17p_blend_protocol)
+      AGX3_PACK_FAIL();
    /* A fragment program ends with a final release: the colour store's class
     * 12 with 0x200, or, with no colour store, its late depth class 1 with
     * 0x200 (pixwait(1), depthf, release); a colour store after depth
