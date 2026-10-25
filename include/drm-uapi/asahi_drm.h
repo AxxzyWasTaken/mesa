@@ -349,6 +349,13 @@ enum drm_asahi_feature {
 	 * struct drm_asahi_cmd_render_with_stage_prior).
 	 */
 	DRM_ASAHI_FEATURE_COMPUTE_STAGE_BARRIERS = (1UL) << 24,
+
+	/**
+	 * @DRM_ASAHI_FEATURE_RENDER_STAGE_PREFIXES: Render commands accept
+	 * DRM_ASAHI_RENDER_STAGE_PREFIXES (struct
+	 * drm_asahi_cmd_render_with_stage_prefixes).
+	 */
+	DRM_ASAHI_FEATURE_RENDER_STAGE_PREFIXES = (1UL) << 25,
 	/** @DRM_ASAHI_FEATURE_M5_STENCIL_MSAA_COMPRESSION: single-layer 2x/4x compressed stencil in the native ZLS form. */
 	DRM_ASAHI_FEATURE_M5_STENCIL_MSAA_COMPRESSION = (1UL) << 26,
 	/** @DRM_ASAHI_FEATURE_COMPUTE_RESOURCES: Per-dispatch storage declarations. */
@@ -1217,6 +1224,18 @@ enum drm_asahi_render_flags {
 	 * the whole one. Requires DRM_ASAHI_FEATURE_COMPUTE_STAGE_BARRIERS.
 	 */
 	DRM_ASAHI_RENDER_COMPUTE_STAGE_BARRIERS = (1U << 22),
+
+	/**
+	 * @DRM_ASAHI_RENDER_STAGE_PREFIXES: The command is a struct
+	 * drm_asahi_cmd_render_with_stage_prefixes. Its tiling half waits only on
+	 * the render and compute prefixes of the tail, each no later than the
+	 * command's own prefix of that subqueue; its fragment half waits on the
+	 * whole ones. Earlier renders in the tiling prefix are waited on to
+	 * completion. Not combined with DRM_ASAHI_RENDER_FRAGMENT_BARRIERS or
+	 * DRM_ASAHI_RENDER_COMPUTE_STAGE_BARRIERS. Requires
+	 * DRM_ASAHI_FEATURE_RENDER_STAGE_PREFIXES.
+	 */
+	DRM_ASAHI_RENDER_STAGE_PREFIXES = (1U << 23),
 };
 
 /**
@@ -1566,6 +1585,21 @@ struct drm_asahi_cmd_render_with_stage_prior {
 	__u16 reserved0;
 	__u32 reserved1;
 	__u64 ta_prior_cdm;
+};
+
+/* DRM_ASAHI_RENDER_STAGE_PREFIXES: the tiling half's render and compute
+ * prefixes, each a command index like the header barriers plus an exact prior
+ * ordinal. The reserved fields are zero. */
+struct drm_asahi_cmd_render_with_stage_prefixes {
+	struct drm_asahi_cmd_render_with_prior legacy;
+	__u16 ta_cdm_barrier;
+	__u16 reserved0;
+	__u32 reserved1;
+	__u64 ta_prior_cdm;
+	__u16 ta_vdm_barrier;
+	__u16 reserved2;
+	__u32 reserved3;
+	__u64 ta_prior_vdm;
 };
 
 struct drm_asahi_render_ray_query_stage {

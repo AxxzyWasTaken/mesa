@@ -1555,13 +1555,26 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
             struct drm_asahi_cmd_render_with_prior cmd = {0};
             asahi_fill_vdm_command(dev, cs, &cmd.legacy);
 
+            /* M5: the vertex half's own render and compute prefixes, when
+             * they are narrower than the whole render's, so its tiling can
+             * overlap the fragment work of the renders only its fragment
+             * half depends on. Supersedes the single-subqueue forms below. */
+            const bool stage_prefixes =
+               agx_chip_g17_m5(dev->dev.chip) && !queue->sync.serialize &&
+               queue->sync.exact_prior &&
+               (dev->dev.params.features &
+                DRM_ASAHI_FEATURE_RENDER_STAGE_PREFIXES) &&
+               cs->sync.ta_split;
+            if (stage_prefixes)
+               cmd.legacy.flags |= DRM_ASAHI_RENDER_STAGE_PREFIXES;
+
             /* The render's vertex half depends on no earlier render while its
              * fragment half does (hk_sync: every render dependency targets
              * fragment or attachment work alone): let the kernel order only
              * the fragment half after them, so this render's vertex work can
              * overlap their fragment work. Compute dependencies keep ordering
              * the vertex half either way. */
-            if (!queue->sync.serialize &&
+            if (!stage_prefixes && !queue->sync.serialize &&
                 (dev->dev.params.features &
                  DRM_ASAHI_FEATURE_FRAGMENT_BARRIERS) &&
                 cs->sync.ta_split &&
@@ -1578,6 +1591,7 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
             STATIC_ASSERT(sizeof(struct drm_asahi_cmd_render_with_stage_prior) ==
                           sizeof(struct drm_asahi_cmd_render_with_prior) + 16);
             const bool stage_cdm =
+               !stage_prefixes &&
                agx_chip_g17_m5(dev->dev.chip) && queue->sync.exact_prior &&
                (dev->dev.params.features &
                 DRM_ASAHI_FEATURE_COMPUTE_STAGE_BARRIERS) &&
@@ -1616,6 +1630,18 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
                header.size = sizeof(extended);
                util_dynarray_append(&payload, header);
                util_dynarray_append_array(&payload, uint8_t, &extended, header.size);
+            } else if (stage_prefixes) {
+               const struct drm_asahi_cmd_render_with_stage_prefixes staged = {
+                  .legacy = cmd,
+                  .ta_cdm_barrier = cs->sync.barrier_ta[HK_SYNC_CDM],
+                  .ta_prior_cdm = cs->sync.prior_ta[HK_SYNC_CDM],
+                  .ta_vdm_barrier = cs->sync.barrier_ta[HK_SYNC_VDM],
+                  .ta_prior_vdm = cs->sync.prior_ta[HK_SYNC_VDM],
+               };
+               header.size = sizeof(staged);
+               util_dynarray_append(&payload, header);
+               util_dynarray_append_array(&payload, uint8_t, &staged,
+                                          header.size);
             } else if (stage_cdm) {
                const struct drm_asahi_cmd_render_with_stage_prior staged = {
                   .legacy = cmd,
