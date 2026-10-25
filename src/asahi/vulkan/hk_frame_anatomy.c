@@ -546,12 +546,14 @@ hk_frame_anatomy_dump_nir(struct hk_device *dev, const struct hk_shader *shader,
 {
    struct hk_frame_anatomy *fa = dev->frame_anatomy;
    if (!fa || !fa->dump_dir || !shader->code_size ||
-       (stage != MESA_SHADER_FRAGMENT && stage != MESA_SHADER_COMPUTE))
+       (stage != MESA_SHADER_FRAGMENT && stage != MESA_SHADER_COMPUTE &&
+        stage != MESA_SHADER_VERTEX))
       return;
 
    char path[512];
    snprintf(path, sizeof(path), "%s/%s-%08x.nir", fa->dump_dir,
-            stage == MESA_SHADER_FRAGMENT ? "fs" : "cs",
+            stage == MESA_SHADER_FRAGMENT ? "fs"
+            : stage == MESA_SHADER_VERTEX ? "vs" : "cs",
             _mesa_hash_data(shader->code_ptr, shader->code_size));
    if (access(path, F_OK) == 0)
       return;
@@ -688,6 +690,7 @@ hk_frame_anatomy_render(struct hk_frame_anatomy_submit *s,
       const struct agx2_stats *st = &vs->b.info.stats;
       const uint32_t hash =
          vs->code_size ? _mesa_hash_data(vs->code_ptr, vs->code_size) : 0;
+      hk_fa_dump_fs(fa, hash, vs, "vs");
       HK_FA_APPEND(" vs=%08x:d%u:i%u:g%u:t%u:sp%u", hash,
                    cs->anatomy_vs[i].draws, st->instrs, st->gprs, st->threads,
                    st->spills + st->fills);
