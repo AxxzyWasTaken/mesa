@@ -324,6 +324,44 @@ image_write_source_can_be_immediate(agx_instr *I, unsigned s)
    return false;
 }
 
+/* M5 FCMPSEL also selects a minifloat immediate (fself32), which is how
+ * native G17G code selects constants such as 1.0. Fold one whose bits
+ * do not fit the integer immediate, opposite a selected register only: the
+ * two-immediate form takes raw bits. Compare-select fusion creates most of
+ * these selects after immediate inlining, so run it after fusing as well. */
+static void
+agx_optimizer_minifloat_select(agx_context *ctx, agx_instr **defs,
+                               agx_instr *I)
+{
+   if (!ctx->key || ctx->key->dev.encoding != AGX_ISA_ENCODING_AGX3C ||
+       I->op != AGX_OPCODE_FCMPSEL || I->nr_srcs != 4 ||
+       I->fcmpsel_minifloat_select || I->saturate ||
+       I->dest[0].size != AGX_SIZE_32)
+      return;
+
+   for (unsigned s = 2; s < 4; ++s) {
+      const agx_index src = I->src[s], other = I->src[s ^ 1];
+      if (src.type != AGX_INDEX_NORMAL || src.abs || src.neg ||
+          agx_preserve_g17p_tied_fcmpsel(ctx, I, s))
+         continue;
+
+      const agx_instr *def = defs[src.value];
+      if (!def || def->op != AGX_OPCODE_MOV_IMM ||
+          def->dest[0].size != AGX_SIZE_32 || def->imm <= UINT8_MAX ||
+          !agx_minifloat_exact(uif(def->imm)))
+         continue;
+
+      if (other.type == AGX_INDEX_IMMEDIATE ||
+          (other.type == AGX_INDEX_NORMAL && defs[other.value] &&
+           defs[other.value]->op == AGX_OPCODE_MOV_IMM))
+         return;
+
+      I->src[s] = agx_immediate_f(uif(def->imm));
+      I->fcmpsel_minifloat_select = true;
+      return;
+   }
+}
+
 static void
 agx_optimizer_inline_imm(agx_context *ctx, agx_instr **defs, agx_instr *I)
 {
@@ -484,6 +522,10 @@ agx_optimizer_inline_imm(agx_context *ctx, agx_instr **defs, agx_instr *I)
       if ((I->op == AGX_OPCODE_IMAGE_WRITE ||
            I->op == AGX_OPCODE_BLOCK_IMAGE_STORE) &&
           !image_write_source_can_be_immediate(I, s))
+         continue;
+
+      /* The minifloat form of an M5 select is folded separately below. */
+      if (I->op == AGX_OPCODE_FCMPSEL && I->fcmpsel_minifloat_select && s >= 2)
          continue;
 
       if (float_src) {
@@ -1643,6 +1685,8 @@ agx_optimizer_forward(agx_context *ctx)
           I->op != AGX_OPCODE_UNIFORM_STORE && I->op != AGX_OPCODE_EXPORT)
          agx_optimizer_inline_imm(ctx, defs, I);
 
+      agx_optimizer_minifloat_select(ctx, defs, I);
+
       /* Inlining a constant into fmov can leave two minifloat operands.
        * Fold the conversion exactly, including negative zero, before RA. */
       if (agx_is_fmov(I) && I->src[0].type == AGX_INDEX_IMMEDIATE &&
@@ -1671,6 +1715,7 @@ agx_optimizer_forward(agx_context *ctx)
          /* Fusing a compare of two inlined immediates yields a select the
           * fold below can resolve. */
          agx_optimizer_cmpsel(ctx, defs, I);
+         agx_optimizer_minifloat_select(ctx, defs, I);
          agx_g17p_tie_zero_minmax(ctx, I);
          agx_optimizer_select_guard(ctx, defs, I);
          agx_instr *folded = agx_optimizer_fold_icmpsel(ctx, I);

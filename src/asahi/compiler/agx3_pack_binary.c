@@ -13213,6 +13213,7 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
           * Canonicalize just as the register/minifloat path below does. */
          if (enc == AGX_ISA_ENCODING_AGX3C && I->op == AGX_OPCODE_FCMPSEL &&
              I->nr_dests == 1 && I->nr_srcs == 4 && !I->saturate &&
+             !I->fcmpsel_minifloat_select &&
              (agx3_vary_reg32(I->dest[0]) || agx3_half_reg(I->dest[0])) &&
              agx_channels(I->dest[0]) == 1 &&
              (((agx3_vary_reg32(I->src[0]) || agx3_half_reg(I->src[0])) &&
@@ -13327,7 +13328,7 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
                .cmp1_hint = agx3_post_ra_hint(cmp[1]),
                .sel_immediate = {sel[0].type == AGX_INDEX_IMMEDIATE,
                                  sel[1].type == AGX_INDEX_IMMEDIATE},
-               .sel_integer = !tied_float,
+               .sel_integer = !tied_float && !I->fcmpsel_minifloat_select,
                .sel = {sel[0].value, sel[1].value},
                .sel_hint = {agx3_post_ra_hint(sel[0]), agx3_post_ra_hint(sel[1])},
                .condition = condition, .wait_mask = wait,

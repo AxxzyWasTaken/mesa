@@ -123,7 +123,10 @@ lower(agx_builder *b, agx_instr *I)
       const int truth = agx3_immediate_compare(b->shader, I);
       const agx_index chosen = I->src[truth ? 2 : 3];
       if (truth >= 0 && chosen.type == AGX_INDEX_IMMEDIATE)
-         return agx_mov_imm_to(b, I->dest[0], chosen.value);
+         return agx_mov_imm_to(b, I->dest[0],
+                               I->fcmpsel_minifloat_select
+                                  ? fui(agx_minifloat_decode(chosen.value))
+                                  : chosen.value);
       if (truth >= 0 && !chosen.abs && !chosen.neg &&
           chosen.size == I->dest[0].size)
          return agx_bitop_to(b, I->dest[0], chosen, agx_zero(),

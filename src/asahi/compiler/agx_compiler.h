@@ -478,6 +478,10 @@ typedef struct {
    /* NIR permits either sign for a zero result of this floating add. */
    bool no_signed_zero : 1;
 
+   /* M5 FCMPSEL: a selected immediate is a minifloat (native fself32), not
+    * raw integer bits. */
+   bool fcmpsel_minifloat_select : 1;
+
    /* Output modifiers */
    bool saturate : 1;
    unsigned mask : 4;
