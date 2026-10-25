@@ -1786,6 +1786,12 @@ agx_emit_load(agx_builder *b, agx_index dest, nir_intrinsic_instr *instr)
    load->memory_index_is_bytes = index_bytes;
       load->memory_byte_offset = byte_offset;
    load->memory_is_packed = packed_count != 0;
+   /* nir_opt_access proved nothing writes this memory and it is not
+    * volatile, so the read is a function of its address alone. The M5 spiller
+    * may then repeat it in place of filling the value from a spill slot. */
+   load->memory_can_reorder =
+      b->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3C &&
+      nir_intrinsic_can_reorder(instr) && !nir_is_coherent(instr);
    agx_emit_cached_split(b, dest, instr->def.num_components);
 }
 
@@ -8995,6 +9001,99 @@ agx3_order_fragment_device_loads(agx_context *ctx)
    return progress;
 }
 
+/* Spill reloads that repeat a device load (agx_spill) can leave such loads
+ * adjacent again after register allocation, possibly in descending order.
+ * Restore the ascending order once registers are final, where two adjacent
+ * loads may only trade places if neither reads or writes what the other
+ * writes. Format and mask need not match: native code ascends regardless.
+ */
+static bool
+agx3_ordered_load_candidate(const agx_instr *I)
+{
+   return I->op == AGX_OPCODE_DEVICE_LOAD && !I->coherent &&
+          I->nr_dests == 1 && I->nr_srcs == 2 &&
+          I->src[1].type == AGX_INDEX_IMMEDIATE && !I->src[1].abs &&
+          !I->src[1].neg && !I->src[1].memory;
+}
+
+static int64_t
+agx3_ordered_load_address(const agx_instr *I)
+{
+   unsigned width_log2 = 0;
+   if (I->format == AGX_FORMAT_I16 || I->format == AGX_FORMAT_F16)
+      width_log2 = 1;
+   else if (I->format == AGX_FORMAT_I32)
+      width_log2 = 2;
+
+   const unsigned shift =
+      I->shift + (I->memory_index_is_bytes ? 0 : width_log2);
+   return ((int64_t)I->src[1].value << shift) + I->memory_byte_offset;
+}
+
+static bool
+agx3_registers_overlap(agx_index a, agx_index b)
+{
+   if (a.memory || b.memory ||
+       (a.type != AGX_INDEX_REGISTER && a.type != AGX_INDEX_NORMAL) ||
+       (b.type != AGX_INDEX_REGISTER && b.type != AGX_INDEX_NORMAL))
+      return false;
+
+   return a.value < b.value + agx_index_size_16(b) &&
+          b.value < a.value + agx_index_size_16(a);
+}
+
+static bool
+agx3_loads_independent(const agx_instr *A, const agx_instr *B)
+{
+   if (agx3_registers_overlap(A->dest[0], B->dest[0]))
+      return false;
+
+   for (unsigned s = 0; s < 2; ++s) {
+      if (agx3_registers_overlap(A->dest[0], B->src[s]) ||
+          agx3_registers_overlap(B->dest[0], A->src[s]))
+         return false;
+   }
+
+   return true;
+}
+
+static void
+agx3_order_fragment_device_loads_after_ra(agx_context *ctx)
+{
+   if (!agx_isa_is_agx3(ctx->key->dev.encoding) ||
+       ctx->stage != MESA_SHADER_FRAGMENT)
+      return;
+
+   agx_foreach_block(ctx, block) {
+      bool progress;
+      do {
+         progress = false;
+         agx_foreach_instr_in_block_safe(block, I) {
+            if (I->link.next == &block->instructions)
+               break;
+
+            agx_instr *next = list_entry(I->link.next, agx_instr, link);
+            if (!agx3_ordered_load_candidate(I) ||
+                !agx3_ordered_load_candidate(next) ||
+                !agx_is_equiv(I->src[0], next->src[0]) ||
+                agx3_ordered_load_address(I) <=
+                   agx3_ordered_load_address(next) ||
+                !agx3_loads_independent(I, next))
+               continue;
+
+            /* The later load is now the last use of a shared base */
+            const bool kill = next->src[0].kill;
+            next->src[0].kill = I->src[0].kill;
+            I->src[0].kill = kill;
+
+            list_del(&next->link);
+            list_addtail(&next->link, &I->link);
+            progress = true;
+         }
+      } while (progress);
+   }
+}
+
 /* Keep scalar UVS values live until a native-shaped terminal writeout.
  * Run after pressure scheduling but before RA: moving physical-register stores
  * would lose values when later instructions reuse their sources. */
@@ -10630,6 +10729,10 @@ agx_compile_function_nir_attempt(nir_shader *nir, nir_function_impl *impl,
     * are computed against the instructions that actually survive. */
    if (ctx->key->dev.encoding != AGX_ISA_ENCODING_AGX2)
       agx3_split_vector_stack_access(ctx);
+
+   /* Before the last-use pass too, which depends on instruction order */
+   if (ctx->spilled_by_load)
+      agx3_order_fragment_device_loads_after_ra(ctx);
 
    /* Set last-use bits after lowering pseudo for best results. */
    agx_opt_register_cache(ctx);

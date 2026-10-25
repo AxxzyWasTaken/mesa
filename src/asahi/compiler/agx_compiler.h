@@ -600,6 +600,8 @@ typedef struct {
    struct util_dynarray collect_split_hints;
    bool is_preamble;
    bool uniforms_written;
+   /* The spiller reloaded a value by repeating its device load */
+   bool spilled_by_load;
    unsigned scratch_size_B;
    /* The input mask/compact ranks are frozen before native import selection.
     * Later DCE may remove a read without changing this external interface. */
