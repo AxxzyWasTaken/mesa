@@ -725,7 +725,9 @@ hk_sync_stream_created(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
    struct hk_cs *gfx = cmd->current_cs.gfx;
    const bool pre_gfx = compute && slot == &cmd->current_cs.pre_gfx && gfx &&
                         gfx != cs;
-   if (unlikely(hk_cmd_buffer_device(cmd)->frame_anatomy)) {
+   /* Unit-test fixtures have no device. */
+   const struct hk_device *dev = hk_cmd_buffer_device(cmd);
+   if (unlikely(dev && dev->frame_anatomy)) {
       cs->anatomy_api_barriers = cmd->anatomy_bar.count;
       cs->anatomy_api_mem = cmd->anatomy_bar.mem;
       cs->anatomy_api_buf = cmd->anatomy_bar.buf;
