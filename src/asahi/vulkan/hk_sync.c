@@ -550,18 +550,19 @@ hk_sync_barrier(struct hk_cmd_buffer *cmd, uint8_t src_kinds,
    barrier_source_dependencies(cmd, src_kinds, dep);
 
    /* M5: of the renders this dependency orders pre-rasterization work after,
-    * only those that wrote memory other than their attachments
-    * (HK_SYNC_GFX_MEM) can hand that work anything it reads without an
-    * image. Order the vertex half (HK_SYNC_GFX) after the latest of them;
-    * the fragment half and image-reading vertex work keep the whole
+    * graphics or transfer, only those that wrote memory other than their
+    * attachments (HK_SYNC_GFX_MEM) can hand that work anything it reads
+    * without an image. Order the vertex half (HK_SYNC_GFX) after the latest
+    * of them; the fragment half and image-reading vertex work keep the whole
     * dependency. The compute subqueue's requirement is unchanged: the kernel
     * orders both halves after compute work either way. */
-   if ((src_kinds & HK_SYNC_GFX) && (dst_kinds & HK_SYNC_GFX) &&
+   const uint8_t render_kinds = HK_SYNC_GFX | HK_SYNC_XFER;
+   if ((src_kinds & render_kinds) && (dst_kinds & HK_SYNC_GFX) &&
        agx_chip_g17_m5(hk_cmd_buffer_device(cmd)->dev.chip)) {
       struct hk_sync_dep vtx = dep[HK_SYNC_VDM];
       vtx.cut = memory_cut(vtx.cut);
-      if (vtx.prior & HK_SYNC_GFX)
-         vtx.prior = (vtx.prior & ~HK_SYNC_GFX) | HK_SYNC_GFX_MEM;
+      if (vtx.prior & render_kinds)
+         vtx.prior = (vtx.prior & ~render_kinds) | HK_SYNC_GFX_MEM;
       const unsigned gfx = util_logbase2(HK_SYNC_GFX);
       dep_max(&cmd->sync.req[gfx][HK_SYNC_VDM], &vtx);
       dep_max(&cmd->sync.req[gfx][HK_SYNC_CDM], &dep[HK_SYNC_CDM]);
