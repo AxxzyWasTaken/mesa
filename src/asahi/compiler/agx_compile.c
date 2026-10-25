@@ -7742,6 +7742,11 @@ agx_optimize_loop_nir(nir_shader *nir, bool m5, bool g17p)
       NIR_PASS(progress, nir, nir_opt_peephole_select,
                &peephole_select_options);
       NIR_PASS(progress, nir, nir_opt_phi_precision);
+      /* The M5 conversion has D3D's saturating, NaN-to-zero semantics.
+       * Fold before nir_opt_algebraic distributes a following add into the
+       * clamping selects. */
+      if (m5)
+         NIR_PASS(progress, nir, agx_nir_fold_d3d_float_to_int);
       NIR_PASS(progress, nir, nir_opt_algebraic);
       NIR_PASS(progress, nir, nir_opt_constant_folding);
       NIR_PASS(progress, nir, nir_opt_undef);

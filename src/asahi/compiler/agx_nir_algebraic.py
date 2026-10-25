@@ -395,6 +395,23 @@ for shift in (1, 2):
                               delta + size - 1), 'b@32'),
              ('ult', ('ushr', folded_offset, shift), ('ushr', b, shift))))
 
+# D3D float-to-integer conversions saturate and map NaN to 0. DXVK spells them
+# out as a conversion plus clamping selects; the M5 hardware conversion already
+# does exactly this (verified for both signs of NaN, infinities and every
+# boundary), so fold the selects into the bare conversion.
+fold_d3d_float_to_int = [
+    (('bcsel', ('fneu', 'a@32', a), 0,
+      ('bcsel', ('flt', a, -2147483648.0), -0x80000000,
+       ('bcsel', ('flt', 2147483520.0, a), 0x7fffffff, ('f2i32', a)))),
+     ('f2i32', a)),
+    (('bcsel', ('flt', 4294967040.0, 'a@32'), 0xffffffff,
+      ('f2u32', ('bcsel', ('fneu', a, a), 0.0, ('fmax', a, 0.0)))),
+     ('f2u32', a)),
+    (('bcsel', ('flt', 4294967040.0, 'a@32'), 0xffffffff,
+      ('f2u32', ('fmax', a, 0.0))),
+     ('f2u32', a)),
+]
+
 fold_selected_f2i32 = [
     (('bcsel@32(agx_selected_f2i32_controls_match)', 'a@1',
       ('f2i32(is_used_once)', 'b@32'), ('f2i32(is_used_once)', 'c@32')),
@@ -449,6 +466,8 @@ agx_selected_f2i32_controls_match(const nir_alu_instr *instr)
                                       fold_extract16_bfe).render())
     print(nir_algebraic.AlgebraicPass("agx_nir_fuse_doubled_add",
                                       fuse_doubled_add).render())
+    print(nir_algebraic.AlgebraicPass("agx_nir_fold_d3d_float_to_int",
+                                      fold_d3d_float_to_int).render())
     print(nir_algebraic.AlgebraicPass("agx_nir_fuse_algebraic_late",
                                       fuse_extr + fuse_ubfe +
                                       fuse_imad + ixor_bcsel +
