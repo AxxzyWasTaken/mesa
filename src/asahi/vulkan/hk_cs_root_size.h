@@ -18,9 +18,16 @@
 #define HK_GFX_DRAW_RESERVATION  0x2000u
 #define HK_CS_SPACE_PADDING      0x800u
 
+/* M5 roots stay small, so the few streams a command buffer opens share its
+ * first command BO and a stream that outgrows its root links on. */
+#define HK_M5_CDM_ROOT_SIZE   16384u
+
 static inline size_t
 hk_cs_root_size(enum agx_chip chip, bool compute)
 {
+   if (agx_chip_g17_m5(chip))
+      return compute ? HK_M5_CDM_ROOT_SIZE : HK_G17P_VDM_ROOT_SIZE;
+
    return agx_chip_native_agx3(chip) && !compute ? HK_G17P_VDM_ROOT_SIZE
                                                  : HK_CS_ROOT_SIZE;
 }
