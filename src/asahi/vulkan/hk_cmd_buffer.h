@@ -1067,6 +1067,9 @@ struct hk_cs {
    /* Start pointer of the root control stream */
    void *start;
 
+   /* Size of the root control stream allocation */
+   uint32_t root_size;
+
    /* Current pointer within the control stream */
    void *current;
 
@@ -2184,6 +2187,7 @@ hk_cmd_buffer_get_cs_general(struct hk_cmd_buffer *cmd, struct hk_cs **ptr,
          .type = compute ? HK_CS_CDM : HK_CS_VDM,
          .addr = root.gpu,
          .start = root.cpu,
+         .root_size = initial_size,
          .chunk = root,
          .current = root.cpu,
          .end = root.cpu + initial_size,
