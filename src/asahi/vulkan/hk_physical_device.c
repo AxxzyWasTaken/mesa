@@ -1563,6 +1563,11 @@ hk_get_device_properties(const struct agx_device *dev,
       .advancedBlendAllOperations = true,
    };
 
+   /* Strict residency on M5 relies on soft faults; see
+    * hk_sparse_buffer_unmapped(). */
+   if (agx_chip_g17_m5(dev->chip))
+      properties->sparseResidencyNonResidentStrict = agx_has_soft_fault(dev);
+
    if (agx_chip_native_agx3(dev->chip)) {
       /* Measured per operation under the G17P drm-shim:
        *

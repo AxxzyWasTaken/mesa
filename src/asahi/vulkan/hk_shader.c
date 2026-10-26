@@ -7,6 +7,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include "hk_shader.h"
+#include "hk_buffer.h"
 #include "hk_frame_anatomy.h"
 #include "hk_agx3_ioto_program_core.h"
 #include "hk_nir_lower_gs.h"
@@ -3128,8 +3129,16 @@ hk_lower_nir(struct hk_device *dev, nir_shader *nir,
                lower_physical_sparse_load, nir_metadata_none, NULL);
    }
 
+   /* Unbound pages read as zero through soft faults, but a dropped store
+    * stays visible to later reads of its address, so storage-buffer stores
+    * still check residency. */
+   const bool sparse_store_guards =
+      dev->vk.enabled_features.sparseResidencyBuffer &&
+      hk_sparse_buffer_unmapped(&dev->dev);
+
    NIR_PASS(_, nir, hk_nir_lower_descriptors, rs, set_layout_count,
-            set_layouts, false, dev->dev.sparse_ro_offset,
+            set_layouts, sparse_store_guards, sparse_store_guards,
+            dev->dev.sparse_ro_offset,
             hk_device_physical(dev)->scaled_sampling,
             agx_chip_sampler_has_lod_bias(dev->dev.chip));
    NIR_PASS(_, nir, nir_lower_explicit_io, nir_var_mem_global,

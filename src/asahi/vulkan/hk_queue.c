@@ -702,7 +702,13 @@ hk_flush_bind(struct hk_bind_builder *b)
     * so we don't leave a gap.
     */
    struct drm_asahi_gem_bind_op op;
-   if (!b->mem) {
+   if (!b->mem && b->buffer && hk_sparse_buffer_unmapped(&b->dev->dev)) {
+      op = (struct drm_asahi_gem_bind_op){
+         .flags = DRM_ASAHI_BIND_UNBIND,
+         .addr = va_addr,
+         .range = b->size,
+      };
+   } else if (!b->mem) {
       op = (struct drm_asahi_gem_bind_op){
          .handle = b->dev->dev.scratch_bo->uapi_handle,
          .flags = DRM_ASAHI_BIND_READ | DRM_ASAHI_BIND_WRITE |
@@ -728,6 +734,7 @@ hk_flush_bind(struct hk_bind_builder *b)
 
    if (!b->mem) {
       op.handle = b->dev->dev.zero_bo->uapi_handle;
+      op.flags = DRM_ASAHI_BIND_READ | agx_fill_bind_flags(&b->dev->dev);
    }
 
    util_dynarray_append(&b->binds, op);
@@ -755,7 +762,8 @@ hk_sparse_buffer_map_commit(struct hk_bind_builder *b)
       const uint64_t first = (op->addr - b->va->addr) / AIL_PAGESIZE;
       const uint64_t pages = DIV_ROUND_UP(op->range, AIL_PAGESIZE);
       const bool resident =
-         op->handle != b->dev->dev.scratch_bo->uapi_handle;
+         op->handle != b->dev->dev.scratch_bo->uapi_handle &&
+         !(op->flags & DRM_ASAHI_BIND_UNBIND);
 
       VkResult result = hk_update_physical_sparse_map(
          b->dev, op->addr, op->range, !resident);

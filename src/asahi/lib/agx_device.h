@@ -433,7 +433,7 @@ agx_bo_unmap_owned(struct agx_bo *bo, void *map, size_t size)
 }
 
 static inline bool
-agx_has_soft_fault(struct agx_device *dev)
+agx_has_soft_fault(const struct agx_device *dev)
 {
    return (dev->params.features & DRM_ASAHI_FEATURE_SOFT_FAULTS) &&
           !(dev->debug & AGX_DBG_NOSOFT);

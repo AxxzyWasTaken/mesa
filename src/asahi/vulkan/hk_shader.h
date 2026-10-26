@@ -723,6 +723,7 @@ hk_nir_lower_descriptors(nir_shader *nir,
                          uint32_t set_layout_count,
                          struct vk_descriptor_set_layout *const *set_layouts,
                          bool sparse_buffer_residency,
+                         bool sparse_soft_unmapped,
                          uint64_t sparse_ro_offset, bool scaled_sampling,
                          bool sampler_has_lod_bias);
 
