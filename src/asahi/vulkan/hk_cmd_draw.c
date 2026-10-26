@@ -10333,17 +10333,18 @@ hk_prelink_object_fragment(struct hk_device *dev, struct hk_api_shader *fs_api)
 }
 
 /* A vertex shader that reads no attributes links the same prolog for every
- * vertex input state. Link the hardware program, and the software program
+ * vertex input state. Link the hardware program, and/or the software program
  * that tessellation and geometry run, for each index size. */
 void
-hk_prelink_vertex(struct hk_device *dev, struct hk_api_shader *vs_api)
+hk_prelink_vertex(struct hk_device *dev, struct hk_api_shader *vs_api,
+                  bool hw_program, bool sw_program)
 {
    static const struct vk_vertex_input_state no_vi;
    static const uint16_t no_strides[MESA_VK_MAX_VERTEX_BINDINGS];
    struct hk_fast_link_key_vs key;
 
    struct hk_shader *hw = &vs_api->variants[HK_VS_VARIANT_HW];
-   if (hw->compiled && !hw->info.vs.attribs_read) {
+   if (hw_program && hw->compiled && !hw->info.vs.attribs_read) {
       hk_vs_link_key_build(dev, hw, true, MESA_PRIM_TRIANGLES, false,
                            AGX_INDEX_SIZE_U32, false, &no_vi, no_strides,
                            &key);
@@ -10351,7 +10352,7 @@ hk_prelink_vertex(struct hk_device *dev, struct hk_api_shader *vs_api)
    }
 
    struct hk_shader *sw = &vs_api->variants[HK_VS_VARIANT_SW];
-   if (sw->compiled && !sw->info.vs.attribs_read) {
+   if (sw_program && sw->compiled && !sw->info.vs.attribs_read) {
       hk_vs_link_key_build(dev, sw, false, MESA_PRIM_TRIANGLES, false,
                            AGX_INDEX_SIZE_U32, false, &no_vi, no_strides,
                            &key);

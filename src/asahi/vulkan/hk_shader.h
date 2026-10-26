@@ -508,7 +508,8 @@ void hk_prelink_pipeline_fragment(struct hk_device *dev,
                                   const struct vk_graphics_pipeline_state *state);
 void hk_prelink_object_fragment(struct hk_device *dev,
                                 struct hk_api_shader *fs);
-void hk_prelink_vertex(struct hk_device *dev, struct hk_api_shader *vs);
+void hk_prelink_vertex(struct hk_device *dev, struct hk_api_shader *vs,
+                       bool hw_program, bool sw_program);
 
 static inline struct hk_shader *
 hk_fs_variant(struct hk_api_shader *obj, unsigned samples)

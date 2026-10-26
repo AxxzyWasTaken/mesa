@@ -7187,8 +7187,14 @@ hk_compile_shaders(struct vk_device *vk_dev, uint32_t shader_count,
       struct hk_api_shader *gs = api[MESA_SHADER_GEOMETRY];
       struct hk_api_shader *fs = api[MESA_SHADER_FRAGMENT];
 
-      if (vs)
-         hk_prelink_vertex(dev, vs);
+      /* A pipeline runs the vertex shader as its hardware program unless
+       * tessellation or geometry follow; a shader object may be drawn
+       * either way. */
+      if (vs) {
+         const bool pre_raster_after_vs = tes || gs;
+         hk_prelink_vertex(dev, vs, !state || !pre_raster_after_vs,
+                           !state || pre_raster_after_vs);
+      }
 
       if (fs && !state) {
          hk_prelink_object_fragment(dev, fs);
