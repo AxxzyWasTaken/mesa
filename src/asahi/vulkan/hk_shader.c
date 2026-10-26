@@ -7169,15 +7169,36 @@ hk_compile_shaders(struct vk_device *vk_dev, uint32_t shader_count,
       }
    }
 
-   /* G17P links a fragment shader with its epilog into one program, a full
-    * compile. Do it for the state a complete pipeline fixes now, rather than
-    * at the first draw on the recording thread. */
-   if (agx_native_graphics(&dev->dev) && state && shader_count == 2 &&
-       infos[0].stage == MESA_SHADER_VERTEX &&
-       infos[1].stage == MESA_SHADER_FRAGMENT) {
-      hk_prelink_pipeline_fragment(
-         dev, container_of(shaders_out[0], struct hk_api_shader, vk),
-         container_of(shaders_out[1], struct hk_api_shader, vk), state);
+   /* G17P and M5 link a fragment shader with its epilog into one program, a
+    * full compile, and a vertex prolog is compiled on its first use. Do both
+    * now rather than at the first draw on the recording thread: for the state
+    * a complete pipeline fixes, or for the most common state when compiling
+    * shader objects. */
+   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) {
+      struct hk_api_shader *api[MESA_SHADER_MESH + 1] = {NULL};
+      for (uint32_t i = 0; i < shader_count; i++) {
+         if (infos[i].stage <= MESA_SHADER_MESH)
+            api[infos[i].stage] =
+               container_of(shaders_out[i], struct hk_api_shader, vk);
+      }
+
+      struct hk_api_shader *vs = api[MESA_SHADER_VERTEX];
+      struct hk_api_shader *tes = api[MESA_SHADER_TESS_EVAL];
+      struct hk_api_shader *gs = api[MESA_SHADER_GEOMETRY];
+      struct hk_api_shader *fs = api[MESA_SHADER_FRAGMENT];
+
+      if (vs)
+         hk_prelink_vertex(dev, vs);
+
+      if (fs && !state) {
+         hk_prelink_object_fragment(dev, fs);
+      } else if (fs && vs && !api[MESA_SHADER_TASK] && !api[MESA_SHADER_MESH]) {
+         const struct hk_shader *hw_vs =
+            gs    ? &gs->variants[HK_GS_VARIANT_RAST]
+            : tes ? &tes->variants[HK_VS_VARIANT_HW]
+                  : &vs->variants[HK_VS_VARIANT_HW];
+         hk_prelink_pipeline_fragment(dev, hw_vs, fs, state);
+      }
    }
 
    return VK_SUCCESS;

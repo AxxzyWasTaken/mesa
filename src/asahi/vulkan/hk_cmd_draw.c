@@ -9896,16 +9896,15 @@ agx_fill_velem_keys(const struct vk_vertex_input_state *vi,
 }
 
 static void
-hk_fill_fast_link_key_vs(struct hk_cmd_buffer *cmd, struct hk_shader *sw_vs,
-                         struct hk_shader *hw_vs, bool indexed,
-                         enum agx_index_size index_size, bool restart,
-                         struct hk_fast_link_key_vs *key)
+hk_vs_link_key_build(struct hk_device *dev, struct hk_shader *sw_vs, bool hw,
+                     enum mesa_prim prim, bool indexed,
+                     enum agx_index_size index_size, bool restart,
+                     const struct vk_vertex_input_state *vi,
+                     const uint16_t *vi_binding_strides,
+                     struct hk_fast_link_key_vs *key)
 {
-   struct hk_device *dev = hk_cmd_buffer_device(cmd);
-   struct vk_dynamic_graphics_state *dyn = &cmd->vk.dynamic_graphics_state;
-
    *key = (struct hk_fast_link_key_vs){
-      .prolog.hw = (sw_vs == hw_vs),
+      .prolog.hw = hw,
       .prolog.uniform_base = (sw_vs->info.agx3_indexed_sampler_valid
                                  ? AGX_ABI_G17P_TEXTURE_POINTER_HALFS
                                  : 0) +
@@ -9923,7 +9922,6 @@ hk_fill_fast_link_key_vs(struct hk_cmd_buffer *cmd, struct hk_shader *sw_vs,
       .prolog.static_vi = !sw_vs->info.vs.use_prolog,
    };
 
-   enum mesa_prim prim = vk_topology_to_mesa(dyn->ia.primitive_topology);
    if (mesa_prim_has_adjacency(prim)) {
       if (restart)
          prim = u_decomposed_prim(prim);
@@ -9945,19 +9943,33 @@ hk_fill_fast_link_key_vs(struct hk_cmd_buffer *cmd, struct hk_shader *sw_vs,
                sw_vs->info.vs.attrib_components_read);
 
    if (sw_vs->info.vs.use_prolog) {
-      agx_fill_velem_keys(dyn->vi, sw_vs->info.vs.attribs_read,
+      agx_fill_velem_keys(vi, sw_vs->info.vs.attribs_read,
                           key->prolog.attribs);
 
-      u_foreach_bit(a, dyn->vi->attributes_valid) {
+      u_foreach_bit(a, vi->attributes_valid) {
          if (!(sw_vs->info.vs.attribs_read & BITFIELD64_BIT(a)))
             continue;
 
          unsigned slot = util_bitcount64(sw_vs->info.vs.attribs_read &
                                          BITFIELD64_MASK(a));
          key->prolog.attribs[slot].stride =
-            dyn->vi_binding_strides[dyn->vi->attributes[a].binding];
+            vi_binding_strides[vi->attributes[a].binding];
       }
    }
+}
+
+static void
+hk_fill_fast_link_key_vs(struct hk_cmd_buffer *cmd, struct hk_shader *sw_vs,
+                         struct hk_shader *hw_vs, bool indexed,
+                         enum agx_index_size index_size, bool restart,
+                         struct hk_fast_link_key_vs *key)
+{
+   struct vk_dynamic_graphics_state *dyn = &cmd->vk.dynamic_graphics_state;
+
+   hk_vs_link_key_build(hk_cmd_buffer_device(cmd), sw_vs, sw_vs == hw_vs,
+                        vk_topology_to_mesa(dyn->ia.primitive_topology),
+                        indexed, index_size, restart, dyn->vi,
+                        dyn->vi_binding_strides, key);
 }
 
 static bool
@@ -10205,9 +10217,46 @@ hk_fill_fast_link_key_fs(struct hk_cmd_buffer *cmd, struct hk_shader *fs,
                                report_errors);
 }
 
+/* Link a fragment shader for the given state now, so the first draw with that
+ * state finds the linked program instead of compiling at draw time. */
+static void
+hk_prelink_fragment(struct hk_device *dev, struct hk_api_shader *fs_api,
+                    const struct hk_shader *hw_vs,
+                    const struct vk_dynamic_graphics_state *dyn,
+                    const VkFormat *color_formats, unsigned color_att_count,
+                    bool depth, bool stencil, uint32_t view_mask)
+{
+   const unsigned samples = MAX2(dyn->ms.rasterization_samples, 1);
+   if (hk_fs_build_sample_variant(dev, fs_api, samples) != VK_SUCCESS)
+      return;
+   struct hk_shader *fs = hk_fs_variant(fs_api, samples);
+   if (fs->b.info.writes_sample_mask)
+      return;
+
+   struct agx_tilebuffer_layout tib = hk_tilebuffer_layout(
+      dev, color_formats, sizeof(VkFormat), color_att_count, samples,
+      view_mask != 0, samples > 1 && view_mask != 0, 0);
+   if (!hk_agx3_g17p_rt0_tile_layout_supported(&tib))
+      return;
+
+   const struct hk_fs_link_inputs in = {
+      .dyn = dyn,
+      .tib = &tib,
+      .color_formats = color_formats,
+      .color_formats_stride = sizeof(VkFormat),
+      .color_att_count = color_att_count,
+      .cull_distance_size = hw_vs ? hw_vs->info.cull_distance_array_size : 0,
+      .depth_attachment = depth,
+      .stencil_attachment = stencil,
+   };
+   struct hk_fast_link_key_fs key;
+   if (hk_fs_link_key_build(dev, fs, &in, &key, false))
+      hk_get_fast_linked(dev, fs, &key);
+}
+
 void
 hk_prelink_pipeline_fragment(struct hk_device *dev,
-                             struct hk_api_shader *vs_api,
+                             const struct hk_shader *hw_vs,
                              struct hk_api_shader *fs_api,
                              const struct vk_graphics_pipeline_state *state)
 {
@@ -10246,33 +10295,76 @@ hk_prelink_pipeline_fragment(struct hk_device *dev,
          return;
    }
 
-   const unsigned samples = MAX2(dyn.ms.rasterization_samples, 1);
-   if (hk_fs_build_sample_variant(dev, fs_api, samples) != VK_SUCCESS)
-      return;
-   struct hk_shader *fs = hk_fs_variant(fs_api, samples);
-   if (fs->b.info.writes_sample_mask)
-      return;
+   hk_prelink_fragment(
+      dev, fs_api, hw_vs, &dyn, state->rp->color_attachment_formats,
+      state->rp->color_attachment_count,
+      state->rp->depth_attachment_format != VK_FORMAT_UNDEFINED,
+      state->rp->stencil_attachment_format != VK_FORMAT_UNDEFINED,
+      state->mv ? state->mv->view_mask : 0);
+}
 
-   const uint32_t view_mask = state->mv ? state->mv->view_mask : 0;
-   struct agx_tilebuffer_layout tib = hk_tilebuffer_layout(
-      dev, state->rp->color_attachment_formats, sizeof(VkFormat),
-      state->rp->color_attachment_count, samples, view_mask != 0,
-      samples > 1 && view_mask != 0, 0);
-   if (!hk_agx3_g17p_rt0_tile_layout_supported(&tib))
-      return;
-
-   const struct hk_fs_link_inputs in = {
-      .dyn = &dyn,
-      .tib = &tib,
-      .color_formats = state->rp->color_attachment_formats,
-      .color_formats_stride = sizeof(VkFormat),
-      .color_att_count = state->rp->color_attachment_count,
-      .cull_distance_size =
-         vs_api->variants[HK_VS_VARIANT_HW].info.cull_distance_array_size,
+/* A shader object has no state until it is drawn. Link a fragment shader for
+ * the most common one: a single RGBA8 target, one sample, no blending, no
+ * depth or stencil. */
+void
+hk_prelink_object_fragment(struct hk_device *dev, struct hk_api_shader *fs_api)
+{
+   struct vk_dynamic_graphics_state dyn;
+   struct vk_vertex_input_state vi = {0};
+   struct vk_sample_locations_state sl = {0};
+   vk_dynamic_graphics_state_init(&dyn);
+   dyn.vi = &vi;
+   dyn.ms.sample_locations = &sl;
+   dyn.ms.rasterization_samples = 1;
+   dyn.ms.sample_mask = 0xffff;
+   dyn.cb.attachment_count = 1;
+   dyn.cb.attachments[0] = (struct vk_color_blend_attachment_state){
+      .write_mask = 0xf,
+      .src_color_blend_factor = VK_BLEND_FACTOR_ONE,
+      .dst_color_blend_factor = VK_BLEND_FACTOR_ZERO,
+      .color_blend_op = VK_BLEND_OP_ADD,
+      .src_alpha_blend_factor = VK_BLEND_FACTOR_ONE,
+      .dst_alpha_blend_factor = VK_BLEND_FACTOR_ZERO,
+      .alpha_blend_op = VK_BLEND_OP_ADD,
    };
-   struct hk_fast_link_key_fs key;
-   if (hk_fs_link_key_build(dev, fs, &in, &key, false))
-      hk_get_fast_linked(dev, fs, &key);
+
+   const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+   hk_prelink_fragment(dev, fs_api, NULL, &dyn, &format, 1, false, false, 0);
+}
+
+/* A vertex shader that reads no attributes links the same prolog for every
+ * vertex input state. Link the hardware program, and the software program
+ * that tessellation and geometry run, for each index size. */
+void
+hk_prelink_vertex(struct hk_device *dev, struct hk_api_shader *vs_api)
+{
+   static const struct vk_vertex_input_state no_vi;
+   static const uint16_t no_strides[MESA_VK_MAX_VERTEX_BINDINGS];
+   struct hk_fast_link_key_vs key;
+
+   struct hk_shader *hw = &vs_api->variants[HK_VS_VARIANT_HW];
+   if (hw->compiled && !hw->info.vs.attribs_read) {
+      hk_vs_link_key_build(dev, hw, true, MESA_PRIM_TRIANGLES, false,
+                           AGX_INDEX_SIZE_U32, false, &no_vi, no_strides,
+                           &key);
+      hk_get_fast_linked(dev, hw, &key);
+   }
+
+   struct hk_shader *sw = &vs_api->variants[HK_VS_VARIANT_SW];
+   if (sw->compiled && !sw->info.vs.attribs_read) {
+      hk_vs_link_key_build(dev, sw, false, MESA_PRIM_TRIANGLES, false,
+                           AGX_INDEX_SIZE_U32, false, &no_vi, no_strides,
+                           &key);
+      hk_get_fast_linked(dev, sw, &key);
+
+      const enum agx_index_size sizes[] = {
+         AGX_INDEX_SIZE_U8, AGX_INDEX_SIZE_U16, AGX_INDEX_SIZE_U32};
+      for (unsigned i = 0; i < ARRAY_SIZE(sizes); ++i) {
+         hk_vs_link_key_build(dev, sw, false, MESA_PRIM_TRIANGLES, true,
+                              sizes[i], false, &no_vi, no_strides, &key);
+         hk_get_fast_linked(dev, sw, &key);
+      }
+   }
 }
 
 /*
