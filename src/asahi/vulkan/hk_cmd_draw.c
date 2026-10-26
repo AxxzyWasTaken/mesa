@@ -10049,7 +10049,10 @@ hk_fs_link_key_build(const struct hk_device *dev, struct hk_shader *fs,
       .blend.alpha_to_coverage = dyn->ms.alpha_to_coverage_enable,
       .blend.alpha_to_one = dyn->ms.alpha_to_one_enable,
       .blend.logicop_enable = dyn->cb.logic_op_enable,
-      .blend.logicop_func = vk_logic_op_to_pipe(dyn->cb.logic_op),
+      /* Only an enabled logic op selects a different epilog. */
+      .blend.logicop_func = dyn->cb.logic_op_enable
+                               ? vk_logic_op_to_pipe(dyn->cb.logic_op)
+                               : 0,
       .defer_api_sample_mask = defer_api_sample_mask,
       .api_sample_mask = api_sample_mask,
    };
