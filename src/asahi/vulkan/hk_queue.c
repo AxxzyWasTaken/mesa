@@ -127,7 +127,12 @@ asahi_fill_cdm_command(struct hk_device *dev, struct hk_cs *cs,
       cs->stream_linked ? cs->root_size : (cs->current - cs->start);
 
    *cmd = (struct drm_asahi_cmd_compute){
-      .flags = cs->m5_matrix_ops ? DRM_ASAHI_COMPUTE_USES_MATRIX : 0,
+      .flags = (cs->m5_matrix_ops ? DRM_ASAHI_COMPUTE_USES_MATRIX : 0) |
+               (!cs->query_access &&
+                      (dev->dev.params.features &
+                       DRM_ASAHI_FEATURE_COMPUTE_NO_QUERY_ACCESS)
+                   ? DRM_ASAHI_COMPUTE_NO_QUERY_ACCESS
+                   : 0),
       .cdm_ctrl_stream_base = cs->addr,
       .cdm_ctrl_stream_end = cs->addr + len,
 

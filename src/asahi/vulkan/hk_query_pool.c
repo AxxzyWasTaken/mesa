@@ -391,6 +391,16 @@ hk_cmd_end_query_stamped(struct hk_cmd_buffer *cmd, struct hk_query_pool *pool,
    util_dynarray_append(&cs->oq_stamps, stamp);
 }
 
+/* Mark the stream that received a query copy or reset: only such a stream
+ * reads or writes query values the kernel may still be publishing for earlier
+ * commands (DRM_ASAHI_COMPUTE_NO_QUERY_ACCESS). */
+static void
+hk_note_query_access(struct hk_cmd_buffer *cmd)
+{
+   if (cmd->current_cs.cs)
+      cmd->current_cs.cs->query_access = true;
+}
+
 static void
 emit_zero_queries_g17p(struct hk_cmd_buffer *cmd, struct hk_query_pool *pool,
                        uint32_t first_index, uint32_t num_queries,
@@ -453,6 +463,7 @@ emit_zero_queries_g17p(struct hk_cmd_buffer *cmd, struct hk_query_pool *pool,
    libagx_reset_query_struct(cmd, agx_1d(num_queries),
                              set_available ? AGX_BARRIER_ALL : AGX_BARRIER_NONE,
                              info);
+   hk_note_query_access(cmd);
    if (vk_command_buffer_has_error(&cmd->vk))
       return;
 
@@ -513,6 +524,7 @@ emit_zero_queries(struct hk_cmd_buffer *cmd, struct hk_query_pool *pool,
    };
 
    libagx_reset_query_struct(cmd, agx_1d(num_queries), AGX_BARRIER_ALL, info);
+   hk_note_query_access(cmd);
 }
 
 static void
@@ -1348,6 +1360,7 @@ hk_cmd_copy_query_pool_results(struct hk_cmd_buffer *cmd,
       hk_cdm_cache_flush(dev, cs);
       libagx_copy_query_g17p_struct(cmd, agx_1d(queryCount), AGX_BARRIER_NONE,
                                    info);
+      hk_note_query_access(cmd);
       if (vk_command_buffer_has_error(&cmd->vk))
          return;
 
@@ -1374,6 +1387,7 @@ hk_cmd_copy_query_pool_results(struct hk_cmd_buffer *cmd,
    };
 
    libagx_copy_query_struct(cmd, agx_1d(queryCount), AGX_BARRIER_ALL, info);
+   hk_note_query_access(cmd);
 }
 
 VKAPI_ATTR void VKAPI_CALL

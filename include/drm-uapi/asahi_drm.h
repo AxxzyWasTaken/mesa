@@ -372,6 +372,11 @@ enum drm_asahi_feature {
 	 * include the earlier points of that timeline without adding GPU waits.
 	 */
 	DRM_ASAHI_FEATURE_CUMULATIVE_SIGNALS = (1UL) << 29,
+	/**
+	 * @DRM_ASAHI_FEATURE_COMPUTE_NO_QUERY_ACCESS: Compute commands accept
+	 * DRM_ASAHI_COMPUTE_NO_QUERY_ACCESS.
+	 */
+	DRM_ASAHI_FEATURE_COMPUTE_NO_QUERY_ACCESS = (1UL) << 30,
 };
 
 #define DRM_ASAHI_PARAM_GROUP_VM_STATUS 1
@@ -1748,6 +1753,14 @@ enum drm_asahi_compute_flags {
 	 * matrix instructions. Requires DRM_ASAHI_FEATURE_COMPUTE_MATRIX.
 	 */
 	DRM_ASAHI_COMPUTE_USES_MATRIX = (1L << 16),
+
+	/**
+	 * @DRM_ASAHI_COMPUTE_NO_QUERY_ACCESS: The command neither copies nor
+	 * resets queries, so it cannot observe timestamps the kernel publishes
+	 * for earlier commands and need not wait for that publication. Requires
+	 * DRM_ASAHI_FEATURE_COMPUTE_NO_QUERY_ACCESS.
+	 */
+	DRM_ASAHI_COMPUTE_NO_QUERY_ACCESS = (1L << 17),
 };
 
 /**

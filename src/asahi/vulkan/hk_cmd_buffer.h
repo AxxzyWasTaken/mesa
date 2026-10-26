@@ -1216,6 +1216,9 @@ struct hk_cs {
     * consumer or the end of the stream. G13 never sets this. */
    bool query_reset_pending;
 
+   /* A query copy or reset was recorded into this stream. */
+   bool query_access;
+
    /* Statistics */
    struct {
       uint32_t calls, cmds, flushes, merged;
@@ -1498,6 +1501,7 @@ hk_cs_merge_cdm(struct hk_cs *a, const struct hk_cs *b)
    a->stats.query_reset_dispatches += b->stats.query_reset_dispatches;
    a->stats.query_reset_queries += b->stats.query_reset_queries;
    a->stats.query_reset_flushes += b->stats.query_reset_flushes;
+   a->query_access |= b->query_access;
    assert(!a->query_reset_pending && !b->query_reset_pending);
 }
 
