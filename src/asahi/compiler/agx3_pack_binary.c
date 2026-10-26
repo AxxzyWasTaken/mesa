@@ -11091,10 +11091,11 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
             /* A fragment SMP whose f156 group is still open (nonterminal)
              * keeps the quad's helper lanes for what follows; a terminating
              * or lone member does not. So the last member stays open when a
-             * quad derivative or quad shuffle follows it (G17P hardware
-             * result; Apple's encoding of this shape is not decoded). */
+             * quad derivative or quad shuffle follows it (G17P and G17G
+             * hardware result; Apple's encoding of this shape is not
+             * decoded). */
             const bool keep_quad_open =
-               enc == AGX_ISA_ENCODING_AGX3B &&
+               agx_isa_is_agx3(enc) &&
                ctx->stage == MESA_SHADER_FRAGMENT && sample_group_member &&
                sample_group_members_remaining == 1 &&
                quad_consumer_after_last_member;
