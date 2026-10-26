@@ -459,7 +459,7 @@ agx_build_end_of_tile_shader(struct agx_bg_eot_cache *cache,
          if (key->op[rt] != AGX_EOT_STORE)
             continue;
          const unsigned selector =
-            agx_g17p_mrt_eot_selector(key->tib.logical_format[rt]);
+            agx_mrt_eot_selector(cache->dev->chip, key->tib.logical_format[rt]);
          if (selector != 0x15 && selector != 0x35 && selector != 0x55 &&
              selector != 0x75 && selector != 0x95)
             return NULL;
@@ -610,7 +610,12 @@ agx_build_end_of_tile_shader(struct agx_bg_eot_cache *cache,
 
       enum pipe_format physical =
          agx_tilebuffer_physical_format(&key->tib, rt);
-      if ((agx_chip_native_agx3(cache->dev->chip) ||
+      if (key->tib.logical_format[rt] == PIPE_FORMAT_R11G11B10_FLOAT &&
+          agx_rg11b10_tile_is_packed_float(cache->dev->chip)) {
+         /* M5 reads the packed word as the packed-float tile format and
+          * converts it to the R11G11B10 PBE (agx_rt0_pbe_format). */
+         physical = (enum pipe_format)AIL_ISA_FORMAT_RG11B10F;
+      } else if ((agx_chip_native_agx3(cache->dev->chip) ||
            agx_chip_g17_m5(cache->dev->chip)) &&
           (key->tib.logical_format[rt] == PIPE_FORMAT_R11G11B10_FLOAT ||
            key->tib.logical_format[rt] == PIPE_FORMAT_R9G9B9E5_FLOAT)) {

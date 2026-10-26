@@ -6704,6 +6704,7 @@ agx3_g17p_rt0_eot_kind(const agx_context *ctx, enum agx_isa_encoding enc)
                  I->format != AGX_FORMAT_I16 &&
                  I->format != AGX_FORMAT_F16 &&
                  I->format != AGX_FORMAT_RGB10A2 &&
+                 I->format != AGX_FORMAT_RG11B10F &&
                  I->format != AGX_FORMAT_I32) || I->dim != AGX_DIM_2D ||
                 !I->explicit_coords ||
                 I->src[0].type != AGX_INDEX_IMMEDIATE ||
@@ -6745,7 +6746,8 @@ agx3_g17p_rt0_eot_kind(const agx_context *ctx, enum agx_isa_encoding enc)
        store_format != AGX_FORMAT_I8 && store_format != AGX_FORMAT_U16NORM &&
        store_format != AGX_FORMAT_S16NORM && store_format != AGX_FORMAT_F16 &&
        store_format != AGX_FORMAT_S8NORM && store_format != AGX_FORMAT_I16 &&
-       store_format != AGX_FORMAT_I32 && store_format != AGX_FORMAT_RGB10A2)
+       store_format != AGX_FORMAT_I32 && store_format != AGX_FORMAT_RGB10A2 &&
+       store_format != AGX_FORMAT_RG11B10F)
       return AGX3_G17P_RT0_EOT_NONE;
 
    return agx3_g17p_rt0_eot_store_kind(ctx->key, store_format);
@@ -6848,7 +6850,8 @@ agx3_g17p_layered_eot_kind(const agx_context *ctx, enum agx_isa_encoding enc)
         store_format != AGX_FORMAT_I8 && store_format != AGX_FORMAT_U16NORM &&
         store_format != AGX_FORMAT_S16NORM && store_format != AGX_FORMAT_F16 &&
         store_format != AGX_FORMAT_S8NORM && store_format != AGX_FORMAT_I16 &&
-        store_format != AGX_FORMAT_I32 && store_format != AGX_FORMAT_RGB10A2))
+        store_format != AGX_FORMAT_I32 && store_format != AGX_FORMAT_RGB10A2 &&
+        store_format != AGX_FORMAT_RG11B10F))
       return AGX3_G17P_RT0_EOT_NONE;
 
    return agx3_g17p_rt0_eot_store_kind(ctx->key, store_format);
@@ -7905,6 +7908,7 @@ agx3_g17p_mrt_eot_store_format_ok(enum agx_format format, uint8_t selector)
    case AGX_FORMAT_U8NORM:
    case AGX_FORMAT_S8NORM:
    case AGX_FORMAT_RGB10A2:
+   case AGX_FORMAT_RG11B10F:
       return selector == 0x75;
    case AGX_FORMAT_I16:
    case AGX_FORMAT_F16:

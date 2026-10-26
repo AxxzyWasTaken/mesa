@@ -18,6 +18,27 @@ agx_g17p_rt0_pbe_format(enum pipe_format format)
              : util_format_linear(format);
 }
 
+enum pipe_format
+agx_rt0_pbe_format(enum agx_chip chip, enum pipe_format format)
+{
+   if (format == PIPE_FORMAT_R11G11B10_FLOAT &&
+       agx_rg11b10_tile_is_packed_float(chip))
+      return format;
+
+   return agx_g17p_rt0_pbe_format(format);
+}
+
+uint8_t
+agx_mrt_eot_selector(enum agx_chip chip, enum pipe_format format)
+{
+   /* A packed-float tile word is a packed 32-bit lane, like RGB10A2. */
+   if (format == PIPE_FORMAT_R11G11B10_FLOAT &&
+       agx_rg11b10_tile_is_packed_float(chip))
+      return 0x75;
+
+   return agx_g17p_mrt_eot_selector(format);
+}
+
 uint8_t
 agx_g17p_mrt_eot_selector(enum pipe_format format)
 {
@@ -129,7 +150,8 @@ agx_g17p_configure_rt0_eot_key(enum pipe_format format,
       format == PIPE_FORMAT_R32G32_FLOAT || format == PIPE_FORMAT_R32_UINT ||
       format == PIPE_FORMAT_R32_SINT || format == PIPE_FORMAT_R32G32_SINT ||
       format == PIPE_FORMAT_R32G32_UINT ||
-      format == PIPE_FORMAT_R11G11B10_FLOAT ||
+      (format == PIPE_FORMAT_R11G11B10_FLOAT &&
+       !agx_rg11b10_tile_is_packed_float(key->dev.chip)) ||
       format == PIPE_FORMAT_R9G9B9E5_FLOAT ||
       format == PIPE_FORMAT_R32G32B32X32_FLOAT ||
       format == PIPE_FORMAT_R32G32B32A32_FLOAT ||
