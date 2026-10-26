@@ -55,8 +55,10 @@ hk_g17p_prewarm_poly_kernels(struct hk_device *dev)
 {
 #define PREWARM(program, args)                                                \
    do {                                                                        \
-      if (!hk_g17p_compute_program_cache_prewarm(                              \
-             dev, program, sizeof(struct args)))                               \
+      if (agx_chip_g17_m5(dev->dev.chip)                                       \
+             ? !agx_get_precompiled(&dev->bg_eot, program)                     \
+             : !hk_g17p_compute_program_cache_prewarm(                         \
+                  dev, program, sizeof(struct args)))                          \
          return false;                                                         \
    } while (0)
 
@@ -73,6 +75,11 @@ hk_g17p_prewarm_poly_kernels(struct hk_device *dev)
    PREWARM(LIBAGX_TESS_QUAD_1, libagx_tess_quad_args);
 
 #undef PREWARM
+
+   /* M5 resets the geometry heap with an immediate-write kernel. */
+   if (agx_chip_g17_m5(dev->dev.chip) &&
+       !agx_get_precompiled(&dev->bg_eot, LIBAGX_WRITE_U32S))
+      return false;
 
    return true;
 }
@@ -980,11 +987,11 @@ hk_CreateDevice(VkPhysicalDevice physicalDevice,
    }
    hk_g17p_bg_eot_dev_cache_init(dev);
 
-   /* Geometry and tessellation are advertised core functionality on G17P.
-    * Upload their immutable internal kernels with the device instead of
+   /* Geometry and tessellation are advertised core functionality on G17P and
+    * M5. Upload their immutable internal kernels with the device instead of
     * making the first vkCmdDraw that needs each kernel serialize on the
     * cache lock and allocate its executable image. */
-   if (agx_native_graphics(&dev->dev) &&
+   if ((agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) &&
        !hk_g17p_prewarm_poly_kernels(dev)) {
       result = VK_ERROR_OUT_OF_DEVICE_MEMORY;
       HK_INIT_FAIL(fail_bg_eot, "poly-prewarm", 0);
