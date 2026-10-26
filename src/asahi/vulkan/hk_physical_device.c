@@ -2008,7 +2008,9 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
          debug_get_bool_option("ASAHI_M5_NATIVE_RT", false);
       supported_extensions.KHR_ray_tracing_pipeline = native_rt;
       supported_extensions.KHR_ray_tracing_maintenance1 = native_rt;
-      supported_extensions.KHR_pipeline_library = native_rt;
+      /* Graphics pipeline libraries need VK_KHR_pipeline_library whether or
+       * not ray tracing pipelines are exposed. */
+      supported_extensions.KHR_pipeline_library |= native_rt;
    }
    supported_extensions.KHR_cooperative_matrix =
       agx_chip_g17_m5(pdev->dev.chip) &&
