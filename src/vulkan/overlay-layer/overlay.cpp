@@ -534,8 +534,12 @@ static struct swapchain_data *new_swapchain_data(VkSwapchainKHR swapchain,
    list_inithead(&data->draws);
    map_object(HKEY(data->swapchain), data);
 
-   /* Open output file on swapchain creation */
-   assert(instance_data->output_file_fd == NULL);
+   /* Open the output file with the instance's first swapchain. It belongs to
+    * the instance, not to a swapchain: an application recreating its
+    * swapchain creates the new one before destroying the old, and closing the
+    * file with the old one left the new one writing through a NULL FILE.
+    */
+   if (instance_data->params.output_file && !instance_data->output_file_fd) {
    instance_data->output_file_fd =
       fopen(instance_data->params.output_file, "w+");
 
@@ -555,6 +559,7 @@ static struct swapchain_data *new_swapchain_data(VkSwapchainKHR swapchain,
       fprintf(instance_data->output_file_fd, "\n");
    } else
       fprintf(stderr, "ERROR opening output file: %s\n", strerror(errno));
+   }
 
    return data;
 }
@@ -864,7 +869,7 @@ static void snapshot_swapchain_frame(struct swapchain_data *data)
       if (capture_begin ||
           elapsed >= instance_data->params.fps_sampling_period) {
          data->fps = 1000000.0f * data->n_frames_since_update / elapsed;
-         if (instance_data->capture_started) {
+         if (instance_data->capture_started && instance_data->output_file_fd) {
             for (int s = 0; s < OVERLAY_PARAM_ENABLED_MAX; s++) {
                if (!instance_data->params.enabled[s])
                   continue;
@@ -1918,11 +1923,6 @@ static void overlay_DestroySwapchainKHR(
       return;
    }
 
-   if (instance_data->output_file_fd) {
-      fclose(instance_data->output_file_fd);
-      instance_data->output_file_fd = NULL;
-   }
-
    struct swapchain_data *swapchain_data =
       FIND(struct swapchain_data, swapchain);
 
@@ -2691,6 +2691,8 @@ static void overlay_DestroyInstance(
    struct instance_data *instance_data = FIND(struct instance_data, instance);
    instance_data_map_physical_devices(instance_data, false);
    instance_data->vtable.DestroyInstance(instance, pAllocator);
+   if (instance_data->output_file_fd)
+      fclose(instance_data->output_file_fd);
    destroy_instance_data(instance_data);
 }
 
