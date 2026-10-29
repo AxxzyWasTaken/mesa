@@ -1736,6 +1736,17 @@ static void setup_swapchain_data(struct swapchain_data *data,
    ImGui::GetIO().IniFilename = NULL;
    ImGui::GetIO().DisplaySize = ImVec2((float)data->width, (float)data->height);
 
+   /* MESA_OVERLAY_SCALE: draw the overlay this many times larger, for a
+    * swapchain rendered at a HiDPI output's buffer scale, where the default
+    * 13 px font is half the size it reads at on a scale-1 output. */
+   const char *scale_env = getenv("MESA_OVERLAY_SCALE");
+   const float overlay_scale = scale_env ? strtof(scale_env, NULL) : 1.0f;
+   if (overlay_scale > 1.0f && overlay_scale <= 8.0f) {
+      ImGui::GetIO().FontGlobalScale = overlay_scale;
+      ImGui::GetStyle().ScaleAllSizes(overlay_scale);
+      data->window_size.x *= overlay_scale;
+   }
+
    struct device_data *device_data = data->device;
 
    /* Render pass */
