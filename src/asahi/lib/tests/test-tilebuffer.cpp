@@ -533,6 +533,17 @@ TEST(Tilebuffer, G17PSpecialFormatEOTKey)
    tib = agx_build_tilebuffer_layout(packed_float, 1, 1, true);
    EXPECT_FALSE(agx_g17p_rt0_tile_layout_supported(&tib));
 
+   /* Beside other targets at four samples it takes the mixed multi-target
+    * programs with the W32 selector, as RGB9E5 does (Transport Fever 3). */
+   enum pipe_format packed_mrt[AGX_MAX_RENDER_TARGETS] = {
+      PIPE_FORMAT_R8G8B8A8_UNORM, PIPE_FORMAT_R11G11B10_FLOAT,
+   };
+   tib = agx_build_tilebuffer_layout_with_limits(
+      packed_mrt, 2, 4, false, AGX_G17P_MAX_BYTES_PER_SAMPLE, 32768, 2048);
+   EXPECT_EQ(tib.sample_size_B, 8);
+   EXPECT_EQ(agx_g17p_classify_mrt(&tib), AGX_G17P_MRT_MIXED);
+   EXPECT_TRUE(agx_g17p_rt0_tile_layout_supported(&tib));
+
    /* RGB9E5 is packed natively into the same raw tile word. */
    enum pipe_format rgb9e5[AGX_MAX_RENDER_TARGETS] = {
       PIPE_FORMAT_R9G9B9E5_FLOAT,

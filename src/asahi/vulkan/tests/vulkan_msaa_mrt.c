@@ -1,0 +1,382 @@
+/* Copyright 2026 Aurora Silicon
+ * SPDX-License-Identifier: MIT
+ *
+ * Multisample colour attachments of mixed formats in one pass, as Transport
+ * Fever 3 records at 4x: with an R11G11B10F target among them G17P refused
+ * the tilebuffer layout ("G17P tilebuffer layout refused: attachments=3
+ * samples=4 sample_size=8 tile_size=512") and vkEndCommandBuffer returned
+ * VK_ERROR_FEATURE_NOT_PRESENT. The default set reproduces that line.
+ *
+ * Pass 1 clears each attachment (loadOp CLEAR, storeOp STORE). Pass 2 reloads
+ * them (loadOp LOAD), clears the left half with vkCmdClearAttachments (a
+ * fragment draw) and resolves them. Each resolved image must equal a
+ * single-sample reference given the same clears.
+ *
+ *   vulkan-msaa-mrt [formats=rgba8,r11g11b10f,none] [attachments=3] [samples=4]
+ *                   [pass2=load|clear]
+ *   formats: one name repeated `attachments` times, or a comma-separated list
+ *   with one name per attachment ("none" = VK_NULL_HANDLE view):
+ *   rgba16f rgba8 rg16f r32f rg32f rgba32f rgb10a2 r11g11b10f none
+ * Exit 0 = PASS, 1 = FAIL. */
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <vulkan/vulkan.h>
+
+#define CHECK(x)                                                              \
+   do {                                                                       \
+      VkResult r_ = (x);                                                      \
+      if (r_ != VK_SUCCESS) {                                                 \
+         printf("FAIL: %s = %d (line %d)\n", #x, r_, __LINE__);               \
+         exit(1);                                                             \
+      }                                                                       \
+   } while (0)
+
+#define W 64
+#define H 64
+#define MAX_ATT 8
+
+static const struct { const char *name; VkFormat fmt; unsigned bpp; } formats[] = {
+   {"rgba16f", VK_FORMAT_R16G16B16A16_SFLOAT, 8},
+   {"rgba8", VK_FORMAT_R8G8B8A8_UNORM, 4},
+   {"rg16f", VK_FORMAT_R16G16_SFLOAT, 4},
+   {"r32f", VK_FORMAT_R32_SFLOAT, 4},
+   {"rg32f", VK_FORMAT_R32G32_SFLOAT, 8},
+   {"rgba32f", VK_FORMAT_R32G32B32A32_SFLOAT, 16},
+   {"rgb10a2", VK_FORMAT_A2B10G10R10_UNORM_PACK32, 4},
+   {"r11g11b10f", VK_FORMAT_B10G11R11_UFLOAT_PACK32, 4},
+   {"none", VK_FORMAT_UNDEFINED, 0},
+};
+
+static VkDevice dev;
+static VkPhysicalDeviceMemoryProperties memprops;
+
+static VkDeviceMemory
+bind_memory(VkMemoryRequirements req, VkMemoryPropertyFlags flags)
+{
+   for (uint32_t i = 0; i < memprops.memoryTypeCount; i++) {
+      if ((req.memoryTypeBits & (1u << i)) &&
+          (memprops.memoryTypes[i].propertyFlags & flags) == flags) {
+         VkMemoryAllocateInfo ai = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, NULL,
+                                    req.size, i};
+         VkDeviceMemory mem;
+         CHECK(vkAllocateMemory(dev, &ai, NULL, &mem));
+         return mem;
+      }
+   }
+   printf("FAIL: no memory type\n");
+   exit(1);
+}
+
+static VkImage
+make_image(VkFormat fmt, VkSampleCountFlagBits samples, VkImageView *view)
+{
+   VkImageCreateInfo ci = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+      .imageType = VK_IMAGE_TYPE_2D,
+      .format = fmt,
+      .extent = {W, H, 1},
+      .mipLevels = 1,
+      .arrayLayers = 1,
+      .samples = samples,
+      .tiling = VK_IMAGE_TILING_OPTIMAL,
+      .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+               VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+   };
+   VkImage img;
+   CHECK(vkCreateImage(dev, &ci, NULL, &img));
+   VkMemoryRequirements req;
+   vkGetImageMemoryRequirements(dev, img, &req);
+   CHECK(vkBindImageMemory(dev, img,
+                           bind_memory(req, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT), 0));
+   if (view) {
+      VkImageViewCreateInfo vi = {
+         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+         .image = img,
+         .viewType = VK_IMAGE_VIEW_TYPE_2D,
+         .format = fmt,
+         .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+      };
+      CHECK(vkCreateImageView(dev, &vi, NULL, view));
+   }
+   return img;
+}
+
+static void
+barrier(VkCommandBuffer cb)
+{
+   VkMemoryBarrier2 mb = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+      .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+      .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+      .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+      .dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+   };
+   VkDependencyInfo di = {.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                          .memoryBarrierCount = 1, .pMemoryBarriers = &mb};
+   vkCmdPipelineBarrier2(cb, &di);
+}
+
+static void
+to_general(VkCommandBuffer cb, VkImage img)
+{
+   VkImageMemoryBarrier2 ib = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+      .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+      .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+      .dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+      .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image = img,
+      .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+   };
+   VkDependencyInfo di = {.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                          .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &ib};
+   vkCmdPipelineBarrier2(cb, &di);
+}
+
+static VkClearColorValue
+colour(unsigned att, unsigned pass)
+{
+   /* Exactly representable in every listed format; distinct per attachment
+    * and per pass. */
+   VkClearColorValue c = {{0, 0, 0, 1}};
+   c.float32[att % 3] = 1.0f;
+   c.float32[(att + pass + 1) % 3] = pass ? 0.5f : 0.0f;
+   c.float32[3] = pass ? 0.0f : 1.0f;
+   return c;
+}
+
+int
+main(int argc, char **argv)
+{
+   const char *list = argc > 1 ? argv[1] : "rgba8,r11g11b10f,none";
+   unsigned count = argc > 2 ? atoi(argv[2]) : 3;
+   unsigned samples = argc > 3 ? atoi(argv[3]) : 4;
+   bool pass2_load = !(argc > 4 && !strcmp(argv[4], "clear"));
+   VkFormat fmt[MAX_ATT];
+   unsigned bpp[MAX_ATT];
+   char names[256];
+   snprintf(names, sizeof(names), "%s", list);
+   unsigned listed = 0;
+   for (char *tok = strtok(names, ","); tok; tok = strtok(NULL, ",")) {
+      unsigned f = 0;
+      while (f < sizeof(formats) / sizeof(formats[0]) && strcmp(formats[f].name, tok))
+         f++;
+      if (f == sizeof(formats) / sizeof(formats[0]) || listed == MAX_ATT)
+         goto usage;
+      fmt[listed] = formats[f].fmt;
+      bpp[listed++] = formats[f].bpp;
+   }
+   if (listed > 1)
+      count = listed;
+   if (!listed || !count || count > MAX_ATT) {
+   usage:
+      fprintf(stderr, "usage: %s [format[,format...]] [attachments<=8] [samples] [load|clear]\n",
+              argv[0]);
+      return 2;
+   }
+   for (unsigned i = listed; i < count; i++) {
+      fmt[i] = fmt[0];
+      bpp[i] = bpp[0];
+   }
+   printf("%u attachments (%s), %ux, pass 2 loadOp %s\n", count, list, samples,
+          pass2_load ? "LOAD" : "CLEAR");
+
+   VkApplicationInfo app = {.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+                            .apiVersion = VK_API_VERSION_1_3};
+   VkInstanceCreateInfo ici = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+                               .pApplicationInfo = &app};
+   VkInstance inst;
+   CHECK(vkCreateInstance(&ici, NULL, &inst));
+   uint32_t n = 1;
+   VkPhysicalDevice pdev;
+   VkResult r = vkEnumeratePhysicalDevices(inst, &n, &pdev);
+   if ((r != VK_SUCCESS && r != VK_INCOMPLETE) || !n) {
+      printf("FAIL: no physical device\n");
+      return 1;
+   }
+   VkPhysicalDeviceProperties props;
+   vkGetPhysicalDeviceProperties(pdev, &props);
+   vkGetPhysicalDeviceMemoryProperties(pdev, &memprops);
+   printf("device: %s\n", props.deviceName);
+
+   float prio = 1.0f;
+   VkDeviceQueueCreateInfo qci = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                                  .queueFamilyIndex = 0, .queueCount = 1,
+                                  .pQueuePriorities = &prio};
+   VkPhysicalDeviceVulkan13Features f13 = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+      .synchronization2 = VK_TRUE, .dynamicRendering = VK_TRUE};
+   VkDeviceCreateInfo dci = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+                             .pNext = &f13, .queueCreateInfoCount = 1,
+                             .pQueueCreateInfos = &qci};
+   CHECK(vkCreateDevice(pdev, &dci, NULL, &dev));
+   VkQueue queue;
+   vkGetDeviceQueue(dev, 0, 0, &queue);
+
+   VkImage ms[MAX_ATT], res[MAX_ATT], ref[MAX_ATT];
+   VkImageView ms_view[MAX_ATT] = {0}, res_view[MAX_ATT] = {0}, ref_view[MAX_ATT] = {0};
+   for (unsigned i = 0; i < count; i++) {
+      if (!fmt[i])
+         continue;
+      ms[i] = make_image(fmt[i], samples, &ms_view[i]);
+      res[i] = make_image(fmt[i], VK_SAMPLE_COUNT_1_BIT, &res_view[i]);
+      ref[i] = make_image(fmt[i], VK_SAMPLE_COUNT_1_BIT, &ref_view[i]);
+   }
+
+   const VkDeviceSize img_size = (VkDeviceSize)W * H * 16;
+   VkBufferCreateInfo bci = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                             .size = img_size * count * 2,
+                             .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT};
+   VkBuffer buf;
+   CHECK(vkCreateBuffer(dev, &bci, NULL, &buf));
+   VkMemoryRequirements breq;
+   vkGetBufferMemoryRequirements(dev, buf, &breq);
+   VkDeviceMemory bmem = bind_memory(breq, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   CHECK(vkBindBufferMemory(dev, buf, bmem, 0));
+
+   VkCommandPoolCreateInfo pci = {.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+   VkCommandPool pool;
+   CHECK(vkCreateCommandPool(dev, &pci, NULL, &pool));
+   VkCommandBufferAllocateInfo cai = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+                                      .commandPool = pool,
+                                      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                                      .commandBufferCount = 1};
+   VkCommandBuffer cb;
+   CHECK(vkAllocateCommandBuffers(dev, &cai, &cb));
+   VkCommandBufferBeginInfo cbi = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+   CHECK(vkBeginCommandBuffer(cb, &cbi));
+
+   for (unsigned i = 0; i < count; i++) {
+      if (!fmt[i])
+         continue;
+      to_general(cb, ms[i]);
+      to_general(cb, res[i]);
+      to_general(cb, ref[i]);
+   }
+
+   /* Reference: pass-1 colour everywhere; the left half gets the pass-2
+    * colour below. */
+   for (unsigned i = 0; i < count; i++) {
+      if (!fmt[i])
+         continue;
+      VkClearColorValue c = colour(i, 0);
+      VkImageSubresourceRange range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+      vkCmdClearColorImage(cb, ref[i], VK_IMAGE_LAYOUT_GENERAL, &c, 1, &range);
+   }
+
+   VkRenderingAttachmentInfo att[MAX_ATT];
+   VkRenderingInfo ri = {.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+                         .renderArea = {{0, 0}, {W, H}},
+                         .layerCount = 1,
+                         .colorAttachmentCount = count,
+                         .pColorAttachments = att};
+   for (unsigned pass = 0; pass < 2; pass++) {
+      for (unsigned i = 0; i < count; i++) {
+         att[i] = (VkRenderingAttachmentInfo){
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = ms_view[i],
+            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .loadOp = pass && pass2_load ? VK_ATTACHMENT_LOAD_OP_LOAD
+                                         : VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .clearValue.color = colour(i, 0),
+         };
+         if (pass && fmt[i]) {
+            att[i].resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+            att[i].resolveImageView = res_view[i];
+            att[i].resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+         }
+      }
+      barrier(cb);
+      vkCmdBeginRendering(cb, &ri);
+      if (pass) {
+         VkClearAttachment ca[MAX_ATT];
+         for (unsigned i = 0; i < count; i++)
+            ca[i] = (VkClearAttachment){VK_IMAGE_ASPECT_COLOR_BIT, i,
+                                        {.color = colour(i, 1)}};
+         VkClearRect rect = {{{0, 0}, {W / 2, H}}, 0, 1};
+         vkCmdClearAttachments(cb, count, ca, 1, &rect);
+      }
+      vkCmdEndRendering(cb);
+   }
+   barrier(cb);
+
+   /* Left half of the reference: render a single-sample pass with the same
+    * vkCmdClearAttachments call, which takes no tilebuffer path under test. */
+   {
+      VkRenderingAttachmentInfo ra[MAX_ATT];
+      for (unsigned i = 0; i < count; i++) {
+         ra[i] = (VkRenderingAttachmentInfo){
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = ref_view[i], .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE};
+      }
+      VkRenderingInfo rri = ri;
+      rri.pColorAttachments = ra;
+      vkCmdBeginRendering(cb, &rri);
+      VkClearAttachment ca[MAX_ATT];
+      for (unsigned i = 0; i < count; i++)
+         ca[i] = (VkClearAttachment){VK_IMAGE_ASPECT_COLOR_BIT, i,
+                                     {.color = colour(i, 1)}};
+      VkClearRect rect = {{{0, 0}, {W / 2, H}}, 0, 1};
+      vkCmdClearAttachments(cb, count, ca, 1, &rect);
+      vkCmdEndRendering(cb);
+   }
+   barrier(cb);
+
+   for (unsigned i = 0; i < count; i++) {
+      if (!fmt[i])
+         continue;
+      VkBufferImageCopy copy = {.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+                                .imageExtent = {W, H, 1}};
+      copy.bufferOffset = img_size * (2 * i);
+      vkCmdCopyImageToBuffer(cb, res[i], VK_IMAGE_LAYOUT_GENERAL, buf, 1, &copy);
+      copy.bufferOffset = img_size * (2 * i + 1);
+      vkCmdCopyImageToBuffer(cb, ref[i], VK_IMAGE_LAYOUT_GENERAL, buf, 1, &copy);
+   }
+   barrier(cb);
+
+   r = vkEndCommandBuffer(cb);
+   printf("vkEndCommandBuffer = %d%s\n", r,
+          r == VK_ERROR_FEATURE_NOT_PRESENT ? " (VK_ERROR_FEATURE_NOT_PRESENT)" : "");
+   if (r != VK_SUCCESS) {
+      printf("FAIL\n");
+      return 1;
+   }
+
+   VkSubmitInfo si = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                      .commandBufferCount = 1, .pCommandBuffers = &cb};
+   CHECK(vkQueueSubmit(queue, 1, &si, VK_NULL_HANDLE));
+   CHECK(vkQueueWaitIdle(queue));
+
+   uint8_t *map;
+   CHECK(vkMapMemory(dev, bmem, 0, VK_WHOLE_SIZE, 0, (void **)&map));
+   unsigned bad = 0;
+   for (unsigned i = 0; i < count; i++) {
+      if (!fmt[i])
+         continue;
+      const unsigned bpp_i = bpp[i];
+      const uint8_t *got = map + img_size * (2 * i);
+      const uint8_t *want = map + img_size * (2 * i + 1);
+      unsigned bad_px = 0;
+      for (unsigned px = 0; px < W * H; px++) {
+         if (memcmp(got + px * bpp_i, want + px * bpp_i, bpp_i)) {
+            if (!bad_px)
+               printf("attachment %u: first mismatch at (%u,%u)\n", i, px % W, px / W);
+            bad_px++;
+         }
+      }
+      if (bad_px)
+         printf("attachment %u: %u/%u pixels wrong\n", i, bad_px, W * H);
+      bad += bad_px;
+   }
+   printf("%s\n", bad ? "FAIL (contents)" : "PASS");
+   return bad ? 1 : 0;
+}

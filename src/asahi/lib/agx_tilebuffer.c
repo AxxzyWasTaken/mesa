@@ -620,8 +620,6 @@ agx_g17p_classify_mixed_mrt(const struct agx_tilebuffer_layout *tib,
       const unsigned size_B = format_size_B(tib->logical_format[rt]);
       mixed &= !tib->spilled[rt] &&
                agx_g17p_mrt_eot_selector(tib->logical_format[rt]) != 0 &&
-               !(tib->logical_format[rt] == PIPE_FORMAT_R11G11B10_FLOAT &&
-                 tib->nr_samples != 1) &&
                size_B && offset_B + size_B <= tib->sample_size_B;
       if (!mixed)
          break;
