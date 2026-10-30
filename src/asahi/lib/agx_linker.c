@@ -237,6 +237,22 @@ agx3_build_usc_base_page(uint8_t *image, size_t size, enum agx_chip chip,
    }
 }
 
+/* The container lead holds helper tables for two clusters. On a four-cluster
+ * GPU (M4 Max) the cores of clusters 2 and 3 call slots at +0x300 and +0x400
+ * of the USC window's base page, so give the base page those tables too. */
+void
+agx3_add_usc_base_cluster_tables(uint8_t *image, size_t size,
+                                 enum agx_chip chip, unsigned cores_per_cluster,
+                                 unsigned clusters)
+{
+   const unsigned slots = agx_chip_usc_helper_table_slots(chip, cores_per_cluster);
+
+   for (unsigned c = 2; c < clusters; ++c) {
+      assert(0x100 * (c + 1) + slots * 0x10 <= size);
+      agx3_fill_helper_table(image, 0x100 * (c + 1), slots);
+   }
+}
+
 static bool
 agx3_build_container(const struct agx_device *dev, uint8_t *image,
                      size_t code_size, bool fragment, bool sampled_fragment)

@@ -87,6 +87,10 @@ struct agx_linked_shader {
  * agx_ioto_program_core.h so decoders can share it. */
 void agx3_build_container_lead(uint8_t *image, enum agx_chip chip,
                                unsigned cores_per_cluster);
+void agx3_add_usc_base_cluster_tables(uint8_t *image, size_t size,
+                                      enum agx_chip chip,
+                                      unsigned cores_per_cluster,
+                                      unsigned clusters);
 void agx3_build_usc_base_page(uint8_t *image, size_t size, enum agx_chip chip,
                               unsigned cores_per_cluster);
 

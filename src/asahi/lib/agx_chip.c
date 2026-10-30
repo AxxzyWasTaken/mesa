@@ -67,7 +67,14 @@ agx_chip_from_params(const struct drm_asahi_params_global *params)
              params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_200)
             return AGX_CHIP_G17P;
          return AGX_CHIP_G16S;
-      case 'C': return AGX_CHIP_G16C;
+      case 'C':
+         /* The M4 Max (T6041) runs the M4 Pro's firmware build on the same
+          * G17 kernel runtime, with four clusters: the same contract. */
+         if (params->chip_id == 0x6041 &&
+             params->usc_generation == AGX_ISA_AGX3 &&
+             params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_200)
+            return AGX_CHIP_G17P;
+         return AGX_CHIP_G16C;
       default: return AGX_CHIP_UNKNOWN;
       }
    case 17:
@@ -294,7 +301,10 @@ agx_params_driver_supported(const struct drm_asahi_params_global *params)
       /* M4 Pro: two clusters (a binned part keeps two). */
       const bool m4_pro =
          params->chip_id == 0x6040 && params->num_clusters_total == 2;
-      return (a18_pro || m4_pro) && params->num_dies == 1 &&
+      /* M4 Max: four clusters (a binned part keeps four). */
+      const bool m4_max =
+         params->chip_id == 0x6041 && params->num_clusters_total == 4;
+      return (a18_pro || m4_pro || m4_max) && params->num_dies == 1 &&
              params->usc_generation == AGX_ISA_AGX3 &&
              params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_200;
    }
