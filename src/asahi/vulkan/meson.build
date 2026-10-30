@@ -739,6 +739,15 @@ if with_tests
   )
 
   executable(
+    'aurora-gbuffer-bench',
+    files('tests/vulkan_gbuffer_bench.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan'), dep_m],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
     'vulkan-msaa-mrt',
     files('tests/vulkan_msaa_mrt.c'),
     include_directories : [inc_include],
