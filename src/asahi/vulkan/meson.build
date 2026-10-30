@@ -757,6 +757,15 @@ if with_tests
   )
 
   executable(
+    'aurora-post-chain',
+    files('tests/vulkan_post_chain.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
     'vulkan-msaa-mrt',
     files('tests/vulkan_msaa_mrt.c'),
     include_directories : [inc_include],
