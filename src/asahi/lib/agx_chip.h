@@ -147,7 +147,8 @@ enum agx_submission_model {
  *
  * Above this bound a load-op clear is emitted as a full-area draw instead,
  * which covers every tile and keeps the target in the tilebuffer. A reloaded
- * attachment has no such draw and spills. A multiview render has a second,
+ * attachment has no such draw and spills, where the defect reaches it
+ * (agx_chip_uncovered_tile_ms_reload_defect). A multiview render has a second,
  * separate defect that the full-area draw does not cover --
  * dEQP-VK.multiview.multisample.no_queries.max_multi_view_view_count, 32
  * views of RGBA32F at 4x, whose clear value is all zeroes so the background
@@ -448,6 +449,23 @@ agx_chip_uncovered_tile_ms_defect(enum agx_chip chip)
 {
    return chip == AGX_CHIP_G17P || chip == AGX_CHIP_G16G ||
           agx_chip_native_g15(chip);
+}
+
+/*
+ * Whether that defect also reaches a reloaded attachment, which must then
+ * spill. On M4 Pro (T6040, chip id 0x6040) a 2x reload keeps the whole sample:
+ * kept in the tilebuffer, 149 runs of 12- and 16-byte samples passed (64x64
+ * to 3456x2234, 1 to 16 layers, partly drawn tiles, every empty tile
+ * processed), where the same runs at 4x lost the upper bytes in 40 of 102.
+ * A18 Pro, measured to lose them at 2x as well, keeps the spill.
+ */
+static inline bool
+agx_chip_uncovered_tile_ms_reload_defect(enum agx_chip chip, uint32_t chip_id,
+                                         unsigned samples)
+{
+   if (chip == AGX_CHIP_G17P && chip_id == 0x6040 && samples == 2)
+      return false;
+   return agx_chip_uncovered_tile_ms_defect(chip);
 }
 
 /* Whether a native fragment program may merge triangles across the

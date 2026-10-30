@@ -4587,18 +4587,24 @@ hk_begin_rendering(VkCommandBuffer commandBuffer,
     * gets that guarantee from the full-area clear draw emitted below, so it
     * stays in the tilebuffer. A reloaded attachment cannot: the background
     * reload is itself the truncating program, and nothing else rewrites the
-    * tiles the application does not draw to. Multiview has a second, separate
-    * defect that the clear draw does not cover either. Those two spill. */
+    * tiles the application does not draw to. (A draw that writes nothing, or
+    * blends the reloaded value back, does not help on M4 Pro: the tile it
+    * reads is already truncated.) Multiview has a second, separate defect that
+    * the clear draw does not cover either. Those two spill, except a reload
+    * where the defect does not reach it (M4 Pro at 2x). */
    bool g17p_wide_ms_to_memory = false;
    if (agx_chip_uncovered_tile_ms_defect(dev->dev.chip) &&
        render->tilebuffer.nr_samples > 1) {
       g17p_wide_ms_to_memory = render->view_mask != 0;
 
+      const bool reload_spills = agx_chip_uncovered_tile_ms_reload_defect(
+         dev->dev.chip, dev->dev.params.chip_id, render->tilebuffer.nr_samples);
       for (uint32_t i = 0; i < pRenderingInfo->colorAttachmentCount; i++) {
          const VkRenderingAttachmentInfo *att =
             &pRenderingInfo->pColorAttachments[i];
 
-         g17p_wide_ms_to_memory |= att->imageView != VK_NULL_HANDLE &&
+         g17p_wide_ms_to_memory |= reload_spills &&
+                                   att->imageView != VK_NULL_HANDLE &&
                                    att->loadOp == VK_ATTACHMENT_LOAD_OP_LOAD &&
                                    is_attachment_stored(att);
       }
