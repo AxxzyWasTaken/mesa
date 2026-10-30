@@ -189,6 +189,70 @@ ail_detile_32bpp(void *_tiled, void *_linear,
    }
 }
 
+/*
+ * The store direction of ail_detile_32bpp: gather each 4x4 block of a fully
+ * covered tile from four linear rows and write it as one sequential 64-byte
+ * line. The tiled side is usually write-combined, where whole in-order lines
+ * are fast and scattered 4-byte stores are not. Tiles the box only partially
+ * covers fall back to memcpy_small.
+ */
+static void
+ail_tile_32bpp(void *_tiled, void *_linear,
+               const struct ail_layout *tiled_layout, unsigned level,
+               unsigned linear_pitch_B, unsigned sx, unsigned sy,
+               unsigned width, unsigned height)
+{
+   static const unsigned row_offs[4] = {0, 2, 8, 10};
+   struct ail_tile tile_size = tiled_layout->tilesize_el[level];
+   unsigned tw = tile_size.width_el, th = tile_size.height_el;
+   unsigned area = tw * th;
+   unsigned tiles_per_row = DIV_ROUND_UP(tiled_layout->stride_el[level], tw);
+   unsigned space_mask_x = ail_space_mask(tw);
+   unsigned space_mask_y = ail_space_mask(th) << 1;
+   unsigned ex = sx + width, ey = sy + height;
+   uint32_t *tiled = (uint32_t *)_tiled;
+   const uint8_t *linear = (const uint8_t *)_linear;
+
+   for (unsigned ty = sy / th; ty <= (ey - 1) / th; ++ty) {
+      unsigned y0 = ty * th;
+
+      for (unsigned tx = sx / tw; tx <= (ex - 1) / tw; ++tx) {
+         unsigned x0 = tx * tw;
+
+         if (x0 < sx || x0 + tw > ex || y0 < sy || y0 + th > ey) {
+            unsigned px = MAX2(x0, sx), py = MAX2(y0, sy);
+
+            memcpy_small<uint32_t, true>(
+               _tiled,
+               (void *)(linear + (py - sy) * linear_pitch_B + (px - sx) * 4),
+               tiled_layout, level, linear_pitch_B, px, py,
+               MIN2(x0 + tw, ex) - px, MIN2(y0 + th, ey) - py);
+            continue;
+         }
+
+         uint32_t *tile = tiled + (ty * tiles_per_row + tx) * area;
+         const uint8_t *src =
+            linear + (y0 - sy) * linear_pitch_B + (x0 - sx) * 4;
+
+         for (unsigned i = 0; i < area; i += 16) {
+            unsigned bx = ail_compact_bits(i & space_mask_x);
+            unsigned by = ail_compact_bits((i & space_mask_y) >> 1);
+            uint32_t blk[16];
+
+            for (unsigned r = 0; r < 4; ++r) {
+               const uint8_t *s = src + (by + r) * linear_pitch_B + bx * 4;
+
+               memcpy(blk + row_offs[r], s, 8);
+               memcpy(blk + row_offs[r] + 4, s + 8, 8);
+            }
+
+            /* One 64-byte write: whole lines, which WC memory needs */
+            memcpy(tile + i, blk, sizeof(blk));
+         }
+      }
+   }
+}
+
 #define TILED_UNALIGNED_TYPES(blocksize_B, store)                              \
    if (blocksize_B == 1) {                                                     \
       memcpy_small<uint8_t, store>(_tiled, _linear, tiled_layout, level,       \
@@ -256,6 +320,16 @@ ail_tile(void *_tiled, void *_linear, const struct ail_layout *tiled_layout,
           "Invalid usage");
    assert((sx_px + swidth_px) <= width_px && "Invalid usage");
    assert((sy_px + sheight_px) <= height_px && "Invalid usage");
+
+   struct ail_tile tile_size = tiled_layout->tilesize_el[level];
+   if (blocksize_B == 4 && swidth_px && sheight_px &&
+       util_format_get_blockwidth(tiled_layout->format) == 1 &&
+       util_format_get_blockheight(tiled_layout->format) == 1 &&
+       tile_size.width_el >= 4 && tile_size.height_el >= 4) {
+      ail_tile_32bpp(_tiled, _linear, tiled_layout, level, linear_pitch_B,
+                     sx_px, sy_px, swidth_px, sheight_px);
+      return;
+   }
 
    TILED_UNALIGNED_TYPES(blocksize_B, true);
 }
