@@ -433,8 +433,17 @@ agx_gallium_pack_native_pbe(
       legacy->layout == AGX_LAYOUT_GPU && !multisample;
    if ((!layered && !multisample &&
         legacy->dimension != AGX_TEXTURE_DIMENSION_2D) ||
+       /* Gen10 linear 2D is agx_pbe_agx3_2d_pack()'s layout exactly. The
+        * macOS 26.6 G17G driver's write descriptor for a buffer-backed
+        * RGBA8Unorm texture, read back from its descriptor heap
+        * (gpu/g17g-witness/argdump.m in the m5air tree):
+        *
+        *   256x64,    stride 1024:  00001f80ffe40a02 0003f01000001800
+        *   2560x1600, stride 10240: 00031f89ffe40a02 0027f01000001800
+        *
+        * address >> 4 in word1[43:0] and stride - 16 from bit 40. */
        (legacy->layout == AGX_LAYOUT_LINEAR &&
-        (!gen9 || legacy->level != 0 || legacy->levels != 1 ||
+        (legacy->level != 0 || legacy->levels != 1 ||
          legacy->unk_mipmapped)) ||
        (legacy->layout != AGX_LAYOUT_LINEAR &&
         legacy->layout != AGX_LAYOUT_TWIDDLED &&
