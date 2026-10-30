@@ -3497,21 +3497,32 @@ hk_tilebuffer_layout(const struct hk_device *dev, const VkFormat *vk_formats,
          formats, count, samples, layered, max_sample_size_B, 65536, 2048,
          resident_mask);
    }
-   return agx_build_tilebuffer_layout_with_limits(
+   return agx_build_tilebuffer_layout_with_limits_resident(
       formats, count, samples, layered, max_sample_size_B,
-      imageblock ? 32768 : 0, agx_native_graphics(&dev->dev) ? 2048 : 0);
+      imageblock ? 32768 : 0, agx_native_graphics(&dev->dev) ? 2048 : 0,
+      resident_mask);
 }
 
 /* M5 compressed multisample colour attachments stay in the tilebuffer: a
  * spilled attachment is read back during the pass through its texture view,
  * and compressed reads do not observe the pass's own memory stores.
  * Compressed multisample targets are at most eight bytes, so all eight fit
- * the 4x sample budget (64 bytes) and do not spill when allocated first. */
+ * the 4x sample budget (64 bytes) and do not spill when allocated first.
+ *
+ * G17P cannot spill a compressed target at all (no decompression program),
+ * and compresses multisample colour only at 2x on M4 Pro. A 2x tile holds
+ * 64 bytes a sample (32 KiB over 16x16 pixels), so allocated first they fit
+ * too.
+ *
+ * shortcut: a multiview pass has an eight-byte budget, so over that it spills
+ * one and fails closed at render time. Refuse 2x colour compression on a
+ * device with the multiview feature if an application needs that shape. */
 static uint8_t
-hk_m5_resident_attachments(const struct hk_device *dev,
-                           const struct hk_rendering_state *render)
+hk_resident_attachments(const struct hk_device *dev,
+                        const struct hk_rendering_state *render)
 {
-   if (!agx_chip_g17_m5(dev->dev.chip) || render->tilebuffer.nr_samples <= 1)
+   if ((!agx_chip_g17_m5(dev->dev.chip) && dev->dev.chip != AGX_CHIP_G17P) ||
+       render->tilebuffer.nr_samples <= 1)
       return 0;
 
    uint8_t mask = 0;
@@ -4614,7 +4625,7 @@ hk_begin_rendering(VkCommandBuffer commandBuffer,
       render->color_att_count, render->tilebuffer.nr_samples,
       (!agx_native_graphics(&dev->dev) && !agx_chip_g17_m5(dev->dev.chip)) ||
          !hk_agx3_g17p_single_layer_rendering(render->view_mask, layer_count),
-      g17p_wide_ms_to_memory, hk_m5_resident_attachments(dev, render));
+      g17p_wide_ms_to_memory, hk_resident_attachments(dev, render));
 
    if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip))
       render->g17p_rt0_layout_supported =
@@ -4933,7 +4944,9 @@ hk_begin_rendering(VkCommandBuffer commandBuffer,
          /* Resident targets retain compression. Only memory-backed targets
           * need their compressed contents converted before shader stores.
           */
-         if (agx_chip_g17_m5(dev->dev.chip) && !render->tilebuffer.spilled[i])
+         if ((agx_chip_g17_m5(dev->dev.chip) ||
+              dev->dev.chip == AGX_CHIP_G17P) &&
+             !render->tilebuffer.spilled[i])
             continue;
 
          struct hk_image_view *view = render->color_att[i].iview;
@@ -4957,10 +4970,12 @@ hk_begin_rendering(VkCommandBuffer commandBuffer,
 
                perf_debug(cmd, "Decompressing in-place");
 
-               /* libagx_decompress has no G17P binary. G17P only compresses
-                * 1-8 byte single-sample targets, which cannot spill (8 x 8 B
-                * fit the 120 B/sample tilebuffer), so this is unreachable;
-                * fail closed with a diagnostic rather than a NULL program. */
+               /* libagx_decompress has no G17P binary. G17P compresses 1-8
+                * byte colour targets, single-sample or 2x on M4 Pro, which
+                * hk_resident_attachments() keeps in the tilebuffer. Only a
+                * multiview pass, whose budget is eight bytes a sample, can
+                * still spill one; fail closed with a diagnostic rather than
+                * a NULL program. */
                if (dev->dev.chip == AGX_CHIP_G17P) {
                   mesa_loge_once("G17P: spilled render pass with a compressed "
                                  "attachment (%s) is unsupported",
@@ -7306,11 +7321,11 @@ hk_get_fast_linked_locked_fs(struct hk_device *dev, struct hk_shader *shader,
                  key->epilog.nr_samples, true, key->epilog.max_sample_size_B,
                  key->epilog.max_bytes_per_tile,
                  key->epilog.max_samples_per_tile, key->epilog.resident_mask)
-            : agx_build_tilebuffer_layout_with_limits(
+            : agx_build_tilebuffer_layout_with_limits_resident(
                  key->epilog.rt_formats, ARRAY_SIZE(key->epilog.rt_formats),
                  key->epilog.nr_samples, true, key->epilog.max_sample_size_B,
                  key->epilog.max_bytes_per_tile,
-                 key->epilog.max_samples_per_tile);
+                 key->epilog.max_samples_per_tile, key->epilog.resident_mask);
       for (unsigned rt = 0; rt < ARRAY_SIZE(tib.logical_format); ++rt) {
          if (tib.logical_format[rt] != PIPE_FORMAT_NONE && !tib.spilled[rt])
             BITSET_SET(g17p_tile_partitions, tib._offset_B[rt]);

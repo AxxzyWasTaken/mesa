@@ -183,9 +183,12 @@ check_shape(VkFormat format, bool is_zs)
    CHECK(ELIGIBLE(i));
    i = base; i.arrayLayers = 6;
    CHECK(ELIGIBLE(i));
+   /* Of the multisample colour attachments, only 2x (one layer) on M4 Pro. */
    for (unsigned s = 2; s <= 64; s <<= 1) {
       i = base; i.samples = (VkSampleCountFlagBits)s;
-      CHECK(ELIGIBLE(i) == (is_depth && s <= 4));
+      CHECK(ELIGIBLE(i) == (s == 2));
+      i.arrayLayers = 2;
+      CHECK(!ELIGIBLE(i));
    }
    i = base; i.tiling = VK_IMAGE_TILING_LINEAR;
    CHECK(!ELIGIBLE(i));
@@ -234,6 +237,8 @@ check_shape(VkFormat format, bool is_zs)
  * pass, attachment slot and neighbouring formats are unknown at allocation.
  * Cover every admitted colour format, including the smallest ones that can
  * spill next to wide targets, and input/transient attachment combinations.
+ * A 2x single-layer attachment is admitted: allocated first, every target
+ * of at most eight bytes fits the 64-byte 2x sample (hk_resident_attachments).
  */
 static void
 check_colour_msaa_spill_policy(void)
@@ -257,10 +262,12 @@ check_colour_msaa_spill_policy(void)
                   attachment.usage |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
                if (mask & 2)
                   attachment.usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
-               CHECK(ELIGIBLE(attachment) == (samples == 1));
+               const bool expected =
+                  samples == 1 || (samples == 2 && layers == 1 && !(mask & 1));
+               CHECK(ELIGIBLE(attachment) == expected);
                attachment.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT |
                                   VK_IMAGE_CREATE_EXTENDED_USAGE_BIT;
-               CHECK(ELIGIBLE(attachment) == (samples == 1));
+               CHECK(ELIGIBLE(attachment) == expected);
             }
          }
       }
@@ -315,7 +322,8 @@ check_layered_and_msaa(void)
 
 /* Preserve the pre-port depth/stencil policy across the shapes observed in
  * depth sampling, feedback loops, host copies and transfer clears. Allocation
- * tests alone did not catch the unsupported colour-alias command paths. */
+ * tests alone did not catch the unsupported colour-alias command paths.
+ * The exception is the depth plane at 2x, without feedback-loop use. */
 static void
 check_legacy_depth_policy(void)
 {
@@ -337,11 +345,12 @@ check_legacy_depth_policy(void)
                                                usages[u]);
                   i.arrayLayers = layers;
                   i.samples = (VkSampleCountFlagBits)samples;
-                  const bool expected = f < 3 && u < 3 && levels == 1 &&
-                                        layers == 1 && samples == 1;
+                  const bool expected =
+                     f < 3 && u < 3 && levels == 1 && layers == 1 &&
+                     (samples == 1 || (samples == 2 && u != 1));
                   CHECK(ELIGIBLE(i) == expected);
                   CHECK(g16s_eligible(AGX_CHIP_G17P, 1, &i) ==
-                        (expected && f == 2));
+                        (expected && f == 2 && samples == 1));
                }
             }
          }
@@ -407,6 +416,33 @@ check_minecraft(void)
 }
 
 static void
+check_transport_fever_3(void)
+{
+   /* Transport Fever 3 at 2x anti-aliasing: its 3456x2234 G-buffer is
+    * R11G11B10F, A2R10G10B10 and RGBA8 (usage 0x13) and D32S8 (0x23),
+    * reloaded and stored about six times a frame. All but R11G11B10F and
+    * the stencil plane compress on M4 Pro; nothing multisampled does on
+    * the other G17P chips. */
+   static const struct { VkFormat format; VkImageUsageFlags usage; bool m4_pro; }
+      gbuffer[] = {
+         {VK_FORMAT_B10G11R11_UFLOAT_PACK32, 0x13, false},
+         {VK_FORMAT_A2R10G10B10_UNORM_PACK32, 0x13, true},
+         {VK_FORMAT_R8G8B8A8_UNORM, 0x13, true},
+         {VK_FORMAT_D32_SFLOAT_S8_UINT, 0x23, true},
+      };
+   for (unsigned g = 0; g < sizeof(gbuffer) / sizeof(gbuffer[0]); ++g) {
+      VkImageCreateInfo i =
+         image(gbuffer[g].format, 3456, 2234, 1, gbuffer[g].usage);
+      i.samples = VK_SAMPLE_COUNT_2_BIT;
+      CHECK(ELIGIBLE(i) == gbuffer[g].m4_pro);
+      CHECK(!g16s_eligible(AGX_CHIP_G17P, 1, &i));
+      CHECK(!hk_g17p_compression_eligible(AGX_CHIP_G17P, 0, &i));
+      i.samples = VK_SAMPLE_COUNT_4_BIT;
+      CHECK(!ELIGIBLE(i));
+   }
+}
+
+static void
 check_zink(void)
 {
    /* Portal 2 under zink (t-1079): GL render targets declare
@@ -444,6 +480,16 @@ check_zink(void)
    depth.usage &= ~VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT;
    CHECK(ELIGIBLE(depth));
    depth.samples = VK_SAMPLE_COUNT_4_BIT;
+   CHECK(!ELIGIBLE(depth));
+   /* At 2x neither its feedback-loop usage nor its sample-location flag. */
+   depth.samples = VK_SAMPLE_COUNT_2_BIT;
+   CHECK(!ELIGIBLE(depth));
+   depth.usage &= ~VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+   CHECK(!ELIGIBLE(depth));
+   depth.flags = 0;
+   CHECK(ELIGIBLE(depth));
+   CHECK(!g16s_eligible(AGX_CHIP_G17P, 1, &depth));
+   depth.usage |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
    CHECK(!ELIGIBLE(depth));
    const VkImageCreateInfo d32 = image(VK_FORMAT_D32_SFLOAT, 2408, 1506, 1, ds);
    CHECK(ELIGIBLE(d32));
@@ -605,6 +651,7 @@ int
 main(void)
 {
    check_formats();
+   check_transport_fever_3();
    check_shape(VK_FORMAT_R8G8B8A8_UNORM, false);
    check_shape(VK_FORMAT_B8G8R8A8_SRGB, false);
    check_shape(VK_FORMAT_R16G16B16A16_SFLOAT, false);

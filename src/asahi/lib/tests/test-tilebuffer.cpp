@@ -754,6 +754,49 @@ TEST(Tilebuffer, ResidentAttachmentsStayInTheTilebuffer)
    EXPECT_EQ(fits._offset_B[0], 16u);
 }
 
+TEST(Tilebuffer, G17PCompressedTwoSampleTargetsStayResident)
+{
+   /* G17P at 2x: a 32 KiB tile of 16x16 pixels holds 64 bytes a sample.
+    * Four RGBA32F targets fill it; the descending-alignment order places
+    * them first and spills the two (compressed) RGBA16F targets, which G17P
+    * cannot do. */
+   enum pipe_format formats[AGX_MAX_RENDER_TARGETS] = {
+      PIPE_FORMAT_R16G16B16A16_FLOAT, PIPE_FORMAT_R32G32B32A32_FLOAT,
+      PIPE_FORMAT_R32G32B32A32_FLOAT, PIPE_FORMAT_R32G32B32A32_FLOAT,
+      PIPE_FORMAT_R32G32B32A32_FLOAT, PIPE_FORMAT_R16G16B16A16_FLOAT,
+   };
+   const auto plain = agx_build_tilebuffer_layout_with_limits_resident(
+      formats, 6, 2, false, AGX_G17P_MAX_BYTES_PER_SAMPLE, 32768, 2048, 0);
+   EXPECT_TRUE(plain.spilled[0] && plain.spilled[5]);
+   EXPECT_FALSE(plain.spilled[4]);
+   const auto limits = agx_build_tilebuffer_layout_with_limits(
+      formats, 6, 2, false, AGX_G17P_MAX_BYTES_PER_SAMPLE, 32768, 2048);
+   EXPECT_EQ(memcmp(&plain, &limits, sizeof(plain)), 0);
+
+   /* Allocated first they stay, and a 16-byte target spills instead. */
+   const auto resident = agx_build_tilebuffer_layout_with_limits_resident(
+      formats, 6, 2, false, AGX_G17P_MAX_BYTES_PER_SAMPLE, 32768, 2048, 0x21);
+   EXPECT_FALSE(resident.spilled[0] || resident.spilled[5]);
+   EXPECT_TRUE(resident.spilled[4]);
+   EXPECT_EQ(resident.resident_mask, 0x21u);
+   EXPECT_EQ(resident.sample_size_B, 64u);
+
+   /* Eight eight-byte targets, the most a 2x pass can compress, fit. */
+   enum pipe_format rgba16f[AGX_MAX_RENDER_TARGETS];
+   for (unsigned rt = 0; rt < AGX_MAX_RENDER_TARGETS; ++rt)
+      rgba16f[rt] = PIPE_FORMAT_R16G16B16A16_FLOAT;
+   const auto eight = agx_build_tilebuffer_layout_with_limits_resident(
+      rgba16f, 8, 2, false, AGX_G17P_MAX_BYTES_PER_SAMPLE, 32768, 2048, 0xff);
+   EXPECT_FALSE(agx_tilebuffer_spills(&eight));
+
+   /* Multiview's eight-byte budget still spills the second one. */
+   const auto multiview = agx_build_tilebuffer_layout_with_limits_resident(
+      formats, 6, 2, false, AGX_G17P_MAX_UNCOVERED_TILE_BYTES_PER_SAMPLE,
+      32768, 2048, 0x21);
+   EXPECT_FALSE(multiview.spilled[0]);
+   EXPECT_TRUE(multiview.spilled[5]);
+}
+
 class SampleDepthOrder : public ::testing::Test {
  protected:
    SampleDepthOrder()

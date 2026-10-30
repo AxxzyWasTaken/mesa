@@ -133,6 +133,14 @@ agx_build_tilebuffer_layout_with_limits(const enum pipe_format *formats,
                                       uint32_t max_bytes_per_tile,
                                       uint16_t max_samples_per_tile);
 
+/* agx_build_tilebuffer_layout_with_limits() with resident_mask as in
+ * agx_build_tilebuffer_layout_resident(). */
+struct agx_tilebuffer_layout
+agx_build_tilebuffer_layout_with_limits_resident(
+   const enum pipe_format *formats, uint8_t nr_cbufs, uint8_t nr_samples,
+   bool layered, uint8_t max_sample_size_B, uint32_t max_bytes_per_tile,
+   uint16_t max_samples_per_tile, uint8_t resident_mask);
+
 /* Native imageblock strides are not limited by the AGX2 USC bitfield. */
 struct agx_tilebuffer_layout
 agx_build_tilebuffer_layout_for_imageblock(

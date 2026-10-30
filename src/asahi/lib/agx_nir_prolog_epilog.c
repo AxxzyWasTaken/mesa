@@ -668,10 +668,10 @@ agx_nir_fs_epilog_native(nir_builder *b, const void *key_)
               key->rt_formats, ARRAY_SIZE(key->rt_formats), key->nr_samples,
               true, key->max_sample_size_B, key->max_bytes_per_tile,
               key->max_samples_per_tile, key->resident_mask)
-         : agx_build_tilebuffer_layout_with_limits(
+         : agx_build_tilebuffer_layout_with_limits_resident(
               key->rt_formats, ARRAY_SIZE(key->rt_formats), key->nr_samples,
               true, key->max_sample_size_B, key->max_bytes_per_tile,
-              key->max_samples_per_tile);
+              key->max_samples_per_tile, key->resident_mask);
 
    unsigned rt_order[AGX_MAX_RENDER_TARGETS];
    for (unsigned rt = 0; rt < ARRAY_SIZE(rt_order); ++rt)

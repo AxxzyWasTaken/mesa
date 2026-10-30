@@ -19,6 +19,13 @@
  * given the same colours. `none` writes nothing in pass 2, so every tile is
  * one the application did not draw to.
  *
+ * On M4 Pro the single-layer 2x attachments of formats up to eight bytes are
+ * compressed. G17P cannot spill a compressed target: in
+ * `rgba16f,rgba32f,rgba32f,rgba32f,rgba32f,rgba16f 1 2` the compressed
+ * RGBA16F targets must stay in the tilebuffer and an RGBA32F target spill
+ * instead (the plain order spilled both RGBA16F and failed the pass);
+ * `r8,rgba32f,rgba32f,rgba32f,rgba32f,rg8 1 2` pads between the groups.
+ *
  * With `layers` above one the images are arrays and both passes are layered;
  * vkCmdClearAttachments writes every layer, or with `layer0` only layer 0,
  * which leaves the other layers without any geometry.
@@ -27,7 +34,7 @@
  *                   [pass2=load|clear] [write=clear|layer0|draw|a2c|none] [layers=1]
  *   formats: one name repeated `attachments` times, or a comma-separated list
  *   with one name per attachment ("none" = VK_NULL_HANDLE view):
- *   rgba16f rgba8 rg16f r32f rg32f rgba32f rgb10a2 r11g11b10f none
+ *   rgba16f rgba8 rg16f r32f rg32f rgba32f rgb10a2 r11g11b10f r8 rg8 none
  * Exit 0 = PASS, 1 = FAIL. */
 #include <stdbool.h>
 #include <stdio.h>
@@ -61,6 +68,8 @@ static const struct { const char *name; VkFormat fmt; unsigned bpp; } formats[] 
    {"rgba32f", VK_FORMAT_R32G32B32A32_SFLOAT, 16},
    {"rgb10a2", VK_FORMAT_A2B10G10R10_UNORM_PACK32, 4},
    {"r11g11b10f", VK_FORMAT_B10G11R11_UFLOAT_PACK32, 4},
+   {"r8", VK_FORMAT_R8_UNORM, 1},
+   {"rg8", VK_FORMAT_R8G8_UNORM, 2},
    {"none", VK_FORMAT_UNDEFINED, 0},
 };
 

@@ -7,7 +7,7 @@
  * with the attachments' own usages (colour and transfer, depth and
  * transfer; never sampled).
  *
- * `rt0=r11g11b10f` uses the game's own format, which stays uncompressed.
+ * `rt0=r11g11b10f` uses the game's own format.
  *
  * A frame clears the G-buffer and draws one full-screen layer whose content
  * is a smooth gradient mixed with `noise` of per-pixel hash. It then visits

@@ -232,9 +232,20 @@ agx_build_tilebuffer_layout_with_limits(
    bool layered, uint8_t max_sample_size_B, uint32_t max_bytes_per_tile,
    uint16_t max_samples_per_tile)
 {
+   return agx_build_tilebuffer_layout_with_limits_resident(
+      formats, nr_cbufs, nr_samples, layered, max_sample_size_B,
+      max_bytes_per_tile, max_samples_per_tile, 0);
+}
+
+struct agx_tilebuffer_layout
+agx_build_tilebuffer_layout_with_limits_resident(
+   const enum pipe_format *formats, uint8_t nr_cbufs, uint8_t nr_samples,
+   bool layered, uint8_t max_sample_size_B, uint32_t max_bytes_per_tile,
+   uint16_t max_samples_per_tile, uint8_t resident_mask)
+{
    return agx_build_tilebuffer_layout_internal(
       formats, nr_cbufs, nr_samples, layered, max_sample_size_B,
-      max_bytes_per_tile, max_samples_per_tile, false, 0);
+      max_bytes_per_tile, max_samples_per_tile, false, resident_mask);
 }
 
 struct agx_tilebuffer_layout
