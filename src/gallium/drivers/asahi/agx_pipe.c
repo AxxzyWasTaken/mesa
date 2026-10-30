@@ -1108,6 +1108,40 @@ agx_transfer_map(struct pipe_context *pctx, struct pipe_resource *resource,
    }
 }
 
+/* texture_subdata into a twiddled level: tile straight from the caller's
+ * data. The generic path maps through a calloc'd copy of the box, fills it
+ * and tiles that on unmap -- for a compositor uploading a 4K SHM frame per
+ * commit, the extra 33 MB copy and its page faults cost as much as the
+ * tiling. Depth/stencil and MSAA keep the transfer helper's handling. */
+static void
+agx_texture_subdata(struct pipe_context *pctx, struct pipe_resource *prsrc,
+                    unsigned level, unsigned usage, const struct pipe_box *box,
+                    const void *data, unsigned stride, uintptr_t layer_stride)
+{
+   struct agx_resource *rsrc = agx_resource(prsrc);
+
+   if (prsrc->target == PIPE_BUFFER || level >= rsrc->layout.levels ||
+       prsrc->nr_samples > 1 ||
+       util_format_is_depth_or_stencil(prsrc->format) ||
+       !ail_is_level_twiddled_uncompressed(&rsrc->layout, level)) {
+      u_default_texture_subdata(pctx, prsrc, level, usage, box, data, stride,
+                                layer_stride);
+      return;
+   }
+
+   usage |= PIPE_MAP_WRITE | PIPE_MAP_DISCARD_RANGE;
+   agx_prepare_for_map(agx_context(pctx), rsrc, level, usage, box, false);
+
+   for (unsigned z = 0; z < box->depth; ++z) {
+      uint8_t *map = agx_map_texture_cpu(rsrc, level, box->z + z);
+
+      ail_tile(map, (uint8_t *)data + layer_stride * z, &rsrc->layout, level,
+               stride, box->x, box->y, box->width, box->height);
+   }
+
+   BITSET_SET(rsrc->data_valid, level);
+}
+
 static void
 agx_transfer_unmap(struct pipe_context *pctx, struct pipe_transfer *transfer)
 {
@@ -1981,7 +2015,7 @@ agx_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 
    pctx->buffer_subdata = u_default_buffer_subdata;
    pctx->clear_buffer = asahi_clear_buffer;
-   pctx->texture_subdata = u_default_texture_subdata;
+   pctx->texture_subdata = agx_texture_subdata;
    pctx->set_debug_callback = u_default_set_debug_callback;
    pctx->get_sample_position = u_default_get_sample_position;
    pctx->invalidate_resource = agx_invalidate_resource;
