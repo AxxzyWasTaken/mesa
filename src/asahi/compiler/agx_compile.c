@@ -4635,8 +4635,7 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
 
       /* An unfused float comparison (lowered after RA to a 0/1 select) has
        * no mixed half/f32 form either: widen the half comparand. */
-      if (I->op == AGX_OPCODE_FCMP && I->nr_srcs == 2 &&
-          I->src[0].size != I->src[1].size) {
+      if (I->op == AGX_OPCODE_FCMP && I->nr_srcs == 2) {
          agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
          for (unsigned s = 0; s < 2; ++s) {
             if (I->src[s].type != AGX_INDEX_NORMAL ||
@@ -4650,6 +4649,31 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
             wide.abs = I->src[s].abs;
             wide.neg = I->src[s].neg;
             I->src[s] = wide;
+            progress = true;
+         }
+
+         /* The post-RA lowering selects immediates 1 and 0, and G17G has no
+          * grounded register-compare/immediate-select form at either result
+          * width (WebRender's box-shadow fragment shader). Select between
+          * registers holding 1 and 0 here instead, at 32 bits, and narrow
+          * an integer half result afterwards. */
+         if (I->src[0].type == AGX_INDEX_NORMAL &&
+             I->src[1].type == AGX_INDEX_NORMAL &&
+             I->src[0].size == AGX_SIZE_32 && I->src[1].size == AGX_SIZE_32 &&
+             I->nr_dests == 1 &&
+             (I->dest[0].size == AGX_SIZE_16 ||
+              I->dest[0].size == AGX_SIZE_32)) {
+            agx_index one = agx_mov_imm(&b, 32, 1);
+            agx_index zero = agx_mov_imm(&b, 32, 0);
+            agx_index wide = I->dest[0].size == AGX_SIZE_32
+                                ? I->dest[0]
+                                : agx_temp(ctx, AGX_SIZE_32);
+            agx_fcmpsel_to(&b, wide, I->src[0], I->src[1],
+                           I->invert_cond ? zero : one,
+                           I->invert_cond ? one : zero, I->fcond);
+            if (I->dest[0].size == AGX_SIZE_16)
+               agx_subdivide_to(&b, I->dest[0], wide, 0);
+            agx_remove_instruction(I);
             progress = true;
          }
          continue;
