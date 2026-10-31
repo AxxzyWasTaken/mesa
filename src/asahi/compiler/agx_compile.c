@@ -4633,6 +4633,21 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
          }
       }
 
+      /* An unfused signed integer comparison is lowered after RA to a 0/1
+       * select; G17G grounds signed conditions only with a 32-bit result
+       * (a loop counter's `i < n` in a 16-bit boolean). Compare into a
+       * 32-bit temporary and narrow it. */
+      if (I->op == AGX_OPCODE_ICMP && I->dest[0].size == AGX_SIZE_16 &&
+          (I->icond == AGX_ICOND_SLT || I->icond == AGX_ICOND_SGT)) {
+         agx_builder b = agx_init_builder(ctx, agx_after_instr(I));
+         agx_index narrow = I->dest[0];
+         agx_index wide = agx_temp(ctx, AGX_SIZE_32);
+         I->dest[0] = wide;
+         agx_subdivide_to(&b, narrow, wide, 0);
+         progress = true;
+         continue;
+      }
+
       /* An unfused float comparison (lowered after RA to a 0/1 select) has
        * no mixed half/f32 form either: widen the half comparand. */
       if (I->op == AGX_OPCODE_FCMP && I->nr_srcs == 2) {
