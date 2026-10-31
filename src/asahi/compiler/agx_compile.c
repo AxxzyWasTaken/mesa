@@ -4594,6 +4594,198 @@ agx_lower_agx3_fma_sources(agx_context *ctx)
    }
 }
 
+/*
+ * Second G17G attempt only (ctx->agx3_reg_float_consts): many float ALU shapes
+ * with a minifloat immediate, or with a half compared against an f32, have no
+ * grounded G17G encoding, while the plain register forms do. Materialize each
+ * float immediate as an exact register of the width the operand is read at
+ * (comparands as f32, everything else at the destination width) and widen a
+ * half comparand facing an f32 one. Binary16 values and minifloats are exact
+ * in both widths, so results are unchanged.
+ */
+bool
+agx_lower_g17g_retry_float_operands(agx_context *ctx)
+{
+   if (ctx->key->dev.encoding != AGX_ISA_ENCODING_AGX3C ||
+       !ctx->agx3_reg_float_consts)
+      return false;
+
+   bool progress = false;
+   agx_foreach_instr_global_safe(ctx, I) {
+      if (I->nr_dests != 1 || I->dest[0].type != AGX_INDEX_NORMAL)
+         continue;
+
+      /* G17G has no witnessed unordered LTN/GTN compare-select. They are
+       * exactly the negations of the ordered GE/LE (NaN included): swap the
+       * selected values, or flip an unfused compare's inversion. */
+      if ((I->op == AGX_OPCODE_FCMPSEL && I->nr_srcs == 4) ||
+          I->op == AGX_OPCODE_FCMP) {
+         if (I->fcond == AGX_FCOND_LTN || I->fcond == AGX_FCOND_GTN) {
+            I->fcond = I->fcond == AGX_FCOND_LTN ? AGX_FCOND_GE : AGX_FCOND_LE;
+            if (I->op == AGX_OPCODE_FCMPSEL) {
+               agx_index t = I->src[2];
+               I->src[2] = I->src[3];
+               I->src[3] = t;
+            } else {
+               I->invert_cond = !I->invert_cond;
+            }
+            progress = true;
+         }
+      }
+
+      /* An unfused float comparison (lowered after RA to a 0/1 select) has
+       * no mixed half/f32 form either: widen the half comparand. */
+      if (I->op == AGX_OPCODE_FCMP && I->nr_srcs == 2 &&
+          I->src[0].size != I->src[1].size) {
+         agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+         for (unsigned s = 0; s < 2; ++s) {
+            if (I->src[s].type != AGX_INDEX_NORMAL ||
+                I->src[s].size != AGX_SIZE_16)
+               continue;
+            agx_index plain = I->src[s];
+            plain.abs = false;
+            plain.neg = false;
+            agx_index wide = agx_temp(ctx, AGX_SIZE_32);
+            agx_fmov_to(&b, wide, plain);
+            wide.abs = I->src[s].abs;
+            wide.neg = I->src[s].neg;
+            I->src[s] = wide;
+            progress = true;
+         }
+         continue;
+      }
+
+      if (I->op != AGX_OPCODE_FCMPSEL && I->op != AGX_OPCODE_FFMA &&
+          I->op != AGX_OPCODE_FADD && I->op != AGX_OPCODE_FMUL)
+         continue;
+
+      /* fadd(x, -0.0) is agx_fmov_to(), i.e. a conversion or plain move
+       * with its own grounded forms: never pull its -0.0 into a register. */
+      if (I->op == AGX_OPCODE_FADD && I->nr_srcs == 2) {
+         const agx_index z = agx_negzero();
+         bool is_fmov = false;
+         for (unsigned s = 0; s < 2; ++s)
+            is_fmov |= I->src[s].type == AGX_INDEX_IMMEDIATE &&
+                       I->src[s].value == z.value &&
+                       I->src[s].neg == z.neg && I->src[s].abs == z.abs;
+         if (is_fmov)
+            continue;
+      }
+
+      const bool select = I->op == AGX_OPCODE_FCMPSEL;
+      agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+
+      for (unsigned s = 0; s < I->nr_srcs; ++s) {
+         agx_index src = I->src[s];
+         if (src.type != AGX_INDEX_IMMEDIATE)
+            continue;
+
+         const bool comparand = select && s < 2;
+         enum agx_size size = comparand ? AGX_SIZE_32 : I->dest[0].size;
+
+         /* The selected values of a compare-select are raw bit patterns,
+          * not floats (agx_is_float_src): keep them bit-exact. Their ABS
+          * flag only marks a 16-bit immediate. */
+         if (!agx_is_float_src(I, s)) {
+            if (src.neg || (size != AGX_SIZE_16 && size != AGX_SIZE_32))
+               continue;
+            I->src[s] = agx_mov_imm(&b, size == AGX_SIZE_32 ? 32 : 16,
+                                    src.value);
+            progress = true;
+            continue;
+         }
+
+         float value = agx_minifloat_decode(src.value);
+         if (src.abs)
+            value = fabsf(value);
+         if (src.neg)
+            value = -value;
+
+         if (size == AGX_SIZE_32) {
+            uint32_t bits;
+            memcpy(&bits, &value, sizeof(bits));
+            I->src[s] = agx_mov_imm(&b, 32, bits);
+         } else if (size == AGX_SIZE_16) {
+            I->src[s] = agx_mov_imm(&b, 16, _mesa_float_to_half(value));
+         } else {
+            continue;
+         }
+         progress = true;
+      }
+
+      /* Mixed half/f32 operands have no G17G form for these operations:
+       * compute at f32. A half destination fed by f32 operands gets an f32
+       * temporary and one conversion afterwards (exact for a select, and a
+       * single rounding for arithmetic, as the native mixed op would do). */
+      bool any32 = false, any16 = false;
+      for (unsigned s = 0; s < I->nr_srcs; ++s) {
+         if (I->src[s].type != AGX_INDEX_NORMAL)
+            continue;
+         any32 |= I->src[s].size == AGX_SIZE_32;
+         any16 |= I->src[s].size == AGX_SIZE_16;
+      }
+      const bool dest16 = I->dest[0].size == AGX_SIZE_16;
+      const bool cmp_mixed =
+         select && I->src[0].size != I->src[1].size;
+      /* Half selects are few and patchy on G17G (no LE/GE register form,
+       * for one); the 32-bit register select is witnessed for eq/lt/gt/ge/le.
+       * On this second attempt run every half-destination select there. */
+      const bool sel_mixed =
+         select && (dest16 ||
+                    I->src[2].size != I->dest[0].size ||
+                    I->src[3].size != I->dest[0].size ||
+                    I->src[0].size != I->dest[0].size);
+      const bool alu_mixed =
+         !select && any16 && (any32 || !dest16);
+      if (!cmp_mixed && !sel_mixed && !alu_mixed)
+         continue;
+
+      for (unsigned s = 0; s < I->nr_srcs; ++s) {
+         if (I->src[s].type != AGX_INDEX_NORMAL ||
+             I->src[s].size != AGX_SIZE_16)
+            continue;
+         /* The 32-bit select compares f32: widen half comparands. */
+         if (select && s < 2 && !cmp_mixed && !sel_mixed)
+            continue;
+         /* Selected values are bit patterns: zero-extend them, as the
+          * existing G17G half-select path does. Floats convert (exact). */
+         if (select && s >= 2) {
+            if (I->src[s].abs || I->src[s].neg)
+               continue;
+            agx_index wide = agx_temp(ctx, AGX_SIZE_32);
+            agx_mov_to(&b, wide, I->src[s]);
+            I->src[s] = wide;
+            progress = true;
+            continue;
+         }
+         agx_index plain = I->src[s];
+         plain.abs = false;
+         plain.neg = false;
+         agx_index wide = agx_temp(ctx, AGX_SIZE_32);
+         agx_fmov_to(&b, wide, plain);
+         wide.abs = I->src[s].abs;
+         wide.neg = I->src[s].neg;
+         I->src[s] = wide;
+         progress = true;
+      }
+
+      if (dest16 && (alu_mixed || sel_mixed)) {
+         agx_index narrow = I->dest[0];
+         agx_index wide = agx_temp(ctx, AGX_SIZE_32);
+         I->dest[0] = wide;
+         agx_builder after = agx_init_builder(ctx, agx_after_instr(I));
+         /* A select keeps the low half of its zero-extended bits; an
+          * arithmetic result converts once. */
+         if (select)
+            agx_subdivide_to(&after, narrow, wide, 0);
+         else
+            agx_fmov_to(&after, narrow, wide);
+         progress = true;
+      }
+   }
+   return progress;
+}
+
 /* The native half-width branch encoder supports register/register and
  * register/zero comparisons. Materialize other constants while SSA temporaries
  * can still be allocated; never invent a scratch register in the packer. */
@@ -10477,17 +10669,20 @@ agx_compile_function_nir_attempt(nir_shader *nir, nir_function_impl *impl,
                          struct agx_shader_key *key,
                          struct util_dynarray *binary,
                          struct agx_shader_info *out, unsigned *offset_out,
-                         unsigned ra_budget_cut, bool disable_remat, bool *retry_without_remat)
+                         unsigned ra_budget_cut, bool disable_remat, bool *retry_without_remat,
+                         bool agx3_reg_float_consts)
 {
    const unsigned initial_binary_size = binary->size;
    const struct agx_shader_info initial_out = *out;
    if (agx_isa_is_agx3(key->dev.encoding) &&
-       !impl->function->is_preamble && !ra_budget_cut)
+       !impl->function->is_preamble && !ra_budget_cut &&
+       !agx3_reg_float_consts)
       NIR_PASS(_, nir, agx_nir_fragment_output_temporaries);
 
    if (agx_isa_is_agx3(key->dev.encoding) &&
        nir->info.stage == MESA_SHADER_VERTEX && !impl->function->is_preamble &&
-       exec_list_length(&impl->body) > 1 && !ra_budget_cut)
+       exec_list_length(&impl->body) > 1 && !ra_budget_cut &&
+       !agx3_reg_float_consts)
       NIR_PASS(_, nir, nir_move_output_stores_to_end);
 
    nir_index_blocks(impl);
@@ -10497,6 +10692,7 @@ agx_compile_function_nir_attempt(nir_shader *nir, nir_function_impl *impl,
    ctx->nir = nir;
    ctx->ra_budget_cut = ra_budget_cut;
    ctx->is_preamble = impl->function->is_preamble;
+   ctx->agx3_reg_float_consts = agx3_reg_float_consts;
    if (ctx->is_preamble)
       out->agx3_preamble_static_spill_version = 0;
    ctx->out = out;
@@ -10640,6 +10836,7 @@ agx_compile_function_nir_attempt(nir_shader *nir, nir_function_impl *impl,
    agx3_fold_constant_fmovs(ctx);
 
    AGX_PASS(ctx, agx_lower_agx3_cf_constants);
+   AGX_PASS(ctx, agx_lower_g17g_retry_float_operands);
    AGX_PASS(ctx, agx_lower_agx3_half_iadd_constants);
    AGX_PASS(ctx, agx_lower_agx3_wide_iadd);
    AGX_PASS(ctx, agx3_lower_large_fetch_indices);
@@ -10831,7 +11028,7 @@ agx_compile_function_nir_attempt(nir_shader *nir, nir_function_impl *impl,
          return agx_compile_function_nir_attempt(
             nir, impl, key, binary, out, offset_out,
             ra_budget_cut ? ra_budget_cut * 2 : 16, disable_remat,
-            retry_without_remat);
+            retry_without_remat, agx3_reg_float_consts);
       }
       agx_set_refusal(ctx, "register allocation found no legal placement",
                       __LINE__);
@@ -11100,7 +11297,8 @@ static bool
 agx_compile_function_nir(nir_shader *nir, nir_function_impl *impl,
                          struct agx_shader_key *key,
                          struct util_dynarray *binary,
-                         struct agx_shader_info *out, unsigned *offset_out)
+                         struct agx_shader_info *out, unsigned *offset_out,
+                         bool agx3_reg_float_consts)
 {
    const bool eligible =
       impl->function->is_preamble && nir->info.stage == MESA_SHADER_FRAGMENT &&
@@ -11109,14 +11307,16 @@ agx_compile_function_nir(nir_shader *nir, nir_function_impl *impl,
       debug_get_bool_option("ASAHI_M5_CPROG_REMAT_RETRY", true);
    if (!eligible)
       return agx_compile_function_nir_attempt(nir, impl, key, binary, out,
-                                             offset_out, 0, false, NULL);
+                                             offset_out, 0, false, NULL,
+                                             agx3_reg_float_consts);
 
    /* Preserve all compiler-owned state, including earlier main code/rodata.
     * The first attempt owns a deep NIR clone and a fresh AIR context. */
    nir_shader *attempt = nir_shader_clone(NULL, nir);
    if (!attempt)
       return agx_compile_function_nir_attempt(nir, impl, key, binary, out,
-                                             offset_out, 0, false, NULL);
+                                             offset_out, 0, false, NULL,
+                                             agx3_reg_float_consts);
 
    nir_function_impl *attempt_impl = NULL;
    nir_foreach_function_with_impl(func, candidate, attempt) {
@@ -11131,7 +11331,8 @@ agx_compile_function_nir(nir_shader *nir, nir_function_impl *impl,
    const size_t saved_size = binary->size;
    bool retry = false;
    bool success = agx_compile_function_nir_attempt(
-      attempt, attempt_impl, key, binary, out, offset_out, 0, false, &retry);
+      attempt, attempt_impl, key, binary, out, offset_out, 0, false, &retry,
+      agx3_reg_float_consts);
    ralloc_free(attempt);
    if (!retry)
       return success;
@@ -11142,7 +11343,8 @@ agx_compile_function_nir(nir_shader *nir, nir_function_impl *impl,
    binary->size = saved_size;
    /* Exactly one retry. Real full-budget spills retain the old refusal. */
    return agx_compile_function_nir_attempt(nir, impl, key, binary, out,
-                                          offset_out, 0, true, NULL);
+                                          offset_out, 0, true, NULL,
+                                          agx3_reg_float_consts);
 }
 
 /*
@@ -13660,8 +13862,27 @@ agx_compile_shader_nir(nir_shader *nir, struct agx_shader_key *key,
 
    nir_foreach_function_with_impl(func, impl, nir) {
       unsigned offset;
-      if (!agx_compile_function_nir(nir, impl, key, &binary, &out->info,
-                                    &offset)) {
+      const struct agx_shader_info saved_info = out->info;
+      const struct agx_shader_key saved_key = *key;
+      const unsigned saved_size = binary.size;
+      bool compiled = agx_compile_function_nir(nir, impl, key, &binary,
+                                               &out->info, &offset, false);
+
+      /* The G17G packer refuses shapes it has no grounded encoding for and
+       * rolls the binary back. Most refusals in real clients (Skia/ANGLE)
+       * are float constants inlined as minifloat immediates; the same
+       * function with those constants in registers encodes. */
+      if (!compiled && key->dev.encoding == AGX_ISA_ENCODING_AGX3C) {
+         if (agx_compiler_debug & AGX_DBG_SHADERS)
+            fprintf(stderr, "AGX3: retrying with float constants in registers\n");
+         out->info = saved_info;
+         *key = saved_key;
+         binary.size = saved_size;
+         compiled = agx_compile_function_nir(nir, impl, key, &binary,
+                                             &out->info, &offset, true);
+      }
+
+      if (!compiled) {
          util_dynarray_fini(&binary);
          memset(out, 0, sizeof(*out));
          return false;

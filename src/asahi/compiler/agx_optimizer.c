@@ -334,6 +334,7 @@ agx_optimizer_minifloat_select(agx_context *ctx, agx_instr **defs,
                                agx_instr *I)
 {
    if (!ctx->key || ctx->key->dev.encoding != AGX_ISA_ENCODING_AGX3C ||
+       ctx->agx3_reg_float_consts ||
        I->op != AGX_OPCODE_FCMPSEL || I->nr_srcs != 4 ||
        I->fcmpsel_minifloat_select || I->saturate ||
        I->dest[0].size != AGX_SIZE_32)
@@ -529,6 +530,9 @@ agx_optimizer_inline_imm(agx_context *ctx, agx_instr **defs, agx_instr *I)
          continue;
 
       if (float_src) {
+         if (ctx->agx3_reg_float_consts)
+            continue;
+
          bool fp16 = (def->dest[0].size == AGX_SIZE_16);
          assert(fp16 || (def->dest[0].size == AGX_SIZE_32));
 

@@ -599,6 +599,12 @@ typedef struct {
    mesa_shader_stage stage;
    struct util_dynarray collect_split_hints;
    bool is_preamble;
+
+   /* G17G second attempt after a packer refusal: keep float constants in
+    * registers instead of inlining them as minifloat immediates. The
+    * register forms of the float ALU, compare-select and compare-branch are
+    * grounded; many immediate shapes are not. */
+   bool agx3_reg_float_consts;
    bool uniforms_written;
    /* The spiller reloaded a value by repeating its device load */
    bool spilled_by_load;
@@ -1434,6 +1440,7 @@ bool agx_nir_lower_frag_sidefx(nir_shader *s, bool g17p);
 void agx_lower_agx3_fma_sources(agx_context *ctx);
 void agx_materialize_agx3_alu_constants(agx_context *ctx);
 void agx_lower_agx3_mixed_width_unary(agx_context *ctx);
+bool agx_lower_g17g_retry_float_operands(agx_context *ctx);
 
 struct agx_cycle_estimate {
    /* ALU throughput */
