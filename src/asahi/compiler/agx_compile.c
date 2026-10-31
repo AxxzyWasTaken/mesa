@@ -4648,6 +4648,47 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
          continue;
       }
 
+      /* An integer compare-select with a half result has no grounded G17G
+       * form for the signed conditions, nor for an immediate comparand or
+       * immediate selected values (GTK's Vulkan vertex shaders select 16-bit
+       * values on a 32-bit `x < n`). Select between 32-bit registers into a
+       * 32-bit temporary and narrow it, as for ICMP above: the selected
+       * values are bit patterns and are zero-extended; an immediate
+       * comparand takes the width of the register it is compared with. */
+      if (I->op == AGX_OPCODE_ICMPSEL && I->nr_srcs == 4 &&
+          I->dest[0].size == AGX_SIZE_16 &&
+          I->src[0].type == AGX_INDEX_NORMAL &&
+          I->src[0].size == AGX_SIZE_32) {
+         agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+         bool ok = true;
+         for (unsigned s = 0; s < 4 && ok; ++s) {
+            agx_index src = I->src[s];
+            if (src.neg || src.abs)
+               ok = false;
+            else if (s == 0)
+               continue;
+            else if (src.type == AGX_INDEX_IMMEDIATE)
+               I->src[s] = agx_mov_imm(&b, 32, src.value);
+            else if (src.type == AGX_INDEX_NORMAL &&
+                     src.size == AGX_SIZE_16 && s >= 2) {
+               agx_index wide = agx_temp(ctx, AGX_SIZE_32);
+               agx_mov_to(&b, wide, src);
+               I->src[s] = wide;
+            } else if (src.type != AGX_INDEX_NORMAL ||
+                       src.size != AGX_SIZE_32)
+               ok = false;
+         }
+         if (ok) {
+            agx_index narrow = I->dest[0];
+            agx_index wide = agx_temp(ctx, AGX_SIZE_32);
+            I->dest[0] = wide;
+            agx_builder after = agx_init_builder(ctx, agx_after_instr(I));
+            agx_subdivide_to(&after, narrow, wide, 0);
+            progress = true;
+         }
+         continue;
+      }
+
       /* An unfused float comparison (lowered after RA to a 0/1 select) has
        * no mixed half/f32 form either: widen the half comparand. */
       if (I->op == AGX_OPCODE_FCMP && I->nr_srcs == 2) {
