@@ -2842,6 +2842,13 @@ agx_screen_create(int fd, struct renderonly *ro,
    if (driQueryOptionb(config->options, "asahi_no_fp16"))
       agx_screen->dev.debug |= AGX_DBG_NO16;
 
+   /* G18G's packer has grounded half-precision forms for only part of what
+    * mediump lowering produces (half FSEL/ADD/FMA with immediates or abs
+    * sources), and one refused instruction drops the whole shader. mediump
+    * is a precision floor: evaluate it at full precision on G18G. */
+   if (agx_screen->dev.chip == AGX_CHIP_G18G)
+      agx_screen->dev.debug |= AGX_DBG_NO16;
+
    int ret =
       drmSyncobjCreate(agx_device(screen)->fd, 0, &agx_screen->flush_syncobj);
    assert(!ret);
