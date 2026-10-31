@@ -455,6 +455,15 @@ agx_optimizer_inline_imm(agx_context *ctx, agx_instr **defs, agx_instr *I)
           I->op == AGX_OPCODE_ASR && s == 0)
          continue;
 
+      /* G18G's half-precision compare-select is grounded only with every
+       * source in a half register (agx3_alu_fcmp_select_half_gpu1). An
+       * inlined immediate leaves a form the packer cannot encode, so keep
+       * the constants in registers (alacritty's discard test, bg.a == 0).
+       * M6 only. */
+      if (ctx->key && agx_is_g18g(&ctx->key->dev) &&
+          I->op == AGX_OPCODE_FCMPSEL && I->dest[0].size == AGX_SIZE_16)
+         continue;
+
       agx_instr *def = defs[src.value];
       if (!def || def->op != AGX_OPCODE_MOV_IMM)
          continue;

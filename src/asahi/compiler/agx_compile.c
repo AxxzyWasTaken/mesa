@@ -6772,6 +6772,32 @@ agx_materialize_agx3_alu_constants(agx_context *ctx)
                I->src[s] = agx_mov_imm(&b, 16, bits);
             }
          }
+         /* G18G's half FSEL is grounded only with all four sources in half
+          * registers (agx3_alu_fcmp_select_half_gpu1). Compare slots hold
+          * minifloats, so materialize their half value; select slots are
+          * bit patterns. M6 only. */
+         if (agx_is_g18g(&ctx->key->dev) &&
+             I->op == AGX_OPCODE_FCMPSEL && I->dest[0].size == AGX_SIZE_16) {
+            for (unsigned s = 0; s < 4; ++s) {
+               agx_index v = I->src[s];
+               if (v.type != AGX_INDEX_IMMEDIATE)
+                  continue;
+               if (s < 2) {
+                  /* Match the width of the other compared value. */
+                  const bool wide = I->src[1 - s].type != AGX_INDEX_IMMEDIATE &&
+                                    I->src[1 - s].size == AGX_SIZE_32;
+                  float f = agx_minifloat_decode(v.value);
+                  if (v.abs)
+                     f = fabsf(f);
+                  if (v.neg)
+                     f = -f;
+                  I->src[s] = wide ? agx_mov_imm(&b, 32, fui(f))
+                                   : agx_mov_imm(&b, 16, _mesa_float_to_half(f));
+               } else {
+                  I->src[s] = agx_mov_imm(&b, 16, v.value);
+               }
+            }
+         }
          /* The native F32/F16 route is qualified for EQ/LT and two full
           * register alternatives. Other full-result shapes use the general
           * F32 comparator route. F16->F32 is exact, including signed zero;
