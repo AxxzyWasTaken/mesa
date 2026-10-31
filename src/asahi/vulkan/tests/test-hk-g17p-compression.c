@@ -383,7 +383,7 @@ check_shared(void)
       CHECK(hk_g17p_shared_compression_eligible((enum agx_chip)chip, 0,
                                                 &base) ==
             (chip == AGX_CHIP_G17P || chip == AGX_CHIP_G17G ||
-             chip == AGX_CHIP_G17S));
+             chip == AGX_CHIP_G17S || chip == AGX_CHIP_G17C));
    CHECK(!hk_g17p_shared_compression_eligible(AGX_CHIP_G17P, 1, &base));
    CHECK(!hk_g17p_shared_compression_eligible(AGX_CHIP_G17P, 0, NULL));
 

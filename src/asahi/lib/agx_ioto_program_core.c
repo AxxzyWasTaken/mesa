@@ -983,8 +983,11 @@ m5_no_resource_program_compose(
                                                 sizeof(staged) - offset))
       return false;
 
-   staged[offset + 20] = (fragment ? 4 : 8) *
-                         (chip == AGX_CHIP_G17S ? 2 : 1);
+   /* G17C takes the G17S value; scaling it with the cluster count (x4)
+    * drops trailing draws of multi-draw passes. */
+   staged[offset + 20] =
+      (fragment ? 4 : 8) *
+      ((chip == AGX_CHIP_G17S || chip == AGX_CHIP_G17C) ? 2 : 1);
    offset += AGX_IOTO_G17S_MINIMAL_PROFILE_LOADER_SIZE;
    if (fragment) {
       static const uint8_t pixrel[] = {0x9f, 0x17, 0x00, 0x04, 0x00, 0x00};

@@ -556,7 +556,8 @@ bool agx_chip_uses_legacy_precompiled_programs(enum agx_chip chip);
 static inline bool
 agx_chip_g17_m5(enum agx_chip chip)
 {
-   return chip == AGX_CHIP_G17G || chip == AGX_CHIP_G17S;
+   return chip == AGX_CHIP_G17G || chip == AGX_CHIP_G17S ||
+          chip == AGX_CHIP_G17C;
 }
 
 /* Stable name for diagnostics, e.g. "G15X". Never NULL. */

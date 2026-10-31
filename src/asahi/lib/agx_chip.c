@@ -345,7 +345,10 @@ agx_params_m5_bringup_supported(const struct drm_asahi_params_global *params)
    const enum agx_chip chip = agx_chip_from_params(params);
    return (chip == AGX_CHIP_G17G && params->chip_id == 0x8142 &&
            params->num_clusters_total == 1) ||
-          (chip == AGX_CHIP_G17S && params->chip_id == 0x6050);
+          (chip == AGX_CHIP_G17S && params->chip_id == 0x6050) ||
+          /* T6050 M5 Max (J716c): G17C, one die, four clusters. */
+          (chip == AGX_CHIP_G17C && params->chip_id == 0x6050 &&
+           params->num_clusters_total == 4);
 
 }
 
