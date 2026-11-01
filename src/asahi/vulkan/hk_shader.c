@@ -4727,10 +4727,14 @@ hk_compile_nir(struct hk_device *dev, const VkAllocationCallbacks *pAllocator,
 
       /* Only a shader that already discards has an early coverage update to
        * carry the kill. A shader with no way to apply it keeps it in the
-       * epilog. */
+       * epilog. Early fragment tests and memory writes make the epilog
+       * lowering fold every demote into the exported sample mask, so the
+       * alpha-to-coverage demote would not survive to the coverage update:
+       * those shaders keep alpha-to-coverage in the epilog too. */
       bool a2c_in_main = false;
       if (dev->dev.chip == AGX_CHIP_G17P && key && key->fs.static_a2c &&
-          nir->info.fs.uses_discard &&
+          nir->info.fs.uses_discard && !nir->info.fs.early_fragment_tests &&
+          !nir->info.writes_memory &&
           !(nir->info.outputs_written &
             BITFIELD64_BIT(FRAG_RESULT_SAMPLE_MASK)))
          NIR_PASS(a2c_in_main, nir, nir_lower_alpha_to_coverage, false, NULL);

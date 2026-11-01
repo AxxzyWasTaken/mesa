@@ -1026,8 +1026,14 @@ lower_sample_mask_deferred(nir_shader *shader, bool uniform_tests,
    if (a2c_in_main) {
       nir_intrinsic_instr *a2c =
          last_discard_in_block(nir_impl_last_block(impl));
-      a2c_mask = a2c->src[0].ssa;
-      nir_instr_remove(&a2c->instr);
+      /* The caller only moves alpha-to-coverage here when nothing folds the
+       * demote away first. If it is gone anyway, leave alpha-to-coverage to
+       * the epilog rather than guess. */
+      assert(a2c != NULL);
+      if (a2c) {
+         a2c_mask = a2c->src[0].ssa;
+         nir_instr_remove(&a2c->instr);
+      }
       *a2c_in_main = false;
    }
 
@@ -1137,7 +1143,9 @@ lower_sample_mask_deferred(nir_shader *shader, bool uniform_tests,
       nir_repair_ssa_impl(impl);
       nir_lower_reg_intrinsics_to_ssa_impl(impl);
    }
-   NIR_PASS(_, shader, nir_lower_vars_to_ssa);
+   /* Not NIR_PASS: a2c_slot and a2c_mask point into this impl, and the
+    * NIR_DEBUG clone/serialize checks would replace it under them. */
+   nir_lower_vars_to_ssa(shader);
    if (a2c_slot)
       *a2c_in_main = kill_alpha_coverage_at_update(impl, a2c_slot, a2c_mask);
    return true;
