@@ -483,7 +483,7 @@ pack_pbe(struct hk_device *dev, struct hk_image_view *view, unsigned view_plane,
 
    if (eot && (agx_native_graphics(&dev->dev) ||
                 agx_chip_g17_m5(dev->dev.chip)))
-      p_format = agx_g17p_rt0_pbe_format(p_format);
+      p_format = hk_eot_pbe_format(&dev->dev, p_format);
 
    const struct util_format_description *desc =
       util_format_description(p_format);

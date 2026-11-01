@@ -637,15 +637,15 @@ hk_float_image_atomics(const struct hk_device *dev)
 
 /* Compressed data is only decodable through its own channel class. Every
  * G17P writer of a colour image is a PBE; the end-of-tile PBE may store a
- * different format from the image (agx_g17p_rt0_pbe_format packs
- * R11G11B10/RGB9E5 into R32_UINT words). Never compress an image whose store
- * class would differ from the class its textures read. */
+ * different format from the image (hk_eot_pbe_format() packs R11G11B10/RGB9E5
+ * into R32_UINT words). Never compress an image whose store class would
+ * differ from the class its textures read. */
 static bool
 hk_g17p_store_class_matches(const struct agx_device *dev, VkFormat format)
 {
    const enum pipe_format p_format = hk_format_to_pipe_format(format);
-   const enum pipe_format store = agx_g17p_rt0_pbe_format(
-      util_format_linear(hk_padded_image_format(p_format)));
+   const enum pipe_format store = hk_eot_pbe_format(
+      dev, util_format_linear(hk_padded_image_format(p_format)));
    if (ail_formats_compatible(p_format, store))
       return true;
 

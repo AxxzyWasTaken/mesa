@@ -2758,6 +2758,12 @@ hk_build_bg_eot_program(struct hk_cmd_buffer *cmd, const VkRenderingInfo *info,
       }
    }
 
+   if (store) {
+      for (unsigned rt = 0; rt < HK_MAX_RTS; ++rt)
+         key.tib.logical_format[rt] =
+            hk_eot_key_format(&dev->dev, key.tib.logical_format[rt]);
+   }
+
    if (unlikely(anatomy_ops)) {
       /* Profiler only. The key ops below are what every chip path builds
        * from; the M5 single-RT path additionally treats a DONT_CARE load
