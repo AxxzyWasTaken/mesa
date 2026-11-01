@@ -4655,30 +4655,66 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
        * 32-bit temporary and narrow it, as for ICMP above: the selected
        * values are bit patterns and are zero-extended; an immediate
        * comparand takes the width of the register it is compared with. */
+      /* With half comparands too (mediump `a < b ? 1 : 0`, registers or
+       * uniforms, which are only lowered later), widen them first:
+       * sign-extended for the signed conditions (SEQ included, so that an
+       * immediate comparand extends the same way as the register), zero-
+       * extended otherwise. G17G has no witnessed sign-extending half add,
+       * so extend as sext(x) = (zext(x) ^ 0x8000) - 0x8000, as SIGNEXT is
+       * lowered above. Every operand is checked before any is rewritten. */
       if (I->op == AGX_OPCODE_ICMPSEL && I->nr_srcs == 4 &&
           I->dest[0].size == AGX_SIZE_16 &&
-          I->src[0].type == AGX_INDEX_NORMAL &&
-          I->src[0].size == AGX_SIZE_32) {
-         agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+          (I->src[0].type == AGX_INDEX_NORMAL ||
+           I->src[0].type == AGX_INDEX_UNIFORM) &&
+          (I->src[0].size == AGX_SIZE_32 || I->src[0].size == AGX_SIZE_16)) {
+         const bool cmp16 = I->src[0].size == AGX_SIZE_16;
+         const bool is_signed = I->icond == AGX_ICOND_SLT ||
+                                I->icond == AGX_ICOND_SGT ||
+                                I->icond == AGX_ICOND_SEQ;
          bool ok = true;
          for (unsigned s = 0; s < 4 && ok; ++s) {
-            agx_index src = I->src[s];
+            const agx_index src = I->src[s];
             if (src.neg || src.abs)
                ok = false;
-            else if (s == 0)
-               continue;
             else if (src.type == AGX_INDEX_IMMEDIATE)
-               I->src[s] = agx_mov_imm(&b, 32, src.value);
-            else if (src.type == AGX_INDEX_NORMAL &&
-                     src.size == AGX_SIZE_16 && s >= 2) {
+               ok = s != 0;
+            else if ((src.type != AGX_INDEX_NORMAL &&
+                      src.type != AGX_INDEX_UNIFORM) ||
+                     agx_channels(src) != 1)
+               ok = false;
+            else if (s < 2)
+               ok = src.size == I->src[0].size;
+            else
+               ok = src.size == AGX_SIZE_16 || src.size == AGX_SIZE_32;
+         }
+         if (!ok)
+            continue;
+
+         agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+         for (unsigned s = 0; s < 4; ++s) {
+            agx_index src = I->src[s];
+            const bool compared = s < 2;
+            if (src.type == AGX_INDEX_IMMEDIATE) {
+               uint32_t value = src.value;
+               if (compared && cmp16 && is_signed)
+                  value = (uint32_t)(int32_t)(int16_t)value;
+               I->src[s] = agx_mov_imm(&b, 32, value);
+            } else if (src.size == AGX_SIZE_16 &&
+                       !(compared && !cmp16)) {
                agx_index wide = agx_temp(ctx, AGX_SIZE_32);
                agx_mov_to(&b, wide, src);
+               if (compared && is_signed) {
+                  agx_index bias = agx_mov_imm(&b, 32, 0x8000);
+                  agx_index flipped = agx_temp(ctx, AGX_SIZE_32);
+                  agx_bitop_to(&b, flipped, wide, bias, 0x6 /* XOR */);
+                  agx_index extended = agx_temp(ctx, AGX_SIZE_32);
+                  agx_iadd_to(&b, extended, flipped, agx_neg(bias), 0);
+                  wide = extended;
+               }
                I->src[s] = wide;
-            } else if (src.type != AGX_INDEX_NORMAL ||
-                       src.size != AGX_SIZE_32)
-               ok = false;
+            }
          }
-         if (ok) {
+         {
             agx_index narrow = I->dest[0];
             agx_index wide = agx_temp(ctx, AGX_SIZE_32);
             I->dest[0] = wide;
@@ -4738,6 +4774,39 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
       if (I->op != AGX_OPCODE_FCMPSEL && I->op != AGX_OPCODE_FFMA &&
           I->op != AGX_OPCODE_FADD && I->op != AGX_OPCODE_FMUL)
          continue;
+
+      /* A half fabs/fneg, fadd(h.abs/.neg, -0.0) into a half, has no
+       * grounded G17G form. It only touches the sign bit: AND 0x7fff for
+       * |h|, XOR 0x8000 for -h, OR 0x8000 for -|h|, with the 16-bit bit
+       * operations G17G does encode (see the sign extension above). */
+      if (I->op == AGX_OPCODE_FADD && I->nr_srcs == 2 && !I->saturate &&
+          I->dest[0].size == AGX_SIZE_16) {
+         const agx_index z = agx_negzero();
+         int x_slot = -1;
+         for (unsigned s = 0; s < 2; ++s) {
+            if (I->src[s].type == AGX_INDEX_IMMEDIATE &&
+                I->src[s].value == z.value && I->src[s].neg == z.neg &&
+                I->src[s].abs == z.abs)
+               x_slot = !s;
+         }
+         agx_index x = x_slot >= 0 ? I->src[x_slot] : agx_null();
+         if (x_slot >= 0 &&
+             (x.type == AGX_INDEX_NORMAL || x.type == AGX_INDEX_UNIFORM) &&
+             x.size == AGX_SIZE_16 && agx_channels(x) == 1 &&
+             (x.abs || x.neg)) {
+            agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+            const bool abs = x.abs, neg = x.neg;
+            x.abs = x.neg = false;
+            agx_index mask =
+               agx_mov_imm(&b, 16, abs && !neg ? 0x7fff : 0x8000);
+            agx_bitop_to(&b, I->dest[0], x, mask,
+                         abs ? (neg ? 0xe /* OR */ : 0x8 /* AND */)
+                             : 0x6 /* XOR */);
+            agx_remove_instruction(I);
+            progress = true;
+            continue;
+         }
+      }
 
       /* fadd(x, -0.0) is agx_fmov_to(), i.e. a conversion or plain move
        * with its own grounded forms: never pull its -0.0 into a register. */
