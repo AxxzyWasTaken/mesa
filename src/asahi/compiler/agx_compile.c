@@ -4838,6 +4838,50 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
          continue;
       }
 
+      /* G17G grounds only the 32-bit integer -> float conversions (to f32
+       * and to f16); the byte and half forms are G17P's. Extend the source
+       * to 32 bits first: zero extension, masked to the byte for U8; sign
+       * extension as (x ^ m) - m with m = 0x80 or 0x8000. */
+      if (I->op == AGX_OPCODE_CONVERT && I->nr_srcs == 2 && !I->saturate &&
+          I->round == AGX_ROUND_RTE &&
+          I->src[0].type == AGX_INDEX_IMMEDIATE &&
+          (I->src[0].value == AGX_CONVERT_U8_TO_F ||
+           I->src[0].value == AGX_CONVERT_S8_TO_F ||
+           I->src[0].value == AGX_CONVERT_U16_TO_F ||
+           I->src[0].value == AGX_CONVERT_S16_TO_F) &&
+          I->src[1].size == AGX_SIZE_16 &&
+          (I->src[1].type == AGX_INDEX_NORMAL ||
+           I->src[1].type == AGX_INDEX_UNIFORM) &&
+          agx_channels(I->src[1]) == 1 && !I->src[1].abs && !I->src[1].neg) {
+         const enum agx_convert mode = I->src[0].value;
+         const bool byte =
+            mode == AGX_CONVERT_U8_TO_F || mode == AGX_CONVERT_S8_TO_F;
+         const bool is_signed =
+            mode == AGX_CONVERT_S8_TO_F || mode == AGX_CONVERT_S16_TO_F;
+         agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+         agx_index wide = agx_temp(ctx, AGX_SIZE_32);
+         agx_mov_to(&b, wide, I->src[1]);
+         if (byte) {
+            agx_index masked = agx_temp(ctx, AGX_SIZE_32);
+            agx_bitop_to(&b, masked, wide, agx_mov_imm(&b, 32, 0xff),
+                         0x8 /* AND */);
+            wide = masked;
+         }
+         if (is_signed) {
+            agx_index bias = agx_mov_imm(&b, 32, byte ? 0x80 : 0x8000);
+            agx_index flipped = agx_temp(ctx, AGX_SIZE_32);
+            agx_bitop_to(&b, flipped, wide, bias, 0x6 /* XOR */);
+            agx_index extended = agx_temp(ctx, AGX_SIZE_32);
+            agx_iadd_to(&b, extended, flipped, agx_neg(bias), 0);
+            wide = extended;
+         }
+         I->src[0] = agx_immediate(is_signed ? AGX_CONVERT_S32_TO_F
+                                             : AGX_CONVERT_U32_TO_F);
+         I->src[1] = wide;
+         progress = true;
+         continue;
+      }
+
       /* Half derivatives have no grounded G17G form: differentiate the f32
        * extension and round the result back (f16 -> f32 is exact, and the
        * f32 difference rounds once to the same half the half unit would
