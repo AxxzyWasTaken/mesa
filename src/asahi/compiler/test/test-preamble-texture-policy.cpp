@@ -69,3 +69,55 @@ TEST(PreambleTexturePolicy, M5KeepsTextureAndConsumersInMain)
       }
    }
 }
+
+/* A device load reads its base from the same low uniforms a sample reads its
+ * handles from, so on G17P a base exported above them moves down. */
+TEST(PreambleHandlePlacement, LoadBasesMoveBelowTheHandleLimit)
+{
+   for (bool load_bases : {false, true}) {
+      SCOPED_TRACE(load_bases);
+      nir_builder b = nir_builder_init_simple_shader(
+         MESA_SHADER_COMPUTE, &agx_nir_options, "load base placement");
+      nir_def *table = agx_test_load_preamble(&b, 1, 64, 0);
+      nir_def *base = agx_test_load_global_constant(&b, 1, 64, table, 8,
+                                                    (gl_access_qualifier)0);
+      /* A per-thread index keeps the load itself in the main program. */
+      nir_def *value = nir_load_constant_agx(
+         &b, 1, 32, base, nir_load_local_invocation_index(&b),
+         .access = ACCESS_CAN_REORDER, .base = 2,
+         .format = PIPE_FORMAT_R32_UINT);
+      nir_intrinsic_instr *store = nir_store_global(&b, value, table);
+      nir_intrinsic_set_align(store, 4, 0);
+
+      unsigned sizes[] = {300, 1000, 1000};
+      ASSERT_TRUE(agx_nir_opt_preamble(b.shader, sizes, true, false));
+      nir_opt_dce(b.shader);
+
+      unsigned allocated = sizes[0];
+      EXPECT_EQ(agx_nir_place_preamble_handles_low(b.shader, 8, allocated,
+                                                   &allocated, load_bases),
+                load_bases);
+      nir_validate_shader(b.shader, "after load base placement");
+
+      int read = -1;
+      nir_foreach_block(block, nir_shader_get_entrypoint(b.shader)) {
+         nir_foreach_instr(instr, block) {
+            if (instr->type != nir_instr_type_intrinsic ||
+                nir_instr_as_intrinsic(instr)->intrinsic !=
+                   nir_intrinsic_load_constant_agx)
+               continue;
+            nir_intrinsic_instr *base_load = nir_src_as_intrinsic(
+               nir_instr_as_intrinsic(instr)->src[0]);
+            ASSERT_NE(base_load, nullptr);
+            ASSERT_EQ(base_load->intrinsic, nir_intrinsic_load_preamble);
+            read = nir_intrinsic_base(base_load);
+         }
+      }
+      if (load_bases) {
+         EXPECT_EQ(read, 8);
+      } else {
+         EXPECT_EQ(read, 300);
+      }
+      ralloc_free(b.shader);
+   }
+}

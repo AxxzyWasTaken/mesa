@@ -893,11 +893,12 @@ if_depth(const nir_instr *instr)
    return depth;
 }
 
-/* If this 64-bit value is a sample's texture or sampler handle, the least
- * if-nesting depth of those samples; otherwise UINT_MAX.
+/* If this 64-bit value is a sample's texture or sampler handle, or with
+ * load_bases a load's base address, the least if-nesting depth of those uses;
+ * otherwise UINT_MAX.
  */
 static unsigned
-sample_handle_depth(const nir_def *def)
+sample_handle_depth(const nir_def *def, bool load_bases)
 {
    unsigned depth = UINT_MAX;
    if (def->bit_size != 64 || def->num_components != 1)
@@ -905,6 +906,14 @@ sample_handle_depth(const nir_def *def)
 
    nir_foreach_use(use, def) {
       nir_instr *parent = nir_src_use_instr(use);
+      if (parent->type == nir_instr_type_intrinsic) {
+         nir_intrinsic_instr *intr = nir_instr_as_intrinsic(parent);
+         if (load_bases && use == &intr->src[0] &&
+             (intr->intrinsic == nir_intrinsic_load_constant_agx ||
+              intr->intrinsic == nir_intrinsic_load_agx))
+            depth = MIN2(depth, if_depth(parent));
+         continue;
+      }
       if (parent->type != nir_instr_type_tex)
          continue;
       nir_tex_instr *tex = nir_instr_as_tex(parent);
@@ -944,16 +953,18 @@ find_slot(struct preamble_slot *slots, unsigned n, unsigned half)
  * nir_opt_preamble lays general exports out by benefit, so bindless texture
  * and sampler handles of a shader with many exports can land above the range
  * a sample reads directly, and each sample then copies its handles into
- * registers first. Move every export that is used as a handle to the bottom of
- * the general range [reserved, exports_end), keeping the others in order
- * behind them. Uniforms from exports_end to the allocated size, if any, are
- * copied in by the launch and stay where they are. Updates the allocated size
- * when alignment grows the layout.
+ * registers first. With load_bases, G17P device loads count too: they read
+ * their base from the same range, and a base above it costs two copies per
+ * load. Move every export that is used as a handle to the bottom of the general
+ * range [reserved, exports_end), keeping the others in order behind them.
+ * Uniforms from exports_end to the allocated size, if any, are copied in by the
+ * launch and stay where they are. Updates the allocated size when alignment
+ * grows the layout.
  */
 bool
 agx_nir_place_preamble_handles_low(nir_shader *nir, unsigned reserved,
                                    unsigned exports_end,
-                                   unsigned *allocated_inout)
+                                   unsigned *allocated_inout, bool load_bases)
 {
    const unsigned allocated = *allocated_inout;
    if (!nir_shader_get_entrypoint(nir)->preamble || allocated > 512 ||
@@ -1015,7 +1026,7 @@ agx_nir_place_preamble_handles_low(nir_shader *nir, unsigned reserved,
                    nir_preamble_class_general) {
                base = nir_intrinsic_base(intr);
                size = MAX2(intr->def.bit_size, 16) * intr->def.num_components / 16;
-               depth = sample_handle_depth(&intr->def);
+               depth = sample_handle_depth(&intr->def, load_bases);
             } else if (intr->intrinsic == nir_intrinsic_bindless_image_agx ||
                        intr->intrinsic == nir_intrinsic_bindless_sampler_agx) {
                base = nir_intrinsic_desc_set(intr);

@@ -1416,7 +1416,8 @@ bool agx_nir_coalesce_preamble_half_exports(nir_shader *s, unsigned reserved,
 
 bool agx_nir_place_preamble_handles_low(nir_shader *s, unsigned reserved,
                                          unsigned exports_end,
-                                         unsigned *allocated);
+                                         unsigned *allocated,
+                                        bool load_bases);
 agx_block *agx_reconverged_mrt_tail(agx_context *ctx);
 bool agx_nir_lower_load_mask(nir_shader *shader);
 bool agx_nir_lower_ubo(nir_shader *shader);
