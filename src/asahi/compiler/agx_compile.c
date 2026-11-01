@@ -4637,6 +4637,57 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
        * select; G17G grounds signed conditions only with a 32-bit result
        * (a loop counter's `i < n` in a 16-bit boolean). Compare into a
        * 32-bit temporary and narrow it. */
+      /* With half comparands (mediump `a == b` into a boolean), RA turns the
+       * compare into a half 0/1 select on half registers, which G17G has no
+       * form for under any condition. Compare 32-bit extensions instead:
+       * signed (SEQ too) or zero extended, sext as in SIGNEXT above. */
+      if (I->op == AGX_OPCODE_ICMP && I->nr_srcs == 2 &&
+          I->dest[0].size == AGX_SIZE_16 &&
+          I->src[0].size == AGX_SIZE_16 && I->src[1].size == AGX_SIZE_16) {
+         bool ok = true;
+         for (unsigned s = 0; s < 2; ++s) {
+            const agx_index src = I->src[s];
+            ok &= !src.neg && !src.abs && agx_channels(src) == 1 &&
+                  (src.type == AGX_INDEX_NORMAL ||
+                   src.type == AGX_INDEX_UNIFORM ||
+                   src.type == AGX_INDEX_IMMEDIATE);
+         }
+         if (ok) {
+            const bool is_signed = I->icond == AGX_ICOND_SLT ||
+                                   I->icond == AGX_ICOND_SGT ||
+                                   I->icond == AGX_ICOND_SEQ;
+            agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+            for (unsigned s = 0; s < 2; ++s) {
+               const agx_index src = I->src[s];
+               if (src.type == AGX_INDEX_IMMEDIATE) {
+                  I->src[s] = agx_mov_imm(
+                     &b, 32,
+                     is_signed ? (uint32_t)(int32_t)(int16_t)src.value
+                               : src.value);
+                  continue;
+               }
+               agx_index wide = agx_temp(ctx, AGX_SIZE_32);
+               agx_mov_to(&b, wide, src);
+               if (is_signed) {
+                  agx_index bias = agx_mov_imm(&b, 32, 0x8000);
+                  agx_index flipped = agx_temp(ctx, AGX_SIZE_32);
+                  agx_bitop_to(&b, flipped, wide, bias, 0x6 /* XOR */);
+                  agx_index extended = agx_temp(ctx, AGX_SIZE_32);
+                  agx_iadd_to(&b, extended, flipped, agx_neg(bias), 0);
+                  wide = extended;
+               }
+               I->src[s] = wide;
+            }
+            agx_builder after = agx_init_builder(ctx, agx_after_instr(I));
+            agx_index narrow = I->dest[0];
+            agx_index wide = agx_temp(ctx, AGX_SIZE_32);
+            I->dest[0] = wide;
+            agx_subdivide_to(&after, narrow, wide, 0);
+            progress = true;
+            continue;
+         }
+      }
+
       if (I->op == AGX_OPCODE_ICMP && I->dest[0].size == AGX_SIZE_16 &&
           (I->icond == AGX_ICOND_SLT || I->icond == AGX_ICOND_SGT)) {
          agx_builder b = agx_init_builder(ctx, agx_after_instr(I));
@@ -4662,6 +4713,25 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
        * extended otherwise. G17G has no witnessed sign-extending half add,
        * so extend as sext(x) = (zext(x) ^ 0x8000) - 0x8000, as SIGNEXT is
        * lowered above. Every operand is checked before any is rewritten. */
+      /* An immediate first comparand: compare the other way round. */
+      if (I->op == AGX_OPCODE_ICMPSEL && I->nr_srcs == 4 &&
+          I->dest[0].size == AGX_SIZE_16 &&
+          I->src[0].type == AGX_INDEX_IMMEDIATE &&
+          (I->src[1].type == AGX_INDEX_NORMAL ||
+           I->src[1].type == AGX_INDEX_UNIFORM)) {
+         const agx_index t = I->src[0];
+         I->src[0] = I->src[1];
+         I->src[1] = t;
+         switch (I->icond) {
+         case AGX_ICOND_ULT: I->icond = AGX_ICOND_UGT; break;
+         case AGX_ICOND_UGT: I->icond = AGX_ICOND_ULT; break;
+         case AGX_ICOND_SLT: I->icond = AGX_ICOND_SGT; break;
+         case AGX_ICOND_SGT: I->icond = AGX_ICOND_SLT; break;
+         default: break;
+         }
+         progress = true;
+      }
+
       if (I->op == AGX_OPCODE_ICMPSEL && I->nr_srcs == 4 &&
           I->dest[0].size == AGX_SIZE_16 &&
           (I->src[0].type == AGX_INDEX_NORMAL ||
@@ -4722,6 +4792,24 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
             agx_subdivide_to(&after, narrow, wide, 0);
             progress = true;
          }
+         continue;
+      }
+
+      /* `imm - x` at 32 bits has no G17G form with the immediate in the
+       * first slot; register subtraction is witnessed. The immediate keeps
+       * its extension: .abs marks a zero-extended source, as for registers
+       * in agx_lower_agx3_widening_iadd(). */
+      if (I->op == AGX_OPCODE_IADD && I->nr_srcs == 2 &&
+          I->dest[0].size == AGX_SIZE_32 &&
+          I->src[0].type == AGX_INDEX_IMMEDIATE && !I->src[0].neg &&
+          (I->src[1].type == AGX_INDEX_NORMAL ||
+           I->src[1].type == AGX_INDEX_UNIFORM) &&
+          I->src[1].neg && I->src[1].size == AGX_SIZE_32) {
+         agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+         const agx_index imm = I->src[0];
+         I->src[0] = agx_mov_imm(
+            &b, 32, imm.abs ? imm.value : (uint32_t)(int32_t)(int16_t)imm.value);
+         progress = true;
          continue;
       }
 
