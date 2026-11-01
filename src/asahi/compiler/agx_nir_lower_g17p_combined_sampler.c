@@ -786,6 +786,17 @@ g17p_indexed_image_fetch_shape(const nir_intrinsic_instr *intr)
            (nir_src_as_uint(image->src[0]) & 7) == 0);
 }
 
+/* A constant descriptor is inside its mapped set, so its heap index may be read
+ * ahead of the sample, out of a branch or loop into the constant program. This
+ * GPU has no soft faults, and a dynamic index is only known to be in range where
+ * the sample really runs: `if (i >= 0) ...` must not read element -1 per draw.
+ */
+static enum gl_access_qualifier
+heap_index_access(const nir_intrinsic_instr *image)
+{
+   return nir_src_is_const(image->src[0]) ? ACCESS_CAN_SPECULATE : 0;
+}
+
 /* Native indexed samples consume zero-extended heap indices, loaded by the
  * GPU from the descriptor set. Keep descriptor-set roots alive so updates
  * after command recording and dynamically selected array elements are visible.
@@ -914,7 +925,8 @@ lower_indexed_samplers(nir_shader *shader, int native32_set, bool m5)
                nir_def *address =
                   nir_iadd(&b, set, nir_u2u64(&b, offset));
                nir_def *texture_index = nir_load_global_constant(
-                  &b, 1, 32, address, .align_mul = 4);
+                  &b, 1, 32, address, .align_mul = 4,
+                  .access = heap_index_access(image));
                texture_index = nir_u2u64(&b, texture_index);
                nir_def *native_handle = nir_bindless_image_agx(
                   &b, texture_index, .desc_set = 0);
@@ -966,7 +978,9 @@ lower_indexed_samplers(nir_shader *shader, int native32_set, bool m5)
                nir_def *offset = nir_iadd_imm(&b, image->src[0].ssa,
                                              AGX_G17P_SAMPLED_HEAP_INDEX_OFFSET);
                nir_def *address = nir_iadd(&b, set, nir_u2u64(&b, offset));
-               texture_index = nir_load_global_constant(&b, 1, 32, address, .align_mul = 4);
+               texture_index = nir_load_global_constant(
+                  &b, 1, 32, address, .align_mul = 4,
+                  .access = heap_index_access(image));
             }
             /* G17P Vulkan descriptors already name the native zero-based
              * sampler heap. The packed native32 path also uses raw indices.
