@@ -4927,8 +4927,13 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
        * and to f16); the byte and half forms are G17P's. Extend the source
        * to 32 bits first: zero extension, masked to the byte for U8; sign
        * extension as (x ^ m) - m with m = 0x80 or 0x8000. */
+      /* A byte is exact in f16 and f32, a half integer in f32, so the
+       * rounding mode of those conversions does not matter. */
       if (I->op == AGX_OPCODE_CONVERT && I->nr_srcs == 2 && !I->saturate &&
-          I->round == AGX_ROUND_RTE &&
+          (I->round == AGX_ROUND_RTE || I->dest[0].size == AGX_SIZE_32 ||
+           (I->src[0].type == AGX_INDEX_IMMEDIATE &&
+            (I->src[0].value == AGX_CONVERT_U8_TO_F ||
+             I->src[0].value == AGX_CONVERT_S8_TO_F))) &&
           I->src[0].type == AGX_INDEX_IMMEDIATE &&
           (I->src[0].value == AGX_CONVERT_U8_TO_F ||
            I->src[0].value == AGX_CONVERT_S8_TO_F ||
@@ -4963,6 +4968,7 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
          I->src[0] = agx_immediate(is_signed ? AGX_CONVERT_S32_TO_F
                                              : AGX_CONVERT_U32_TO_F);
          I->src[1] = wide;
+         I->round = AGX_ROUND_RTE;
          progress = true;
          continue;
       }
