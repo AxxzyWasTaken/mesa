@@ -136,7 +136,7 @@ agx_set_sampler_uniforms(struct agx_batch *batch, mesa_shader_stage stage)
          memcpy(unif->custom_border[s], st->samplers[s]->custom_border,
                 sizeof(unif->custom_border[s]));
 
-         if (dev->chip == AGX_CHIP_G17P) {
+         if (agx_shadow_gather_custom_border(dev->chip)) {
             const struct pipe_sampler_state *sampler = &st->samplers[s]->base;
             const struct util_format_description *desc =
                util_format_description(sampler->border_color_format);
