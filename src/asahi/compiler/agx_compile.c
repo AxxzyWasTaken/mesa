@@ -4795,6 +4795,49 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
          continue;
       }
 
+      /* |a| * |b| at half precision has no grounded G17G form with both
+       * sources absolute: multiply and clear the sign bit (|a*b|, NaNs and
+       * signed zeros included). */
+      if (I->op == AGX_OPCODE_FMUL && I->nr_srcs == 2 && !I->saturate &&
+          I->dest[0].size == AGX_SIZE_16 &&
+          I->src[0].size == AGX_SIZE_16 && I->src[1].size == AGX_SIZE_16 &&
+          I->src[0].abs && I->src[1].abs &&
+          !I->src[0].neg && !I->src[1].neg &&
+          I->src[0].type != AGX_INDEX_IMMEDIATE &&
+          I->src[1].type != AGX_INDEX_IMMEDIATE) {
+         I->src[0].abs = I->src[1].abs = false;
+         agx_index product = agx_temp(ctx, AGX_SIZE_16);
+         agx_index narrow = I->dest[0];
+         I->dest[0] = product;
+         agx_builder after = agx_init_builder(ctx, agx_after_instr(I));
+         agx_bitop_to(&after, narrow, product,
+                      agx_mov_imm(&after, 16, 0x7fff), 0x8 /* AND */);
+         progress = true;
+         continue;
+      }
+
+      /* An f32 -> f16 conversion of a negated source (fadd(-x, -0.0) into a
+       * half) has no grounded form; convert x and flip the half's sign. */
+      if (I->op == AGX_OPCODE_FADD && I->nr_srcs == 2 && !I->saturate &&
+          I->dest[0].size == AGX_SIZE_16 && I->src[0].size == AGX_SIZE_32 &&
+          I->src[0].neg && !I->src[0].abs &&
+          (I->src[0].type == AGX_INDEX_NORMAL ||
+           I->src[0].type == AGX_INDEX_UNIFORM) &&
+          I->src[1].type == AGX_INDEX_IMMEDIATE &&
+          I->src[1].value == agx_negzero().value &&
+          I->src[1].neg == agx_negzero().neg &&
+          I->src[1].abs == agx_negzero().abs) {
+         I->src[0].neg = false;
+         agx_index converted = agx_temp(ctx, AGX_SIZE_16);
+         agx_index narrow = I->dest[0];
+         I->dest[0] = converted;
+         agx_builder after = agx_init_builder(ctx, agx_after_instr(I));
+         agx_bitop_to(&after, narrow, converted,
+                      agx_mov_imm(&after, 16, 0x8000), 0x6 /* XOR */);
+         progress = true;
+         continue;
+      }
+
       /* Half derivatives have no grounded G17G form: differentiate the f32
        * extension and round the result back (f16 -> f32 is exact, and the
        * f32 difference rounds once to the same half the half unit would
