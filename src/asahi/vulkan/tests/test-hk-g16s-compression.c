@@ -70,7 +70,8 @@ check_formats(void)
       depth += d;
 
       VkImageCreateInfo i = image((VkFormat)f, 64, 64, 1, color_usage);
-      CHECK(ELIGIBLE(i) == (c || hk_g17p_compression_depth_format((VkFormat)f)));
+      CHECK(ELIGIBLE(i) == (c || hk_g17p_compression_depth_format((VkFormat)f) ||
+                            f == VK_FORMAT_B10G11R11_UFLOAT_PACK32));
    }
    CHECK(color == 46);
    CHECK(depth == 4);
@@ -84,7 +85,6 @@ check_formats(void)
       VK_FORMAT_R32G32B32_SFLOAT,
       VK_FORMAT_R8G8B8_UNORM,
       VK_FORMAT_R16G16B16_SFLOAT,
-      VK_FORMAT_B10G11R11_UFLOAT_PACK32,
       VK_FORMAT_E5B9G9R9_UFLOAT_PACK32,
       VK_FORMAT_R4G4B4A4_UNORM_PACK16,
       VK_FORMAT_A1R5G5B5_UNORM_PACK16,
@@ -420,12 +420,11 @@ check_transport_fever_3(void)
 {
    /* Transport Fever 3 at 2x anti-aliasing: its 3456x2234 G-buffer is
     * R11G11B10F, A2R10G10B10 and RGBA8 (usage 0x13) and D32S8 (0x23),
-    * reloaded and stored about six times a frame. All but R11G11B10F and
-    * the stencil plane compress on M4 Pro; nothing multisampled does on
-    * the other G17P chips. */
+    * reloaded and stored about six times a frame. All but the stencil plane
+    * compress on M4 Pro; nothing multisampled does on the other G17P chips. */
    static const struct { VkFormat format; VkImageUsageFlags usage; bool m4_pro; }
       gbuffer[] = {
-         {VK_FORMAT_B10G11R11_UFLOAT_PACK32, 0x13, false},
+         {VK_FORMAT_B10G11R11_UFLOAT_PACK32, 0x13, true},
          {VK_FORMAT_A2R10G10B10_UNORM_PACK32, 0x13, true},
          {VK_FORMAT_R8G8B8A8_UNORM, 0x13, true},
          {VK_FORMAT_D32_SFLOAT_S8_UINT, 0x23, true},
@@ -440,6 +439,45 @@ check_transport_fever_3(void)
       i.samples = VK_SAMPLE_COUNT_4_BIT;
       CHECK(!ELIGIBLE(i));
    }
+}
+
+static void
+check_r11g11b10f(void)
+{
+   const VkImageUsageFlags attachment = VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+      VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+   /* The game's HDR chain: 1x with a mip chain, on M4 Pro only. */
+   VkImageCreateInfo i =
+      image(VK_FORMAT_B10G11R11_UFLOAT_PACK32, 3456, 2234, 12, attachment);
+   CHECK(ELIGIBLE(i));
+   CHECK(!hk_g17p_compression_eligible(AGX_CHIP_G17P, 0, &i));
+
+   /* A texture can be uploaded with any bits, and this class has no NaN. */
+   i.usage = attachment & ~VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+   CHECK(!ELIGIBLE(i));
+   i.usage = attachment | VK_IMAGE_USAGE_STORAGE_BIT;
+   CHECK(!ELIGIBLE(i));
+   i.usage = attachment;
+
+   /* One layer. */
+   i.arrayLayers = 2;
+   CHECK(!ELIGIBLE(i));
+   i.arrayLayers = 1;
+   i.imageType = VK_IMAGE_TYPE_3D;
+   CHECK(!ELIGIBLE(i));
+   i.imageType = VK_IMAGE_TYPE_2D;
+
+   /* The same 2x rule as the other formats. */
+   i.mipLevels = 1;
+   i.samples = VK_SAMPLE_COUNT_2_BIT;
+   CHECK(ELIGIBLE(i));
+   i.samples = VK_SAMPLE_COUNT_4_BIT;
+   CHECK(!ELIGIBLE(i));
+   i.samples = VK_SAMPLE_COUNT_2_BIT;
+   i.usage |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+   CHECK(!ELIGIBLE(i));
 }
 
 static void
@@ -652,6 +690,7 @@ main(void)
 {
    check_formats();
    check_transport_fever_3();
+   check_r11g11b10f();
    check_shape(VK_FORMAT_R8G8B8A8_UNORM, false);
    check_shape(VK_FORMAT_B8G8R8A8_SRGB, false);
    check_shape(VK_FORMAT_R16G16B16A16_SFLOAT, false);

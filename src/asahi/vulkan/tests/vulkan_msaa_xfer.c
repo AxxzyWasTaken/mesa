@@ -9,7 +9,8 @@
  * and depth/stencil (sample zero) into single-sample images. Inside the
  * rectangle the resolved values must be A's clear values, outside B's.
  *
- *   vulkan-msaa-xfer [depth=d32|d32s8] [format=rgba8|rgb10a2|rgba16f]
+ *   vulkan-msaa-xfer [depth=d32|d32s8]
+ *                    [format=rgba8|rgb10a2|rgba16f|r11g11b10f]
  *                    [mode=copy|clear|mixed|mixed-src]
  *
  * `clear` skips the copy (B keeps its clear values everywhere). `mixed` adds
@@ -147,8 +148,10 @@ main(int argc, char **argv)
       cfmt = VK_FORMAT_A2R10G10B10_UNORM_PACK32, cbpp = 4;
    } else if (!strcmp(cname, "rgba16f")) {
       cfmt = VK_FORMAT_R16G16B16A16_SFLOAT, cbpp = 8;
+   } else if (!strcmp(cname, "r11g11b10f")) {
+      cfmt = VK_FORMAT_B10G11R11_UFLOAT_PACK32, cbpp = 4;
    } else {
-      fprintf(stderr, "usage: %s [d32|d32s8] [rgba8|rgb10a2|rgba16f] "
+      fprintf(stderr, "usage: %s [d32|d32s8] [rgba8|rgb10a2|rgba16f|r11g11b10f] "
                       "[copy|clear|mixed|mixed-src]\n", argv[0]);
       return 2;
    }
@@ -378,6 +381,10 @@ main(int argc, char **argv)
       memcpy(want_b, (uint8_t[]){0, 0, 0xff, 0xff}, 4);
    } else if (cfmt == VK_FORMAT_A2R10G10B10_UNORM_PACK32) {
       const uint32_t a = 3u << 30 | 0x3ffu << 20, b = 3u << 30 | 0x3ffu;
+      memcpy(want_a, &a, 4);
+      memcpy(want_b, &b, 4);
+   } else if (cfmt == VK_FORMAT_B10G11R11_UFLOAT_PACK32) {
+      const uint32_t a = 0x3c0, b = 0x1e0u << 22;
       memcpy(want_a, &a, 4);
       memcpy(want_b, &b, 4);
    } else {

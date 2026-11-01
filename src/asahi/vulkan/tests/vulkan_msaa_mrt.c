@@ -34,7 +34,8 @@
  *                   [pass2=load|clear] [write=clear|layer0|draw|a2c|none] [layers=1]
  *   formats: one name repeated `attachments` times, or a comma-separated list
  *   with one name per attachment ("none" = VK_NULL_HANDLE view):
- *   rgba16f rgba8 rg16f r32f rg32f rgba32f rgb10a2 r11g11b10f r8 rg8 none
+ *   rgba16f rgba8 rg16f r32f rg32f rgba32f rgb10a2 bgr10a2 r11g11b10f r8 rg8
+ *   none
  * Exit 0 = PASS, 1 = FAIL. */
 #include <stdbool.h>
 #include <stdio.h>
@@ -67,6 +68,7 @@ static const struct { const char *name; VkFormat fmt; unsigned bpp; } formats[] 
    {"rg32f", VK_FORMAT_R32G32_SFLOAT, 8},
    {"rgba32f", VK_FORMAT_R32G32B32A32_SFLOAT, 16},
    {"rgb10a2", VK_FORMAT_A2B10G10R10_UNORM_PACK32, 4},
+   {"bgr10a2", VK_FORMAT_A2R10G10B10_UNORM_PACK32, 4},
    {"r11g11b10f", VK_FORMAT_B10G11R11_UFLOAT_PACK32, 4},
    {"r8", VK_FORMAT_R8_UNORM, 1},
    {"rg8", VK_FORMAT_R8G8_UNORM, 2},
@@ -397,7 +399,8 @@ main(int argc, char **argv)
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
             .clearValue.color = colour(i, 0),
          };
-         if (pass && fmt[i]) {
+         /* A single-sample pass has nothing to resolve: read it back. */
+         if (pass && fmt[i] && samples > 1) {
             att[i].resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
             att[i].resolveImageView = res_view[i];
             att[i].resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -455,7 +458,8 @@ main(int argc, char **argv)
       VkBufferImageCopy copy = {.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, layers},
                                 .imageExtent = {W, H, 1}};
       copy.bufferOffset = img_size * (2 * i);
-      vkCmdCopyImageToBuffer(cb, res[i], VK_IMAGE_LAYOUT_GENERAL, buf, 1, &copy);
+      vkCmdCopyImageToBuffer(cb, samples > 1 ? res[i] : ms[i], VK_IMAGE_LAYOUT_GENERAL,
+                             buf, 1, &copy);
       copy.bufferOffset = img_size * (2 * i + 1);
       vkCmdCopyImageToBuffer(cb, ref[i], VK_IMAGE_LAYOUT_GENERAL, buf, 1, &copy);
    }
