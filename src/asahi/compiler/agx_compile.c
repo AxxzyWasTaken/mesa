@@ -4973,6 +4973,22 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
          continue;
       }
 
+      /* A three-channel tile load (blending into RGB565) has no grounded
+       * G17G form: load all four channels and keep the first three. */
+      if (I->op == AGX_OPCODE_LD_TILE && I->mask == 0x7 &&
+          agx_channels(I->dest[0]) == 3) {
+         agx_index narrow = I->dest[0];
+         agx_index wide = agx_vec_temp(ctx, narrow.size, 4);
+         I->dest[0] = wide;
+         I->mask = 0xf;
+         agx_builder after = agx_init_builder(ctx, agx_after_instr(I));
+         agx_index channels[4];
+         agx_emit_split(&after, channels, wide, 4);
+         agx_emit_collect_to(&after, narrow, 3, channels);
+         progress = true;
+         continue;
+      }
+
       /* Half derivatives have no grounded G17G form: differentiate the f32
        * extension and round the result back (f16 -> f32 is exact, and the
        * f32 difference rounds once to the same half the half unit would
