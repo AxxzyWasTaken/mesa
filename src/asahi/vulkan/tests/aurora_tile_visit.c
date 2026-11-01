@@ -8,11 +8,10 @@
  * were, sample by sample, and write the others as a one-target pass does.
  * A layout that spills is not elided, and carries that path's own bugs.
  *
- *   aurora-tile-visit [ms=2] [fmts=rgba8,rgb10] [frames=0]
+ *   aurora-tile-visit [ms=2] [fmts=rgba8,rgb10]
  *
  * fmts names one to three targets from r11f, rgb10, rgba8, bgra8, rgba16f,
- * rgba32f, rg16f, r32f and r8. frames > 0 then repeats every shape for timing: take
- * per-job GPU time from the asahi_g17_complete tracepoint. */
+ * rgba32f, rg16f, r32f and r8. */
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -315,14 +314,11 @@ int
 main(int argc, char **argv)
 {
    char fmts_arg[64] = "rgba8,rgb10";
-   int frames = 0;
    for (int i = 1; i < argc; i++) {
       if (!strncmp(argv[i], "ms=", 3))
          samples = atoi(argv[i] + 3);
       else if (!strncmp(argv[i], "fmts=", 5))
          snprintf(fmts_arg, sizeof(fmts_arg), "%s", argv[i] + 5);
-      else if (!strncmp(argv[i], "frames=", 7))
-         frames = atoi(argv[i] + 7);
    }
    VkFormat rt_formats[MAX_RT];
    unsigned rts = 0;
@@ -456,154 +452,145 @@ main(int argc, char **argv)
    submit(cmd);
 
    unsigned fails = 0;
-   for (unsigned repeat = 0; repeat <= (frames ? (unsigned)frames : 0); repeat++) {
-      for (unsigned s = 0; s < SHAPE_COUNT; s++) {
-         if (s == SHAPE_TWO_DRAWS && rts < 2)
-            continue;
-         const float frame = s + 1;
-         const bool timing = repeat > 0;
+   for (unsigned s = 0; s < SHAPE_COUNT; s++) {
+      if (s == SHAPE_TWO_DRAWS && rts < 2)
+         continue;
+      const float frame = s + 1;
 
-         /* A fresh scene, and what each target and its resolve must then be. */
-         VkRenderingAttachmentInfo at[MAX_RT];
-         for (unsigned i = 0; i < rts; i++)
-            at[i] = (VkRenderingAttachmentInfo){
-               .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-               .imageView = rt[i].view,
-               .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-               .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-               .storeOp = VK_ATTACHMENT_STORE_OP_STORE};
-         VkRenderingInfo ri = {.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-                               .renderArea = {{0, 0}, {W, H}}, .layerCount = 1,
-                               .colorAttachmentCount = rts,
-                               .pColorAttachments = at};
-         cmd = begin();
-         vkCmdBeginRendering(cmd, &ri);
-         draw_pipe(cmd, scene, 0, 6);
+      /* A fresh scene, and what each target and its resolve must then be. */
+      VkRenderingAttachmentInfo at[MAX_RT];
+      for (unsigned i = 0; i < rts; i++)
+         at[i] = (VkRenderingAttachmentInfo){
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = rt[i].view,
+            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE};
+      VkRenderingInfo ri = {.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+                            .renderArea = {{0, 0}, {W, H}}, .layerCount = 1,
+                            .colorAttachmentCount = rts,
+                            .pColorAttachments = at};
+      cmd = begin();
+      vkCmdBeginRendering(cmd, &ri);
+      draw_pipe(cmd, scene, 0, 6);
+      vkCmdEndRendering(cmd);
+      for (unsigned i = 0; i < references; i++) {
+         barrier(cmd);
+         VkRenderingAttachmentInfo ref = at[i];
+         ref.imageView = reference[i].view;
+         ref.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+         VkRenderingInfo ref_info = ri;
+         ref_info.colorAttachmentCount = 1;
+         ref_info.pColorAttachments = &ref;
+         vkCmdBeginRendering(cmd, &ref_info);
+         draw_pipe(cmd, post_one[i], frame, 6);
          vkCmdEndRendering(cmd);
-         if (!timing) {
-            for (unsigned i = 0; i < references; i++) {
-               barrier(cmd);
-               VkRenderingAttachmentInfo ref = at[i];
-               ref.imageView = reference[i].view;
-               ref.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-               VkRenderingInfo ref_info = ri;
-               ref_info.colorAttachmentCount = 1;
-               ref_info.pColorAttachments = &ref;
-               vkCmdBeginRendering(cmd, &ref_info);
-               draw_pipe(cmd, post_one[i], frame, 6);
-               vkCmdEndRendering(cmd);
-            }
-         }
-         submit(cmd);
+      }
+      submit(cmd);
 
-         uint64_t before[MAX_RT][MAX_MS], resolve_before[MAX_RT] = {0};
-         if (!timing) {
-            for (unsigned i = 0; i < rts; i++) {
-               for (int m = 0; m < samples; m++)
-                  before[i][m] = hash_image(rt[i].view, m);
-               cmd = begin();
-               VkImageResolve region = {
-                  {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, {0, 0, 0},
-                  {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, {0, 0, 0}, {W, H, 1}};
-               vkCmdResolveImage(cmd, rt[i].image, VK_IMAGE_LAYOUT_GENERAL,
-                                 resolved[i].image, VK_IMAGE_LAYOUT_GENERAL, 1,
-                                 &region);
-               submit(cmd);
-               resolve_before[i] = hash_image(resolved[i].view, -1);
-            }
-         }
-
-         /* The visit. */
-         const bool no_store = s == SHAPE_RESOLVE_NOSTORE ||
-                               s == SHAPE_TRIANGLE_RESOLVE_NOSTORE;
-         const bool resolve0 = s == SHAPE_RESOLVE || no_store ||
-                               s == SHAPE_RESOLVE_ALL;
-         for (unsigned i = 0; i < rts; i++) {
-            at[i].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-            if (resolve0 && (i == 0 || s == SHAPE_RESOLVE_ALL)) {
-               at[i].resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-               at[i].resolveImageView = resolved[i].view;
-               at[i].resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            }
-         }
-         if (no_store)
-            at[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
+      uint64_t before[MAX_RT][MAX_MS], resolve_before[MAX_RT] = {0};
+      for (unsigned i = 0; i < rts; i++) {
+         for (int m = 0; m < samples; m++)
+            before[i][m] = hash_image(rt[i].view, m);
          cmd = begin();
-         if (s == SHAPE_NONE)
-            vkCmdResetQueryPool(cmd, query_pool, 0, 1);
-         vkCmdBeginRendering(cmd, &ri);
-         switch (s) {
-         case SHAPE_TRIANGLE:
-         case SHAPE_TRIANGLE_RESOLVE_NOSTORE:
-            draw_pipe(cmd, post_tri, frame, 3);
-            break;
-         case SHAPE_NONE:
-            vkCmdBeginQuery(cmd, query_pool, 0, VK_QUERY_CONTROL_PRECISE_BIT);
-            draw_pipe(cmd, hist, frame, 6);
-            draw_pipe(cmd, hist, frame, 6);
-            vkCmdEndQuery(cmd, query_pool, 0);
-            break;
-         case SHAPE_TWO_DRAWS:
-            draw_pipe(cmd, post, frame, 6);
-            draw_pipe(cmd, post1, frame, 6);
-            break;
-         default:
-            draw_pipe(cmd, post, frame, 6);
-            break;
-         }
-         vkCmdEndRendering(cmd);
+         VkImageResolve region = {
+            {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, {0, 0, 0},
+            {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, {0, 0, 0}, {W, H, 1}};
+         vkCmdResolveImage(cmd, rt[i].image, VK_IMAGE_LAYOUT_GENERAL,
+                           resolved[i].image, VK_IMAGE_LAYOUT_GENERAL, 1,
+                           &region);
          submit(cmd);
-         if (timing)
-            continue;
+         resolve_before[i] = hash_image(resolved[i].view, -1);
+      }
 
-         /* Check. */
-         bool ok = true;
-         uint64_t expected[2] = {0};
-         for (unsigned i = 0; i < references; i++)
-            expected[i] = hash_image(reference[i].view, 0);
-         for (unsigned i = 0; i < rts; i++) {
-            /* A STORE-less RT0 has nothing to compare. */
-            if (i == 0 && no_store)
-               continue;
-            for (int m = 0; m < samples; m++) {
-               const bool written = (i == 0 && s != SHAPE_NONE) ||
-                                    (i == 1 && s == SHAPE_TWO_DRAWS);
-               if (hash_image(rt[i].view, m) !=
-                   (written ? expected[i] : before[i][m])) {
-                  printf("  %s: rt%u sample %d changed\n", shape_names[s], i, m);
-                  ok = false;
-               }
-            }
+      /* The visit. */
+      const bool no_store = s == SHAPE_RESOLVE_NOSTORE ||
+                            s == SHAPE_TRIANGLE_RESOLVE_NOSTORE;
+      const bool resolve0 = s == SHAPE_RESOLVE || no_store ||
+                            s == SHAPE_RESOLVE_ALL;
+      for (unsigned i = 0; i < rts; i++) {
+         at[i].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+         if (resolve0 && (i == 0 || s == SHAPE_RESOLVE_ALL)) {
+            at[i].resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+            at[i].resolveImageView = resolved[i].view;
+            at[i].resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;
          }
-         if (resolve0 && hash_image(resolved[0].view, -1) != expected[0]) {
-            printf("  %s: resolved rt0 wrong\n", shape_names[s]);
-            ok = false;
-         }
-         if (s == SHAPE_RESOLVE_ALL) {
-            for (unsigned i = 1; i < rts; i++) {
-               if (hash_image(resolved[i].view, -1) != resolve_before[i]) {
-                  printf("  %s: resolved rt%u wrong\n", shape_names[s], i);
-                  ok = false;
-               }
-            }
-         }
-         if (s == SHAPE_NONE) {
-            /* 2430 of 3456 columns survive the discard, in both draws. */
-            uint64_t passed = 0;
-            CHECK(vkGetQueryPoolResults(dev, query_pool, 0, 1, sizeof(passed),
-                                        &passed, 8,
-                                        VK_QUERY_RESULT_64_BIT |
-                                           VK_QUERY_RESULT_WAIT_BIT));
-            if (passed != (uint64_t)2430 * H * samples * 2) {
-               printf("  none: query counted %llu\n",
-                      (unsigned long long)passed);
+      }
+      if (no_store)
+         at[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+      cmd = begin();
+      if (s == SHAPE_NONE)
+         vkCmdResetQueryPool(cmd, query_pool, 0, 1);
+      vkCmdBeginRendering(cmd, &ri);
+      switch (s) {
+      case SHAPE_TRIANGLE:
+      case SHAPE_TRIANGLE_RESOLVE_NOSTORE:
+         draw_pipe(cmd, post_tri, frame, 3);
+         break;
+      case SHAPE_NONE:
+         vkCmdBeginQuery(cmd, query_pool, 0, VK_QUERY_CONTROL_PRECISE_BIT);
+         draw_pipe(cmd, hist, frame, 6);
+         draw_pipe(cmd, hist, frame, 6);
+         vkCmdEndQuery(cmd, query_pool, 0);
+         break;
+      case SHAPE_TWO_DRAWS:
+         draw_pipe(cmd, post, frame, 6);
+         draw_pipe(cmd, post1, frame, 6);
+         break;
+      default:
+         draw_pipe(cmd, post, frame, 6);
+         break;
+      }
+      vkCmdEndRendering(cmd);
+      submit(cmd);
+
+      /* Check. */
+      bool ok = true;
+      uint64_t expected[2] = {0};
+      for (unsigned i = 0; i < references; i++)
+         expected[i] = hash_image(reference[i].view, 0);
+      for (unsigned i = 0; i < rts; i++) {
+         /* A STORE-less RT0 has nothing to compare. */
+         if (i == 0 && no_store)
+            continue;
+         for (int m = 0; m < samples; m++) {
+            const bool written = (i == 0 && s != SHAPE_NONE) ||
+                                 (i == 1 && s == SHAPE_TWO_DRAWS);
+            if (hash_image(rt[i].view, m) !=
+                (written ? expected[i] : before[i][m])) {
+               printf("  %s: rt%u sample %d changed\n", shape_names[s], i, m);
                ok = false;
             }
          }
-         printf("%s %s\n", ok ? "PASS" : "FAIL", shape_names[s]);
-         fails += !ok;
       }
+      if (resolve0 && hash_image(resolved[0].view, -1) != expected[0]) {
+         printf("  %s: resolved rt0 wrong\n", shape_names[s]);
+         ok = false;
+      }
+      if (s == SHAPE_RESOLVE_ALL) {
+         for (unsigned i = 1; i < rts; i++) {
+            if (hash_image(resolved[i].view, -1) != resolve_before[i]) {
+               printf("  %s: resolved rt%u wrong\n", shape_names[s], i);
+               ok = false;
+            }
+         }
+      }
+      if (s == SHAPE_NONE) {
+         /* 2430 of 3456 columns survive the discard, in both draws. */
+         uint64_t passed = 0;
+         CHECK(vkGetQueryPoolResults(dev, query_pool, 0, 1, sizeof(passed),
+                                     &passed, 8,
+                                     VK_QUERY_RESULT_64_BIT |
+                                        VK_QUERY_RESULT_WAIT_BIT));
+         if (passed != (uint64_t)2430 * H * samples * 2) {
+            printf("  none: query counted %llu\n",
+                   (unsigned long long)passed);
+            ok = false;
+         }
+      }
+      printf("%s %s\n", ok ? "PASS" : "FAIL", shape_names[s]);
+      fails += !ok;
    }
    printf("%s\n", fails ? "FAIL" : "PASS");
    return fails != 0;
