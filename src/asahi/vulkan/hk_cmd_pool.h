@@ -18,6 +18,15 @@
 #define HK_CMD_POOL_BO_MAX 32
 #define HK_G17P_CMD_POOL_MAIN_BO_MAX 256
 
+/* A recording with no recycled BO starts each uploader on a span of a shared
+ * slab: one tile upload writes under 8 KiB in total, and a whole BO per
+ * uploader costs it five VM binds, five mmaps and 640 KiB of first touches.
+ * A span is 16 KiB so it keeps the alignment a BO base gives its uploader. */
+#define HK_CMD_SPAN_SIZE (16 * 1024)
+/* Two G17P render stream roots, or one compute root. */
+#define HK_CMD_STREAM_SPAN_SIZE (64 * 1024)
+#define HK_CMD_SLAB_MAX_SIZE (4 * 1024 * 1024)
+
 enum hk_cmd_bo_type {
    HK_CMD_BO_MAIN,
    HK_CMD_BO_USC,
@@ -30,6 +39,11 @@ struct hk_cmd_bo {
    struct agx_bo *bo;
 
    void *map;
+
+   /* What this object owns: all of bo, or span of a device slab. */
+   uint64_t addr;
+   uint32_t size;
+   struct hk_vdm_allocation *span;
 
    /* Full VA of the G17P VDM alias in the architectural user window. */
    uint64_t g17p_vdm_alias;
@@ -95,6 +109,9 @@ struct hk_cmd_pool {
    /** Recyclable hk_cmd_bo lists, kept separate by mapping and VA policy. */
    struct list_head free_bos[HK_CMD_BO_TYPE_COUNT];
    uint32_t num_free_bos[HK_CMD_BO_TYPE_COUNT];
+   /** Spans likewise, so a warm small recording skips the device lock. */
+   struct list_head free_spans[HK_CMD_BO_TYPE_COUNT];
+   uint32_t num_free_spans[HK_CMD_BO_TYPE_COUNT];
    struct list_head free_gen1_as_chunks[2];
    uint32_t num_free_gen1_as_chunks[2];
 };
@@ -115,12 +132,16 @@ VkResult hk_cmd_pool_alloc_bo(struct hk_cmd_pool *pool,
 void hk_cmd_pool_free_bo_list(struct hk_cmd_pool *pool,
                               enum hk_cmd_bo_type type,
                               struct list_head *bos);
+VkResult hk_cmd_pool_alloc_bo_span(struct hk_cmd_pool *pool,
+                                   enum hk_cmd_bo_type type, uint32_t size,
+                                   struct hk_cmd_bo **bo_out);
 VkResult hk_cmd_bo_ensure_vdm_alias(struct hk_cmd_pool *pool,
                                     struct hk_cmd_bo *bo);
 
-VkResult hk_cmd_pool_alloc_vdm(struct hk_cmd_pool *pool, uint64_t size,
-                               uint64_t alignment, struct agx_ptr *ptr,
-                               struct hk_vdm_allocation **allocation);
-void hk_cmd_pool_free_vdm(struct hk_cmd_pool *pool,
-                          struct hk_vdm_allocation *allocation);
+VkResult hk_cmd_pool_alloc_span(struct hk_cmd_pool *pool,
+                                enum hk_cmd_slab_class class, uint64_t size,
+                                uint64_t alignment, struct agx_ptr *ptr,
+                                struct hk_vdm_allocation **allocation);
+void hk_device_free_span(struct hk_device *dev,
+                         struct hk_vdm_allocation *allocation);
 void hk_device_finish_vdm_slabs(struct hk_device *dev);

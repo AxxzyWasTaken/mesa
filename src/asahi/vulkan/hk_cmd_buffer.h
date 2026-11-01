@@ -1517,8 +1517,10 @@ struct hk_uploader {
  * See hk_ioto_arena_core.h for why programs cannot each have a BO.
  */
 struct hk_ioto_arena {
-   /* Chunk currently being filled. Owned by hk_cmd_buffer::large_bos. */
+   /* Chunk currently being filled. Owned by hk_cmd_buffer::large_bos, unless
+    * it is the span below, which has no bo of its own. */
    struct agx_bo *bo;
+   struct hk_vdm_allocation *span;
    uint8_t *map;
    uint64_t base;
    uint32_t cursor;
@@ -1976,8 +1978,8 @@ hk_pool_alloc_from(struct hk_cmd_buffer *cmd, struct hk_uploader *uploader,
 {
    assert(alignment > 0);
    const uint32_t offset = align(uploader->offset, alignment);
-   if (likely(uploader->map != NULL && size <= HK_CMD_BO_SIZE &&
-              offset <= HK_CMD_BO_SIZE && size <= HK_CMD_BO_SIZE - offset)) {
+   if (likely(uploader->map != NULL && offset <= uploader->capacity &&
+              size <= uploader->capacity - offset)) {
       uploader->offset = offset + size;
       return (struct agx_ptr){
          .gpu = uploader->base + offset,
