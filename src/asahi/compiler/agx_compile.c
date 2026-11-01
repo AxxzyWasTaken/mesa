@@ -4795,10 +4795,90 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
          continue;
       }
 
+      /* A 32-bit result selected on half comparands (a bool `==` in a vertex
+       * shader) is grounded on G17G only against an equality immediate of
+       * at most 2. Compare the 32-bit extensions instead, sign-extended for
+       * the signed conditions and zero-extended otherwise, as above. */
+      if (I->op == AGX_OPCODE_ICMPSEL && I->nr_srcs == 4 &&
+          I->dest[0].size == AGX_SIZE_32 && I->src[0].size == AGX_SIZE_16 &&
+          (I->src[0].type == AGX_INDEX_NORMAL ||
+           I->src[0].type == AGX_INDEX_UNIFORM) &&
+          !(I->src[1].type == AGX_INDEX_IMMEDIATE && I->src[1].value <= 2 &&
+            (I->icond == AGX_ICOND_UEQ || I->icond == AGX_ICOND_SEQ))) {
+         const bool is_signed = I->icond == AGX_ICOND_SLT ||
+                                I->icond == AGX_ICOND_SGT ||
+                                I->icond == AGX_ICOND_SEQ;
+         bool ok = true;
+         for (unsigned s = 0; s < 2 && ok; ++s) {
+            const agx_index src = I->src[s];
+            ok = !src.neg && !src.abs &&
+                 (src.type == AGX_INDEX_IMMEDIATE ||
+                  ((src.type == AGX_INDEX_NORMAL ||
+                    src.type == AGX_INDEX_UNIFORM) &&
+                   agx_channels(src) == 1 && src.size == AGX_SIZE_16));
+         }
+         if (ok) {
+            agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+            for (unsigned s = 0; s < 2; ++s) {
+               const agx_index src = I->src[s];
+               if (src.type == AGX_INDEX_IMMEDIATE) {
+                  I->src[s] = agx_mov_imm(
+                     &b, 32,
+                     is_signed ? (uint32_t)(int32_t)(int16_t)src.value
+                               : src.value);
+                  continue;
+               }
+               agx_index wide = agx_temp(ctx, AGX_SIZE_32);
+               agx_mov_to(&b, wide, src);
+               if (is_signed) {
+                  agx_index bias = agx_mov_imm(&b, 32, 0x8000);
+                  agx_index flipped = agx_temp(ctx, AGX_SIZE_32);
+                  agx_bitop_to(&b, flipped, wide, bias, 0x6 /* XOR */);
+                  agx_index extended = agx_temp(ctx, AGX_SIZE_32);
+                  agx_iadd_to(&b, extended, flipped, agx_neg(bias), 0);
+                  wide = extended;
+               }
+               I->src[s] = wide;
+            }
+            progress = true;
+            continue;
+         }
+      }
+
+      /* G17G grounds a & ~b (truth table 0x2, 0x4 with the sources
+       * exchanged) only on halves. At 32 bits complement the cleared source
+       * with an XOR against all ones and AND (bitfieldInsert's select). */
+      if (I->op == AGX_OPCODE_BITOP && I->nr_srcs == 2 &&
+          I->dest[0].size == AGX_SIZE_32 &&
+          ((I->truth_table & 0xfu) == 0x2u ||
+           (I->truth_table & 0xfu) == 0x4u)) {
+         const unsigned c = (I->truth_table & 0xfu) == 0x2u ? 1 : 0;
+         const agx_index src = I->src[c];
+         if (!src.neg && !src.abs && src.size == AGX_SIZE_32 &&
+             agx_channels(src) == 1 &&
+             (src.type == AGX_INDEX_NORMAL || src.type == AGX_INDEX_UNIFORM ||
+              src.type == AGX_INDEX_IMMEDIATE)) {
+            agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+            if (src.type == AGX_INDEX_IMMEDIATE) {
+               I->src[c] = agx_mov_imm(&b, 32, ~(uint32_t)src.value);
+            } else {
+               agx_index inverted = agx_temp(ctx, AGX_SIZE_32);
+               agx_bitop_to(&b, inverted, src,
+                            agx_mov_imm(&b, 32, UINT32_C(0xffffffff)),
+                            0x6 /* XOR */);
+               I->src[c] = inverted;
+            }
+            I->truth_table = 0x8 /* AND */;
+            progress = true;
+            continue;
+         }
+      }
+
       /* |a| * |b| at half precision has no grounded G17G form with both
        * sources absolute: multiply and clear the sign bit (|a*b|, NaNs and
        * signed zeros included). */
-      if (I->op == AGX_OPCODE_FMUL && I->nr_srcs == 2 && !I->saturate &&
+      if ((I->op == AGX_OPCODE_FMUL || I->op == AGX_OPCODE_HMUL) &&
+          I->nr_srcs == 2 && !I->saturate &&
           I->dest[0].size == AGX_SIZE_16 &&
           I->src[0].size == AGX_SIZE_16 && I->src[1].size == AGX_SIZE_16 &&
           I->src[0].abs && I->src[1].abs &&
@@ -4816,24 +4896,29 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
          continue;
       }
 
-      /* An f32 -> f16 conversion of a negated source (fadd(-x, -0.0) into a
-       * half) has no grounded form; convert x and flip the half's sign. */
+      /* An f32 -> f16 conversion of a negated or absolute source
+       * (fadd(-x, -0.0) into a half) has no grounded form; convert x and
+       * set the half's sign: XOR 0x8000 for -x, AND 0x7fff for |x|, OR
+       * 0x8000 for -|x|. */
       if (I->op == AGX_OPCODE_FADD && I->nr_srcs == 2 && !I->saturate &&
           I->dest[0].size == AGX_SIZE_16 && I->src[0].size == AGX_SIZE_32 &&
-          I->src[0].neg && !I->src[0].abs &&
+          (I->src[0].neg || I->src[0].abs) &&
           (I->src[0].type == AGX_INDEX_NORMAL ||
            I->src[0].type == AGX_INDEX_UNIFORM) &&
           I->src[1].type == AGX_INDEX_IMMEDIATE &&
           I->src[1].value == agx_negzero().value &&
           I->src[1].neg == agx_negzero().neg &&
           I->src[1].abs == agx_negzero().abs) {
-         I->src[0].neg = false;
+         const bool abs = I->src[0].abs, neg = I->src[0].neg;
+         I->src[0].neg = I->src[0].abs = false;
          agx_index converted = agx_temp(ctx, AGX_SIZE_16);
          agx_index narrow = I->dest[0];
          I->dest[0] = converted;
          agx_builder after = agx_init_builder(ctx, agx_after_instr(I));
          agx_bitop_to(&after, narrow, converted,
-                      agx_mov_imm(&after, 16, 0x8000), 0x6 /* XOR */);
+                      agx_mov_imm(&after, 16, abs && !neg ? 0x7fff : 0x8000),
+                      abs ? (neg ? 0xe /* OR */ : 0x8 /* AND */)
+                          : 0x6 /* XOR */);
          progress = true;
          continue;
       }
