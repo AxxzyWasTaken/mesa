@@ -7698,13 +7698,20 @@ agx_lower_front_face(struct nir_builder *b, nir_intrinsic_instr *intr,
    return true;
 }
 
+/* Lanes of a G17P SIMD group mostly agree on the kind of a light, so a rare
+ * arm under a type test is skipped whole. Flattened, its rcp and rsq run every
+ * loop iteration and every load it reads stays above the test. 24 is the best
+ * of 12, 16, 24, 32 and 48 on TF3's light loop; smaller arms pay for a branch.
+ */
+#define AGX_G17P_EXPENSIVE_FLATTEN_LIMIT 24
+
 /*
  * Standard NIR optimization loop. This is run in agx_preprocess_nir, then once
  * again at shader variant compile time. Unless there was a complex shader key,
  * the latter run should be almost a no-op.
  */
 static void
-agx_optimize_loop_nir(nir_shader *nir, bool m5)
+agx_optimize_loop_nir(nir_shader *nir, bool m5, bool g17p)
 {
    const nir_shader_compiler_options *saved_options = nir->options;
    nir_shader_compiler_options options;
@@ -7729,6 +7736,7 @@ agx_optimize_loop_nir(nir_shader *nir, bool m5)
       nir_opt_peephole_select_options peephole_select_options = {
          .limit = 64,
          .expensive_alu_ok = true,
+         .expensive_limit = g17p ? AGX_G17P_EXPENSIVE_FLATTEN_LIMIT : 0,
       };
       NIR_PASS(progress, nir, nir_opt_peephole_select,
                &peephole_select_options);
@@ -8151,7 +8159,7 @@ agx_optimize_nir(nir_shader *nir, bool soft_fault, bool uniform_atomics,
    /* This runs only once up front since other optimizations don't affect it */
    NIR_PASS(_, nir, nir_opt_shrink_stores, true);
 
-   agx_optimize_loop_nir(nir, m5);
+   agx_optimize_loop_nir(nir, m5, g17p);
 
    /* If soft fault is enabled, we can freely speculate everything. That lets us
     * peephole select and form preambles more aggressively.
@@ -8169,6 +8177,7 @@ agx_optimize_nir(nir_shader *nir, bool soft_fault, bool uniform_atomics,
    nir_opt_peephole_select_options peephole_select_options = {
       .limit = 64,
       .expensive_alu_ok = true,
+      .expensive_limit = g17p ? AGX_G17P_EXPENSIVE_FLATTEN_LIMIT : 0,
    };
    NIR_PASS(_, nir, nir_opt_peephole_select, &peephole_select_options);
 
@@ -8465,8 +8474,13 @@ agx_optimize_nir(nir_shader *nir, bool soft_fault, bool uniform_atomics,
                                nir_move_comparisons | nir_move_copies |
                                nir_move_load_ssbo | nir_move_alu;
 
-   NIR_PASS(_, nir, nir_opt_sink, move_all);
-   NIR_PASS(_, nir, nir_opt_move, move_all);
+   /* Sinking a G17P buffer load into the arm that reads it saves the load when
+    * the arm is skipped. Sink leaves it at the top of that block; moving it on
+    * to its use would make each load wait alone instead of overlapping.
+    */
+   NIR_PASS(_, nir, nir_opt_sink,
+            g17p ? move_all : move_all & ~nir_move_load_ssbo);
+   NIR_PASS(_, nir, nir_opt_move, move_all & ~nir_move_load_ssbo);
    NIR_PASS(progress, nir, nir_lower_all_phis_to_scalar);
 
    /* After lowering phis to scalar, we must copy prop/DCE for correctness. RA
@@ -11025,7 +11039,7 @@ agx_preprocess_nir_internal(nir_shader *nir, bool g17p, bool native_fragment_dep
     * will run through the loop later, once we have the shader key, but if we
     * run now, that run will ideally be almost a no-op.
     */
-   agx_optimize_loop_nir(nir, !g17p && native_fragment_depth);
+   agx_optimize_loop_nir(nir, !g17p && native_fragment_depth, g17p);
 
    /* Lower idiv after an optimization loop so we can constant fold more before
     * nir_opt_idiv_const.
