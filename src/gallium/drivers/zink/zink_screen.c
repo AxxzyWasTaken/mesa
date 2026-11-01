@@ -1651,6 +1651,9 @@ zink_destroy_screen(struct pipe_screen *pscreen)
    hash_table_foreach(&screen->dts, entry)
       zink_kopper_deinit_displaytarget(screen, entry->data);
 
+   if (screen->wl_drawables.table)
+      _mesa_hash_table_fini(&screen->wl_drawables, NULL);
+
    if (screen->copy_context)
       screen->copy_context->base.destroy(&screen->copy_context->base);
 

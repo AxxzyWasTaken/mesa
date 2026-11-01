@@ -175,6 +175,8 @@ void
 dri2_init_drawable(struct dri_drawable *drawable, bool isPixmap, int alphaBits);
 void
 kopper_destroy_drawable(struct dri_drawable *drawable);
+void
+kopper_release_drawable(struct dri_drawable *drawable);
 #endif
 
 /* vim: set sw=3 ts=8 sts=3 expandtab: */

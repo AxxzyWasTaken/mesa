@@ -1407,6 +1407,7 @@ struct zink_screen {
    unsigned robust_ctx_count;
 
    struct hash_table dts;
+   struct hash_table wl_drawables;
    simple_mtx_t dt_lock;
 
    bool device_lost;

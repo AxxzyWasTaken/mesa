@@ -249,6 +249,55 @@ find_dt_entry(struct zink_screen *screen, const struct kopper_displaytarget *cdt
    return he;
 }
 
+/* Track native Wayland drawable lifetimes separately from GPU resource refs.
+ * A released wl_proxy can be allocated again while old GPU resources still
+ * retain the old display target. Unregister the cached target at the end of
+ * the final live drawable's lifetime; its resources remain refcounted. */
+void
+zink_kopper_wl_drawable_ref(struct pipe_screen *pscreen, const struct kopper_loader_info *info)
+{
+#ifdef VK_USE_PLATFORM_WAYLAND_KHR
+   if (info->bos.sType != VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR)
+      return;
+   struct zink_screen *screen = zink_screen(pscreen);
+   const VkWaylandSurfaceCreateInfoKHR *wl = (const VkWaylandSurfaceCreateInfoKHR *)&info->bos;
+   simple_mtx_lock(&screen->dt_lock);
+   if (!screen->wl_drawables.table)
+      _mesa_hash_table_init(&screen->wl_drawables, screen, _mesa_hash_pointer, _mesa_key_pointer_equal);
+   struct hash_entry *entry = _mesa_hash_table_search(&screen->wl_drawables, wl->surface);
+   uintptr_t count = entry ? (uintptr_t)entry->data : 0;
+   _mesa_hash_table_insert(&screen->wl_drawables, wl->surface, (void *)(count + 1));
+   simple_mtx_unlock(&screen->dt_lock);
+#endif
+}
+
+void
+zink_kopper_wl_drawable_unref(struct pipe_screen *pscreen, const struct kopper_loader_info *info)
+{
+#ifdef VK_USE_PLATFORM_WAYLAND_KHR
+   if (info->bos.sType != VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR)
+      return;
+   struct zink_screen *screen = zink_screen(pscreen);
+   const VkWaylandSurfaceCreateInfoKHR *wl = (const VkWaylandSurfaceCreateInfoKHR *)&info->bos;
+   simple_mtx_lock(&screen->dt_lock);
+   struct hash_entry *entry = _mesa_hash_table_search(&screen->wl_drawables, wl->surface);
+   assert(entry && (uintptr_t)entry->data > 0);
+   uintptr_t count = (uintptr_t)entry->data - 1;
+   if (count) {
+      entry->data = (void *)count;
+   } else {
+      _mesa_hash_table_remove(&screen->wl_drawables, entry);
+      if (screen->dts.table) {
+         struct hash_entry *target = _mesa_hash_table_search(&screen->dts, wl->surface);
+         if (target && ((struct kopper_displaytarget *)target->data)->type == KOPPER_WAYLAND) {
+            _mesa_hash_table_remove(&screen->dts, target);
+         }
+      }
+   }
+   simple_mtx_unlock(&screen->dt_lock);
+#endif
+}
+
 void
 zink_kopper_deinit_displaytarget(struct zink_screen *screen, struct kopper_displaytarget *cdt)
 {
@@ -256,10 +305,10 @@ zink_kopper_deinit_displaytarget(struct zink_screen *screen, struct kopper_displ
       return;
    simple_mtx_lock(&screen->dt_lock);
    struct hash_entry *he = find_dt_entry(screen, cdt);
-   assert(he);
-   /* this deinits the registered entry, which should always be the "right" entry */
-   cdt = he->data;
-   _mesa_hash_table_remove(&screen->dts, he);
+   /* The Wayland drawable may already have detached this entry, and a new
+    * surface may now occupy the same address. Never remove its entry. */
+   if (he && he->data == cdt)
+      _mesa_hash_table_remove(&screen->dts, he);
    simple_mtx_unlock(&screen->dt_lock);
    destroy_swapchain(screen, cdt->swapchain);
    prune_old_swapchains(screen, cdt, true);
@@ -464,13 +513,14 @@ zink_kopper_displaytarget_create(struct zink_screen *screen, unsigned tex_usage,
       } else {
          he = find_dt_entry(screen, &k);
       }
-      simple_mtx_unlock(&screen->dt_lock);
       if (he) {
          cdt = he->data;
          p_atomic_inc(&cdt->refcount);
          *stride = cdt->stride;
+         simple_mtx_unlock(&screen->dt_lock);
          return cdt;
       }
+      simple_mtx_unlock(&screen->dt_lock);
    }
 
    cdt = CALLOC_STRUCT(kopper_displaytarget);
@@ -555,8 +605,17 @@ out:
 void
 zink_kopper_displaytarget_destroy(struct zink_screen *screen, struct kopper_displaytarget *cdt)
 {
-   if (!p_atomic_dec_zero(&cdt->refcount))
+   simple_mtx_lock(&screen->dt_lock);
+   if (!p_atomic_dec_zero(&cdt->refcount)) {
+      simple_mtx_unlock(&screen->dt_lock);
       return;
+   }
+   if (cdt->surface) {
+      struct hash_entry *he = find_dt_entry(screen, cdt);
+      if (he && he->data == cdt)
+         _mesa_hash_table_remove(&screen->dts, he);
+   }
+   simple_mtx_unlock(&screen->dt_lock);
    zink_kopper_deinit_displaytarget(screen, cdt);
    FREE(cdt);
 }
