@@ -10858,6 +10858,45 @@ agx3_implicit_coord_stage_producer(const agx_instr *I)
            !I->src[0].neg && !I->src[1].abs && !I->src[1].neg);
 }
 
+/* G17G: a texture sample that leaves its coordinate vector live (one varying
+ * sampled from two textures) reads wrong coordinates: both samples return the
+ * corner texel. Samples that consume their coordinates are correct. Give each
+ * sample whose coordinates have another use a private copy it consumes. */
+static bool
+agx3c_private_tex_coords(agx_context *ctx)
+{
+   if (ctx->key->dev.chip != AGX_CHIP_G17G)
+      return false;
+
+   unsigned *uses = rzalloc_array(ctx, unsigned, ctx->alloc);
+   if (uses == NULL)
+      return false;
+   agx_foreach_instr_global(ctx, I) {
+      agx_foreach_ssa_src(I, s)
+         uses[I->src[s].value]++;
+   }
+
+   bool progress = false;
+   agx_foreach_instr_global_safe(ctx, I) {
+      if (I->op != AGX_OPCODE_TEXTURE_SAMPLE ||
+          I->src[0].type != AGX_INDEX_NORMAL || uses[I->src[0].value] < 2)
+         continue;
+      const unsigned n = agx_channels(I->src[0]);
+      if (n < 1 || n > 4)
+         continue;
+      agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+      agx_index comps[4];
+      agx_emit_split(&b, comps, I->src[0], n);
+      agx_index copy = agx_vec_temp(ctx, I->src[0].size, n);
+      agx_emit_collect_to(&b, copy, n, comps);
+      uses[I->src[0].value]--;
+      I->src[0] = copy;
+      progress = true;
+   }
+   ralloc_free(uses);
+   return progress;
+}
+
 /* Mark the last two scalar coordinate operations of a straight-line implicit
  * fragment sample for direct staging destinations. Apple does not calculate
  * the UVs in GPRs and copy them afterwards: the final perspective MUL or ADD
@@ -11386,6 +11425,7 @@ agx_compile_function_nir_attempt(nir_shader *nir, nir_function_impl *impl,
    AGX_PASS(ctx, agx3_order_g17p_mrt_tile_ops);
    AGX_PASS(ctx, agx3_bank_scalar_tile_store_inputs);
    AGX_PASS(ctx, agx3_mark_implicit_tex_coord_staging);
+   AGX_PASS(ctx, agx3c_private_tex_coords);
 
    /* Expose independent coordinate inputs before register allocation. Resource
     * values have no GPR destination; remove any now-unused coordinate collect.
