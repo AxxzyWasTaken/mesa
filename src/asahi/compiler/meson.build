@@ -205,6 +205,7 @@ if with_tests
          'test/test-repair-ssa.cpp',
          'test/test-preamble-image-payload.cpp',
          'test/test-preamble-share-values.cpp',
+         'test/test-preamble-speculative-buffer.cpp',
          'test/test-preamble-modifiers.cpp',
          'test/test-preamble-texture-policy.cpp',
          'test/test-cprog-cleanup.cpp',
