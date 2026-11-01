@@ -1435,6 +1435,21 @@ static void x11_present_update_refresh_cycle_estimate(struct x11_swapchain *swap
  * maximum stays just below zero: the server's values are only rewritten when its clock is clearly ahead
  * (impossible with a shared clock) or far behind, so a native X server sees no change.
  */
+static bool
+x11_server_ust_offset_is_local(int64_t offset)
+{
+   return offset <= 10000 && offset >= -1000000;
+}
+
+/* True until the first completion shows a shared clock, and whenever the
+ * server's clock is clearly not ours (a VM bridge or a remote server). */
+static bool
+x11_server_may_be_foreign(const struct x11_swapchain *chain)
+{
+   return !chain->server_ust_offset_valid ||
+          !x11_server_ust_offset_is_local(chain->server_ust_offset);
+}
+
 static uint64_t
 x11_server_ust_to_local(struct x11_swapchain *chain, uint64_t ust)
 {
@@ -1445,7 +1460,7 @@ x11_server_ust_to_local(struct x11_swapchain *chain, uint64_t ust)
       chain->server_ust_offset_valid = true;
    }
 
-   if (chain->server_ust_offset <= 10000 && chain->server_ust_offset >= -1000000)
+   if (x11_server_ust_offset_is_local(chain->server_ust_offset))
       return ust;
 
    return (uint64_t)MAX2((int64_t)ust - chain->server_ust_offset, 0);
@@ -1872,8 +1887,10 @@ x11_present_to_x11_dri3(struct x11_swapchain *chain, uint32_t image_index,
    {
       /* muvm's X11 bridge hands the buffer to the host X server without the
        * dma-buf's implicit fences, so it can scan out a half-rendered frame.
-       * Wait for rendering (the write fences) before presenting. */
-      if (image->base.dma_buf_fd >= 0) {
+       * Wait for rendering (the write fences) before presenting there. A
+       * server on our clock honours the implicit fences itself, so once the
+       * first completion shows a shared clock this wait stops. */
+      if (image->base.dma_buf_fd >= 0 && x11_server_may_be_foreign(chain)) {
          struct pollfd pfd = { .fd = image->base.dma_buf_fd, .events = POLLIN };
          while (poll(&pfd, 1, -1) < 0 && (errno == EINTR || errno == EAGAIN))
             ;
