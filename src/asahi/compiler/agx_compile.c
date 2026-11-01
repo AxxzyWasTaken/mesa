@@ -4795,6 +4795,28 @@ agx_lower_g17g_retry_float_operands(agx_context *ctx)
          continue;
       }
 
+      /* Half derivatives have no grounded G17G form: differentiate the f32
+       * extension and round the result back (f16 -> f32 is exact, and the
+       * f32 difference rounds once to the same half the half unit would
+       * produce for representable values). */
+      if ((I->op == AGX_OPCODE_DFDX || I->op == AGX_OPCODE_DFDY) &&
+          I->nr_srcs == 1 && I->dest[0].size == AGX_SIZE_16 &&
+          I->src[0].size == AGX_SIZE_16 && !I->saturate &&
+          (I->src[0].type == AGX_INDEX_NORMAL ||
+           I->src[0].type == AGX_INDEX_UNIFORM) &&
+          agx_channels(I->src[0]) == 1) {
+         agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+         agx_index wide_src = agx_temp(ctx, AGX_SIZE_32);
+         agx_fmov_to(&b, wide_src, I->src[0]);
+         agx_index wide_dst = agx_temp(ctx, AGX_SIZE_32);
+         agx_builder after = agx_init_builder(ctx, agx_after_instr(I));
+         agx_fmov_to(&after, I->dest[0], wide_dst);
+         I->src[0] = wide_src;
+         I->dest[0] = wide_dst;
+         progress = true;
+         continue;
+      }
+
       /* `imm - x` at 32 bits has no G17G form with the immediate in the
        * first slot; register subtraction is witnessed. The immediate keeps
        * its extension: .abs marks a zero-extended source, as for registers
