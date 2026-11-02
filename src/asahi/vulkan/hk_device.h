@@ -284,11 +284,16 @@ struct hk_device {
          *entries[HK_SHADER_BINARY_CACHE_MAX];
    } shader_binary_cache;
 
-   /* Device-wide compact VDM backing. Command buffers from different pools
-    * suballocate immutable spans from the same finite G17P aperture. */
+   /* Device-wide command memory. Command buffers from different pools
+    * suballocate immutable spans: compact VDM backing from the same finite
+    * G17P aperture, and the first span of each uploader. A slab that refused
+    * an allocation waits on full until one of its spans is freed. */
    struct {
       simple_mtx_t lock;
-      struct list_head slabs;
+      struct list_head slabs[HK_CMD_SLAB_COUNT];
+      struct list_head full[HK_CMD_SLAB_COUNT];
+      /* The next slab's size: a process that records little pins little. */
+      uint32_t next_size[HK_CMD_SLAB_COUNT];
    } vdm;
 
    /* Native G17P indirect compute grid helper.  A compact indirect helper

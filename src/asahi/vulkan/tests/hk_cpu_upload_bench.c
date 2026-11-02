@@ -56,8 +56,10 @@ fixture(void)
    f->cmd.vk.base.type = VK_OBJECT_TYPE_COMMAND_BUFFER;
    f->cmd.uploader.main.map = f->main_map;
    f->cmd.uploader.main.base = 0x100000;
+   f->cmd.uploader.main.capacity = HK_CMD_BO_SIZE;
    f->cmd.uploader.root.map = f->root_map;
    f->cmd.uploader.root.base = 0x200000;
+   f->cmd.uploader.root.capacity = HK_CMD_BO_SIZE;
    f->layout.base.type = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
    f->set_layout.vk.base.type = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT;
    f->set_layout.vk.dynamic_descriptor_count = 1;
