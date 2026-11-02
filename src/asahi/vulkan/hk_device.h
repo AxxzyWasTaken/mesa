@@ -368,15 +368,23 @@ enum hk_perftest {
  * and only when that stream already holds work
  * (hk_cdm_visibility_flush_needed()). It writes back every dirty line, so
  * the writes it covers include those of earlier streams and earlier
- * command buffers. A barrier recorded before any work in a command buffer
- * has no such stream and records no flush: a write in an earlier command
- * buffer, read through another address by the first work after that
- * barrier, has no memory-scope flush between them. Whether the hardware
- * returns stale data in that case has not been tested. Not covered: a
+ * command buffers. A barrier recorded with no open compute stream holding
+ * work records no flush. This includes the first barrier of a command
+ * buffer and barriers after the stream was closed, for example by a
+ * timestamp or query copy. Earlier writes read through another address
+ * after such a barrier have no memory-scope flush between them. Whether
+ * the hardware returns stale data in that case has not been tested. When
+ * the open stream holds work unrelated to the source, the flush goes at its
+ * end, but a graphics destination is still ordered only after the source's
+ * stream, so it can start before the flush. Not covered: a
  * resource created after the command buffer was recorded and reached
  * through a path recording did not see, that is a device address the
  * command buffer reads indirectly, or a descriptor set bound at recording
- * and updated after it (descriptorBinding*UpdateAfterBind). */
+ * and updated after it (descriptorBinding*UpdateAfterBind). Graphics-only
+ * sources also do not request memory scope: attachment or shader writes
+ * through a sparse image followed by transfer or compute reads through a
+ * plain alias receive the ordinary post-graphics strong flush. That case
+ * has not been hardware-tested. */
 static inline bool
 hk_cdm_alias_scope(const struct hk_device *dev)
 {
