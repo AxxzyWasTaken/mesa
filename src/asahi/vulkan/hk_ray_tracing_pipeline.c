@@ -2045,7 +2045,6 @@ hk_hit_object_record_from_query(nir_builder *b, struct hk_rt_compiler *compiler,
    nir_def *q = intr->src[1].ssa;
    nir_def *sbt_index = intr->src[2].ssa;
    nir_def *hit_kind = intr->src[3].ssa;
-   const bool attributes = !nir_src_is_undef(intr->src[4]);
 
    nir_def *type = nir_rq_load(b, 1, 32, q, .committed = true,
                                .ray_query_value = nir_ray_query_value_intersection_type);
@@ -2072,22 +2071,32 @@ hk_hit_object_record_from_query(nir_builder *b, struct hk_rt_compiler *compiler,
       hk_hobj_store(b, hobj, HK_HOBJ_INSTANCE_ADDR, instance);
       hk_hobj_store(b, hobj, HK_HOBJ_PRIMITIVE_ID, primitive);
       hk_hobj_store(b, hobj, HK_HOBJ_GEOMETRY_ID_AND_FLAGS, geometry);
-      hk_hobj_store(b, hobj, HK_HOBJ_HIT_KIND, hit_kind);
       if (compiler->native_agx)
          hk_hobj_store(b, hobj, HK_HOBJ_PRIMITIVE_ADDR,
             agx_nir_gen1_vertex_position_address(b, instance, geometry, primitive));
-      if (attributes) {
-         nir_def *words = intr->src[4].ssa;
-         for (unsigned i = 0; i < words->num_components; ++i)
-            nir_store_deref(b, hk_hobj_attribute(b, hobj, i),
-                            nir_channel(b, words, i), 0x1);
-      } else {
+      /* The application's hit kind and attributes describe a generated hit.
+       * A triangle already has its own. */
+      nir_push_if(b, nir_ieq_imm(b, type, 1));
+      {
+         nir_def *front = nir_rq_load(b, 1, 1, q, .committed = true,
+            .ray_query_value = nir_ray_query_value_intersection_front_face);
+         hk_hobj_store(b, hobj, HK_HOBJ_HIT_KIND,
+            nir_bcsel(b, front, nir_imm_int(b, 0xfe), nir_imm_int(b, 0xff)));
          nir_def *bary = nir_rq_load(b, 2, 32, q, .committed = true,
             .ray_query_value = nir_ray_query_value_intersection_barycentrics);
          for (unsigned i = 0; i < 2; ++i)
             nir_store_deref(b, hk_hobj_attribute(b, hobj, i),
                             nir_channel(b, bary, i), 0x1);
       }
+      nir_push_else(b, NULL);
+      {
+         hk_hobj_store(b, hobj, HK_HOBJ_HIT_KIND, hit_kind);
+         nir_def *words = intr->src[4].ssa;
+         for (unsigned i = 0; i < words->num_components; ++i)
+            nir_store_deref(b, hk_hobj_attribute(b, hobj, i),
+                            nir_channel(b, words, i), 0x1);
+      }
+      nir_pop_if(b, NULL);
    }
    nir_push_else(b, NULL);
    {
