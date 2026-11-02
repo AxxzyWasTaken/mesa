@@ -52,6 +52,7 @@ static const struct debug_named_value agx_debug_options[] = {
    {"nosched",   AGX_DBG_NOSCHED,   "Do not schedule the shader"},
    {"spill",     AGX_DBG_SPILL,     "Spill (almost) everything"},
    {"nopromote", AGX_DBG_NOPROMOTE, "Do not promote constants to uniforms"},
+   {"latecov",   AGX_DBG_LATECOV,   "Keep G17P coverage updates at the end of the fragment"},
    DEBUG_NAMED_VALUE_END
 };
 /* clang-format on */

@@ -6,6 +6,7 @@
 #include "compiler/list.h"
 #include "compiler/nir/nir_builder.h"
 #include "agx_compiler.h"
+#include "agx_debug.h"
 #include "nir.h"
 #include "nir_builder_opcodes.h"
 #include "nir_intrinsics.h"
@@ -64,6 +65,11 @@
  *
  * 5. zs_emit may be used in the shader exactly once to trigger tests.
  * sample_mask with 0 may be used to discard early.
+ *
+ * 6. On G17P a SIMD group may run only one testing sample_mask, even if two
+ *    cover disjoint lanes. Testing in both arms of an if loses a few percent
+ *    of the depth writes of groups that take both arms, differently every
+ *    frame, and can hang the 3D stage. Kill-only updates are not limited.
  *
  * This pass lowers demote_samples to sample_mask instructions satisfying these
  * rules. Other passes should not generate sample_mask instructions, as there
@@ -302,14 +308,35 @@ accumulate_demote(nir_builder *b, nir_intrinsic_instr *intr, void *data)
  * demoted lanes by an exact boolean negation of the demote's guard. A G17P
  * texture result carried across a later loop is also lane-dependent: hardware
  * drops intermittent fragment groups if a coverage kill precedes that shape,
- * even when the loop executes zero iterations.
+ * even when the loop executes zero iterations. That did not reproduce on G17P
+ * with one testing update per group (see update_coverage_after_last_demote),
+ * but the other chips here have not been retested.
  */
 static bool
-quad_dependent_instr(const nir_instr *instr)
+derivative_instr(const nir_instr *instr)
 {
    if (instr->type == nir_instr_type_tex)
       return nir_tex_instr_has_implicit_derivative(nir_instr_as_tex(instr));
    if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   switch (nir_instr_as_intrinsic(instr)->intrinsic) {
+   case nir_intrinsic_ddx:
+   case nir_intrinsic_ddx_fine:
+   case nir_intrinsic_ddx_coarse:
+   case nir_intrinsic_ddy:
+   case nir_intrinsic_ddy_fine:
+   case nir_intrinsic_ddy_coarse:
+      return true;
+   default:
+      return false;
+   }
+}
+
+static bool
+lane_state_instr(const nir_instr *instr)
+{
+   if (instr->type != nir_instr_type_intrinsic || derivative_instr(instr))
       return false;
 
    const nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
@@ -318,12 +345,6 @@ quad_dependent_instr(const nir_instr *instr)
       return true;
 
    switch (intr->intrinsic) {
-   case nir_intrinsic_ddx:
-   case nir_intrinsic_ddx_fine:
-   case nir_intrinsic_ddx_coarse:
-   case nir_intrinsic_ddy:
-   case nir_intrinsic_ddy_fine:
-   case nir_intrinsic_ddy_coarse:
    case nir_intrinsic_is_helper_invocation:
    case nir_intrinsic_load_helper_invocation:
    case nir_intrinsic_load_active_subgroup_invocation_agx:
@@ -333,6 +354,12 @@ quad_dependent_instr(const nir_instr *instr)
    default:
       return false;
    }
+}
+
+static bool
+quad_dependent_instr(const nir_instr *instr)
+{
+   return derivative_instr(instr) || lane_state_instr(instr);
 }
 
 static bool
@@ -649,6 +676,151 @@ kill_dead_quads(nir_function_impl *impl, nir_variable *killed)
    }
 }
 
+/* The most instructions a lane can run after its last demote in this list. */
+static unsigned
+instrs_after_last_demote(struct exec_list *list)
+{
+   unsigned instrs = 0;
+
+   foreach_list_typed_reverse(nir_cf_node, node, node, list) {
+      if (!cf_node_has(node, is_demote)) {
+         nir_foreach_block_in_cf_node(block, node)
+            instrs += exec_list_length(&block->instr_list);
+      } else if (node->type == nir_cf_node_block) {
+         nir_foreach_instr_reverse(instr, nir_cf_node_as_block(node)) {
+            if (is_demote(instr))
+               break;
+            instrs++;
+         }
+         return instrs;
+      } else if (node->type == nir_cf_node_if) {
+         nir_if *nif = nir_cf_node_as_if(node);
+         return instrs + MAX2(instrs_after_last_demote(&nif->then_list),
+                              instrs_after_last_demote(&nif->else_list));
+      } else {
+         return instrs;
+      }
+   }
+
+   return instrs;
+}
+
+static nir_cf_node *
+last_demote_node(struct exec_list *list)
+{
+   foreach_list_typed_reverse(nir_cf_node, node, node, list) {
+      if (cf_node_has(node, is_demote))
+         return node;
+   }
+
+   return NULL;
+}
+
+/* Whether lanes have enough left to run after their last demote for moving
+ * it below the coverage update to pay. */
+static bool
+worth_moving(struct exec_list *list)
+{
+   return instrs_after_last_demote(list) >= 64;
+}
+
+static bool
+worth_splitting(nir_cf_node *node)
+{
+   if (!node || node->type != nir_cf_node_if)
+      return false;
+
+   nir_if *nif = nir_cf_node_as_if(node);
+   return worth_moving(&nif->then_list) || worth_moving(&nif->else_list);
+}
+
+static nir_if *split_if_after_last_demote(nir_builder *b, nir_if *nif);
+
+/* Where the work after a demoting node starts. */
+static nir_cursor
+after_demoting_node(nir_cf_node *node)
+{
+   if (node->type == nir_cf_node_block) {
+      return nir_after_instr(
+         &last_discard_in_block(nir_cf_node_as_block(node))->instr);
+   }
+
+   return nir_after_cf_node_and_phis(node);
+}
+
+/* Move what follows the last demote of the list to the builder's cursor. */
+static void
+move_after_last_demote(nir_builder *b, struct exec_list *list)
+{
+   nir_cf_node *node = last_demote_node(list);
+
+   if (worth_splitting(node))
+      split_if_after_last_demote(b, nir_cf_node_as_if(node));
+
+   nir_cursor begin = node ? after_demoting_node(node) : nir_before_cf_list(list);
+   nir_cf_list rest;
+   nir_cf_extract(&rest, begin, nir_after_cf_list(list));
+   b->cursor = nir_cf_reinsert(&rest, b->cursor);
+}
+
+/* Give what follows the demotes of an if a second if of its own on the same
+ * condition, built at the cursor. An arm with little left stays above the
+ * update, or the values the other arm carries across it would stay live
+ * through that arm too. The merge moves, so its phis go through registers;
+ * the caller puts SSA back afterwards. */
+static nir_if *
+split_if_after_last_demote(nir_builder *b, nir_if *nif)
+{
+   nir_lower_phis_to_regs_block(
+      nir_cf_node_as_block(nir_cf_node_next(&nif->cf_node)), true);
+
+   nir_if *rest = nir_push_if(b, nif->condition.ssa);
+   if (worth_moving(&nif->then_list))
+      move_after_last_demote(b, &nif->then_list);
+   nir_push_else(b, rest);
+   if (worth_moving(&nif->else_list))
+      move_after_last_demote(b, &nif->else_list);
+   nir_pop_if(b, rest);
+   return rest;
+}
+
+/*
+ * Issue the one final coverage update right after the last demote instead of
+ * at the end of the shader, where every lane of a SIMD group reaches it
+ * together: two testing updates in one group, even on disjoint lanes, lose
+ * depth writes and fragments and can hang the 3D stage. That rules out an
+ * update per arm of an if, so a demote inside an if with work left below it
+ * splits the if:
+ *
+ *    if (c) { A; demote; B } else { C }
+ *
+ * becomes, when C is small,
+ *
+ *    if (c) { A; demote } else { C }
+ *    update
+ *    if (c) { B }
+ *
+ * Returns whether it split anything.
+ */
+static bool
+update_coverage_after_last_demote(nir_builder *b, nir_function_impl *impl,
+                                  nir_variable *killed)
+{
+   nir_cf_node *node = last_demote_node(&impl->body);
+   const bool split = worth_splitting(node);
+
+   if (split) {
+      b->cursor = nir_after_cf_node(node);
+      nir_if *rest = split_if_after_last_demote(b, nir_cf_node_as_if(node));
+      b->cursor = nir_before_cf_node(&rest->cf_node);
+   } else {
+      b->cursor = node ? after_demoting_node(node) : nir_before_impl(impl);
+   }
+
+   final_coverage_update(b, nir_load_var(b, killed), false);
+   return split;
+}
+
 /*
  * Native G16G variant. A MOVMSK coverage update takes the killed lanes out of
  * the quad: derivatives and quad operations after a demote then read stale
@@ -662,7 +834,8 @@ kill_dead_quads(nir_function_impl *impl, nir_variable *killed)
  * last discard.
  */
 static bool
-lower_sample_mask_deferred(nir_shader *shader, bool uniform_tests)
+lower_sample_mask_deferred(nir_shader *shader, bool uniform_tests,
+                           bool early_update)
 {
    nir_function_impl *impl = nir_shader_get_entrypoint(shader);
    const bool lanes_reach_sensitive_work =
@@ -706,13 +879,28 @@ lower_sample_mask_deferred(nir_shader *shader, bool uniform_tests)
    nir_store_var(&b, ctx.killed, nir_imm_intN_t(&b, 0, 16),
                  nir_component_mask(1));
 
+   /* The update ends a SIMD group once its lanes are killed or have failed
+    * the tests the update runs, and until it runs a discarding shader has no
+    * early tests at all, however rarely it discards. On G17P the lanes it
+    * kills keep feeding their quad's derivatives while the quad lives. It
+    * would drop the side effects of fragments that fail the tests, though,
+    * and change the lanes that helper state and subgroup operations see.
+    * Depth-writing and forced-early shaders stay on the update at the end. */
+   early_update &= !early && !writes_zs && !shader->info.writes_memory &&
+                   !shader->info.fs.uses_sample_shading &&
+                   !cf_list_has(&impl->body, lane_state_instr) &&
+                   !(agx_get_compiler_debug() & AGX_DBG_LATECOV);
+   const bool split =
+      early_update &&
+      update_coverage_after_last_demote(&b, impl, ctx.killed);
+
    nir_shader_intrinsics_pass(shader, accumulate_demote,
                               nir_metadata_none, &ctx);
 
    /* Unconditional top-level demotes are handled where they occur: their
     * block continues in uniform control flow. No dead-quad kill may precede
-    * a sampled loop: every coverage update has to stay after it. */
-   if (!cf_list_has(&impl->body, subgroup_instr) &&
+    * a sampled loop in this late form: every update stays after it. */
+   if (!early_update && !cf_list_has(&impl->body, subgroup_instr) &&
        !sampled_loop_after_demote) {
       nir_foreach_block(block, impl) {
          if (block->cf_node.parent != &impl->cf_node)
@@ -738,16 +926,22 @@ lower_sample_mask_deferred(nir_shader *shader, bool uniform_tests)
       kill_dead_quads(impl, ctx.killed);
    }
 
-   b.cursor = nir_after_impl(impl);
-   nir_def *killed = nir_load_var(&b, ctx.killed);
-   if (early || writes_zs) {
-      /* Tests already ran (or zs_emit runs them): kill without testing. */
-      nir_sample_mask_agx(&b, killed, nir_imm_intN_t(&b, 0, 16));
-   } else {
-      final_coverage_update(&b, killed, uniform_tests);
+   if (!early_update) {
+      b.cursor = nir_after_impl(impl);
+      nir_def *killed = nir_load_var(&b, ctx.killed);
+      if (early || writes_zs) {
+         /* Tests already ran (or zs_emit runs them): kill without testing. */
+         nir_sample_mask_agx(&b, killed, nir_imm_intN_t(&b, 0, 16));
+      } else {
+         final_coverage_update(&b, killed, uniform_tests);
+      }
    }
 
    nir_progress(true, impl, nir_metadata_none);
+   if (split) {
+      nir_repair_ssa_impl(impl);
+      nir_lower_reg_intrinsics_to_ssa_impl(impl);
+   }
    NIR_PASS(_, shader, nir_lower_vars_to_ssa);
    return true;
 }
@@ -755,12 +949,19 @@ lower_sample_mask_deferred(nir_shader *shader, bool uniform_tests)
 bool
 agx_nir_lower_sample_mask_deferred(nir_shader *shader)
 {
-   return lower_sample_mask_deferred(shader, false);
+   return lower_sample_mask_deferred(shader, false, false);
+}
+
+/* G17P: the final coverage update right after the last demote on each path. */
+bool
+agx_nir_lower_sample_mask_deferred_g17p(nir_shader *shader)
+{
+   return lower_sample_mask_deferred(shader, false, true);
 }
 
 /* M5: one uniformly selected final coverage update (final_coverage_update). */
 bool
 agx_nir_lower_sample_mask_deferred_m5(nir_shader *shader)
 {
-   return lower_sample_mask_deferred(shader, true);
+   return lower_sample_mask_deferred(shader, true, false);
 }

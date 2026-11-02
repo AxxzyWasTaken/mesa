@@ -4712,6 +4712,8 @@ hk_compile_nir(struct hk_device *dev, const VkAllocationCallbacks *pAllocator,
                dev->dev.chip, &shader->info.fs.epilog_key);
       if (agx_chip_g17_m5(dev->dev.chip))
          NIR_PASS(_, nir, agx_nir_lower_sample_mask_deferred_m5);
+      else if (dev->dev.chip == AGX_CHIP_G17P)
+         NIR_PASS(_, nir, agx_nir_lower_sample_mask_deferred_g17p);
       else if (agx_native_graphics(&dev->dev))
          NIR_PASS(_, nir, agx_nir_lower_sample_mask_deferred);
       else
