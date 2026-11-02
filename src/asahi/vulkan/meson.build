@@ -746,26 +746,8 @@ if with_tests
   )
 
   executable(
-    'aurora-gbuffer-bench',
-    files('tests/vulkan_gbuffer_bench.c'),
-    include_directories : [inc_include],
-    dependencies : [cc.find_library('vulkan'), dep_m],
-    c_args : [c_msvc_compat_args],
-    gnu_symbol_visibility : 'hidden',
-  )
-
-  executable(
     'vulkan-msaa-xfer',
     files('tests/vulkan_msaa_xfer.c'),
-    include_directories : [inc_include],
-    dependencies : [cc.find_library('vulkan')],
-    c_args : [c_msvc_compat_args],
-    gnu_symbol_visibility : 'hidden',
-  )
-
-  executable(
-    'aurora-post-chain',
-    files('tests/vulkan_post_chain.c'),
     include_directories : [inc_include],
     dependencies : [cc.find_library('vulkan')],
     c_args : [c_msvc_compat_args],

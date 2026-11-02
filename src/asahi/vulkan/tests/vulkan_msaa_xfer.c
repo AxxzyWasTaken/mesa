@@ -25,7 +25,7 @@
 #include <string.h>
 #include <vulkan/vulkan.h>
 
-#include "vulkan_gbuffer_bench_shaders.h"
+#include "vulkan_msaa_xfer_shaders.h"
 
 #define CHECK(x)                                                              \
    do {                                                                       \
@@ -216,8 +216,8 @@ main(int argc, char **argv)
    VkPipelineLayout layout;
    CHECK(vkCreatePipelineLayout(dev, &lci, NULL, &layout));
    VkShaderModuleCreateInfo smci = {.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                                    .codeSize = sizeof(gbuffer_bench_vert),
-                                    .pCode = gbuffer_bench_vert};
+                                    .codeSize = sizeof(msaa_xfer_vert),
+                                    .pCode = msaa_xfer_vert};
    VkShaderModule vs;
    CHECK(vkCreateShaderModule(dev, &smci, NULL, &vs));
    VkPipelineShaderStageCreateInfo stage = {
