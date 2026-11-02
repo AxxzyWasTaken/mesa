@@ -935,7 +935,12 @@ hk_get_device_features(
       const bool sparse = dev->chip == AGX_CHIP_G17P;
       features->shaderResourceResidency = sparse;
       features->sparseBinding = sparse;
-      features->sparseResidencyAliased = false;
+      /* A memory range may back several sparse VAs, including several
+       * locations within one resource. The common binder preserves the BO
+       * offset for each mapping and its RO shadow; G17P's transactional
+       * VM_BIND path retains each mapping independently. Residency metadata
+       * is per resource VA, not per backing allocation. */
+      features->sparseResidencyAliased = agx_is_a18_pro(dev);
       features->sparseResidencyImage2D = sparse;
       /* The sparse binder and SSTT use the same slice layout for 3D images
        * as for 2D arrays. Report the nonstandard, one-slice block shape rather
@@ -959,10 +964,11 @@ hk_get_device_features(
        * layer/viewport UVS scalar.  The public bit is backed by the exact
        * two-instance/two-layer image qualification. */
       features->shaderOutputLayer = true;
-      /* VK_KHR_shader_quad_control permits quad operations and derivatives
-       * inside divergent control flow.  The ordinary subgroup quad shuffles
-       * exposed below do not establish that stronger execution guarantee. */
-      features->shaderQuadControl = false;
+      /* G17P uses the common reconvergence and subgroup lowering with AGX3
+       * quad encodings. The execution modes also select helper-capable
+       * fragment entry and prevent merging triangles across derivative quads.
+       */
+      features->shaderQuadControl = agx_is_a18_pro(dev);
 
       /* Qualified on A18 Pro only. */
       if (dev->chip == AGX_CHIP_G17P) {
@@ -973,7 +979,7 @@ hk_get_device_features(
    }
 
    /* Compute derivatives are NIR quad-swap lowering plus explicit-gradient
-    * samples, both available on M5; quad control stays off as on G17P. */
+    * samples, both available on M5; quad control remains restricted to G17P. */
    if (agx_chip_g17_m5(dev->chip)) {
       features->computeDerivativeGroupQuads = true;
       features->computeDerivativeGroupLinear = true;
@@ -1570,10 +1576,10 @@ hk_get_device_properties(const struct agx_device *dev,
        *   QUAD              g08_subgroup_quad           encodes
        *   ROTATE/CLUSTERED  g24_subgroup_rotate         encodes
        *
-       * Quad broadcasts and swaps are now grounded for the compute and
-       * fragment stages.  Keep subgroupQuadOperationsInAllStages false until
-       * every other advertised graphics stage is independently witnessed. */
-      properties->subgroupQuadOperationsInAllStages = false;
+       * G17P uses the same lane instructions in native vertex/fragment
+       * programs and the compute programs implementing tessellation and
+       * geometry. Other AGX3 targets retain their stage restriction. */
+      properties->subgroupQuadOperationsInAllStages = agx_is_a18_pro(dev);
       properties->sparseResidencyNonResidentStrict = false;
    }
 
@@ -1927,7 +1933,7 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
       goto fail_fd;
    }
 
-   bool is_asahi = (strcmp(version->name, "asahi") == 0);
+   bool is_asahi = agx_is_native_drm_driver(version->name);
    is_asahi |= strcmp(version->name, "virtio_gpu") == 0;
    drmFreeVersion(version);
 
@@ -2025,9 +2031,8 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
       agx_chip_sampler_generation(pdev->dev.chip) == AGX_SAMPLER_GENERATION_GEN5;
 
    if (agx_native_graphics(&pdev->dev)) {
-      /* This extension controls divergent quad derivatives, not the standard
-       * subgroup quad shuffle operations exposed above. */
-      supported_extensions.KHR_shader_quad_control = false;
+      supported_extensions.KHR_shader_quad_control =
+         agx_is_a18_pro(&pdev->dev);
    }
 
    /* VK_KHR_shader_fma makes shaderFmaFloat32 mandatory. */

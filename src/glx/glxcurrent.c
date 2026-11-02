@@ -98,6 +98,64 @@ glXGetCurrentDrawable(void)
 }
 
 /**
+ * Stop a context being current to the calling thread. Called with the GLX lock
+ * held. This is the only place that completes a deferred glXDestroyContext.
+ */
+static void
+release_context(struct glx_context *gc)
+{
+   gc->vtable->unbind(gc);
+   gc->currentDpy = NULL;
+
+   if (gc->xid == None) {
+      /* We are switching away from a context that was
+       * previously destroyed, so we need to free the memory
+       * for the old handle. */
+      gc->vtable->destroy(gc);
+   }
+}
+
+/**
+ * A thread that exits with a context bound cannot unbind it later, so without
+ * this glXDestroyContext from any other thread defers the free forever. Keep
+ * this key's value non-NULL on threads that have bound a context.
+ */
+static pthread_key_t thread_exit_key;
+static pthread_once_t thread_exit_once = PTHREAD_ONCE_INIT;
+static bool thread_exit_key_valid;
+
+static void
+release_on_thread_exit(void *unused)
+{
+   struct glx_context *gc = __glXGetCurrentContext();
+
+   /* Closing a Display freed the screens of the contexts bound to it. */
+   if (gc == &dummyContext || !__glXDisplayIsOpen(gc->currentDpy))
+      return;
+
+   __glXLock();
+   release_context(gc);
+   __glXUnlock();
+
+   __glXSetCurrentContextNull();
+}
+
+static void
+thread_exit_init(void)
+{
+   thread_exit_key_valid = !pthread_key_create(&thread_exit_key,
+                                               release_on_thread_exit);
+}
+
+/* Threads outliving a dlclose must not call into the unmapped library. */
+static void __attribute__((destructor))
+thread_exit_fini(void)
+{
+   if (thread_exit_key_valid)
+      pthread_key_delete(thread_exit_key);
+}
+
+/**
  * Make a particular context current.
  *
  * \note This is in this file so that it can access dummyContext.
@@ -131,17 +189,8 @@ MakeContextCurrent(Display * dpy, GLXDrawable draw,
 
    __glXLock();
 
-   if (oldGC != &dummyContext) {
-      oldGC->vtable->unbind(oldGC);
-      oldGC->currentDpy = NULL;
-
-      if (oldGC->xid == None) {
-         /* We are switching away from a context that was
-          * previously destroyed, so we need to free the memory
-          * for the old handle. */
-         oldGC->vtable->destroy(oldGC);
-      }
-   }
+   if (oldGC != &dummyContext)
+      release_context(oldGC);
 
    __glXSetCurrentContextNull();
 
@@ -170,6 +219,10 @@ MakeContextCurrent(Display * dpy, GLXDrawable draw,
          gc->currentDrawable = draw;
          gc->currentReadable = read;
          __glXSetCurrentContext(gc);
+
+         pthread_once(&thread_exit_once, thread_exit_init);
+         if (thread_exit_key_valid)
+            pthread_setspecific(thread_exit_key, gc);
       }
    }
 

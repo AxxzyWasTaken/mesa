@@ -122,8 +122,8 @@ hk_g17p_vdm_lookup(struct hk_cmd_buffer *cmd, uint64_t primary, bool bind)
 
    {
       list_for_each_entry(struct hk_cmd_bo, bo, &cmd->uploader.main.bos, link) {
-         const uint64_t start = bo->bo->va->addr;
-         if (primary < start || primary - start >= bo->bo->size)
+         const uint64_t start = bo->addr;
+         if (bo->span || primary < start || primary - start >= bo->size)
             continue;
 
          if (bind) {
@@ -279,7 +279,7 @@ hk_free_resettable_cmd_buffer(struct hk_cmd_buffer *cmd)
    list_for_each_entry_safe(struct hk_vdm_allocation, allocation,
                             &cmd->vdm_allocations, link) {
       list_del(&allocation->link);
-      hk_cmd_pool_free_vdm(pool, allocation);
+      hk_device_free_span(dev, allocation);
    }
 
    list_for_each_entry_safe(struct hk_cs, it, &cmd->control_streams, node) {
@@ -367,9 +367,11 @@ hk_reset_cmd_buffer(struct vk_command_buffer *vk_cmd_buffer,
    cmd->uploader.main.map = NULL;
    cmd->uploader.main.base = 0;
    cmd->uploader.main.offset = 0;
+   cmd->uploader.main.capacity = 0;
    cmd->uploader.usc.map = NULL;
    cmd->uploader.usc.base = 0;
    cmd->uploader.usc.offset = 0;
+   cmd->uploader.usc.capacity = 0;
    cmd->uploader.root.map = NULL;
    cmd->uploader.root.base = 0;
    cmd->uploader.root.offset = 0;
@@ -382,6 +384,7 @@ hk_reset_cmd_buffer(struct vk_command_buffer *vk_cmd_buffer,
    cmd->uploader.streams.map = NULL;
    cmd->uploader.streams.base = 0;
    cmd->uploader.streams.offset = 0;
+   cmd->uploader.streams.capacity = 0;
 
    cmd->current_cs.gfx = NULL;
    cmd->current_cs.cs = NULL;
@@ -470,11 +473,19 @@ hk_CmdExecuteCommands(VkCommandBuffer commandBuffer,
 }
 
 static VkResult
-hk_cmd_buffer_alloc_bo(struct hk_cmd_buffer *cmd, enum hk_cmd_bo_type type,
-                       struct hk_cmd_bo **bo_out)
+hk_cmd_buffer_alloc_bo(struct hk_cmd_buffer *cmd,
+                       const struct hk_uploader *uploader, uint32_t size,
+                       enum hk_cmd_bo_type type, struct hk_cmd_bo **bo_out)
 {
    struct hk_cmd_pool *pool = hk_cmd_buffer_pool(cmd);
-   VkResult result = hk_cmd_pool_alloc_bo(pool, type, bo_out);
+   const uint32_t span = uploader == &cmd->uploader.streams
+                            ? HK_CMD_STREAM_SPAN_SIZE
+                            : HK_CMD_SPAN_SIZE;
+   VkResult result =
+      !uploader->map && size <= span && list_is_empty(&pool->free_bos[type]) &&
+            hk_g17p_cached_cmd_memory(&hk_cmd_buffer_device(cmd)->dev)
+         ? hk_cmd_pool_alloc_bo_span(pool, type, span, bo_out)
+         : hk_cmd_pool_alloc_bo(pool, type, bo_out);
    if (result != VK_SUCCESS)
       return result;
 
@@ -523,8 +534,8 @@ hk_pool_alloc_from_slow(struct hk_cmd_buffer *cmd,
 
    uint32_t offset = align(uploader->offset, alignment);
 
-   assert(offset <= HK_CMD_BO_SIZE);
-   if (uploader->map != NULL && size <= HK_CMD_BO_SIZE - offset) {
+   if (uploader->map != NULL && offset <= uploader->capacity &&
+       size <= uploader->capacity - offset) {
       uploader->offset = offset + size;
 
       return (struct agx_ptr){
@@ -534,7 +545,7 @@ hk_pool_alloc_from_slow(struct hk_cmd_buffer *cmd,
    }
 
    struct hk_cmd_bo *bo;
-   VkResult result = hk_cmd_buffer_alloc_bo(cmd, type, &bo);
+   VkResult result = hk_cmd_buffer_alloc_bo(cmd, uploader, size, type, &bo);
    if (unlikely(result != VK_SUCCESS)) {
       vk_command_buffer_set_error(&cmd->vk, result);
       return (struct agx_ptr){0};
@@ -548,14 +559,16 @@ hk_pool_alloc_from_slow(struct hk_cmd_buffer *cmd,
     * upload BO on this one allocation and continuing on the current upload
     * BO.
     */
-   if (uploader->map == NULL || size < uploader->offset) {
-      uploader->map = agx_bo_map(bo->bo);
-      uploader->base = bo->bo->va->addr;
+   if (uploader->map == NULL ||
+       bo->size - size > uploader->capacity - uploader->offset) {
+      uploader->map = bo->map;
+      uploader->base = bo->addr;
       uploader->offset = size;
+      uploader->capacity = bo->size;
    }
 
    return (struct agx_ptr){
-      .gpu = bo->bo->va->addr,
+      .gpu = bo->addr,
       .cpu = bo->map,
    };
 }
@@ -612,9 +625,9 @@ hk_pool_vdm_primary_alloc(struct hk_cmd_buffer *cmd, uint32_t size,
       MAX2(alignment, HK_G17P_VDM_UPLOAD_CHUNK_SIZE);
    struct agx_ptr chunk = {0};
    struct hk_vdm_allocation *allocation = NULL;
-   const VkResult result = hk_cmd_pool_alloc_vdm(
-      hk_cmd_buffer_pool(cmd), chunk_size, chunk_alignment, &chunk,
-      &allocation);
+   const VkResult result = hk_cmd_pool_alloc_span(
+      hk_cmd_buffer_pool(cmd), HK_CMD_SLAB_VDM, chunk_size, chunk_alignment,
+      &chunk, &allocation);
    if (unlikely(result != VK_SUCCESS)) {
       vk_command_buffer_set_error(&cmd->vk, result);
       return (struct agx_ptr){0};
@@ -883,9 +896,9 @@ hk_cmd_bo_clean_unlinked_streams(struct hk_cmd_buffer *cmd,
                                  const struct hk_cmd_bo *bo)
 {
    const uintptr_t base = (uintptr_t)bo->map;
-   if (bo->bo->size > UINTPTR_MAX - base)
+   if (bo->size > UINTPTR_MAX - base)
       return false;
-   const uintptr_t limit = base + bo->bo->size;
+   const uintptr_t limit = base + bo->size;
 
    list_for_each_entry(struct hk_cs, cs, &cmd->control_streams, node) {
       const uintptr_t start = (uintptr_t)cs->start;
@@ -930,7 +943,7 @@ hk_cmd_buffer_publish_cached_uploads(struct hk_cmd_buffer *cmd)
          if (bo->stream_only && !linked_stream &&
              hk_cmd_bo_clean_unlinked_streams(cmd, bo))
             continue;
-         size_t size = bo->bo->size;
+         size_t size = bo->size;
          for (unsigned u = 0; u < ARRAY_SIZE(current); ++u) {
             if (current[u]->map == bo->map)
                size = MIN2(size, current[u]->offset);

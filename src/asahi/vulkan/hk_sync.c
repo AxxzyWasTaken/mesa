@@ -973,7 +973,8 @@ hk_sync_check_cs(struct hk_cmd_buffer *cmd)
       cs->sync.kind |= HK_SYNC_GFX_MEM;
    note_last(cmd, cs);
 
-   if (agx_chip_g17_m5(hk_cmd_buffer_device(cmd)->dev.chip) &&
+   if ((agx_native_graphics(&hk_cmd_buffer_device(cmd)->dev) ||
+        agx_chip_g17_m5(hk_cmd_buffer_device(cmd)->dev.chip)) &&
        cmd->sync.pending_start_ts.handle && !cs->timestamp.start.handle &&
        !cs->timestamp.end.handle) {
       cs->timestamp.start = cmd->sync.pending_start_ts;
@@ -1331,7 +1332,11 @@ hk_sync_write_timestamp(struct hk_cmd_buffer *cmd, VkPipelineStageFlags2 stage,
    if (!src_kinds) {
       hk_sync_flush_pending_timestamp(cmd);
       st->pending_start_ts = req;
-      if (agx_chip_g17_m5(hk_cmd_buffer_device(cmd)->dev.chip))
+      /* A query reset or earlier dispatch may have left a reusable stream.
+       * Consume the start stamp before recording work into it too, rather
+       * than resolving it as an end stamp at the next timestamp write. */
+      if (agx_native_graphics(&hk_cmd_buffer_device(cmd)->dev) ||
+          agx_chip_g17_m5(hk_cmd_buffer_device(cmd)->dev.chip))
          st->cs_check_pending = true;
       return;
    }

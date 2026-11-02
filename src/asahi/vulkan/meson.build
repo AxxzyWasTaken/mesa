@@ -491,6 +491,13 @@ libhk = static_library(
 hk_wrap_test_link_args = cc.get_supported_link_arguments('-fno-lto')
 
 if with_tests
+  test('hk_sparse_alias', executable('hk_sparse_alias_test',
+    files('tests/test-hk-sparse-alias.c'),
+    include_directories : [inc_gallium, inc_gallium_aux, inc_include, inc_src,
+      inc_asahi, inc_virtio_gpu, inc_virtio_vdrm, include_directories('.')],
+    dependencies : [hk_deps], link_with : [libhk],
+    link_args : [ld_args_gc_sections, '-Wl,--wrap=__vk_errorf']),
+    suite : ['asahi'])
   test('hk_rt_inlining', executable('hk_rt_inlining_test',
     files('tests/test-hk-rt-inlining.c'),
     include_directories : [inc_gallium, inc_gallium_aux, inc_include, inc_src,
@@ -786,6 +793,15 @@ if with_tests
   executable(
     'g17p-vulkan-multiview-clear',
     files('tests/g17p_vulkan_multiview_clear.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
+    'aurora-tilesubmit',
+    files('tests/aurora_tilesubmit.c'),
     include_directories : [inc_include],
     dependencies : [cc.find_library('vulkan')],
     c_args : [c_msvc_compat_args],

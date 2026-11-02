@@ -87,7 +87,9 @@ kmsro_screen_create(int kms_fd, const struct pipe_screen_config *config,
       util_sparse_array_init(&ro->bo_map, sizeof(struct renderonly_scanout), 64);
       simple_mtx_init(&ro->bo_map_lock, mtx_plain);
 
-      if (!force_zink && strcmp(render_dev_name, "asahi") == 0) {
+      /* "aurora" is the native AGX kernel driver; "asahi" is its older name. */
+      if (!force_zink && (strcmp(render_dev_name, "aurora") == 0 ||
+                          strcmp(render_dev_name, "asahi") == 0)) {
 #if defined(GALLIUM_ASAHI)
          ro->create_for_resource = renderonly_create_gpu_import_for_resource;
          screen = asahi_drm_screen_create_renderonly(ro->gpu_fd, ro, config);

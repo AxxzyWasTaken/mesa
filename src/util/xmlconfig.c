@@ -654,7 +654,7 @@ struct OptConfData {
 #endif
    driOptionCache *cache;
    int screenNum;
-   const char *driverName, *execName;
+   const char *driverName, *driverNameAlias, *execName;
    const char *kernelDriverName;
    const char *deviceName;
    uint32_t deviceVersion;
@@ -736,7 +736,8 @@ parseDeviceAttr(struct OptConfData *data, const char **attr)
       else if (!strcmp(attr[i], "device_version_regexp")) device_version_regexp = attr[i+1];
       else XML_WARNING("unknown device attribute: %s.", attr[i]);
    }
-   if (driver && strcmp(driver, data->driverName))
+   if (driver && strcmp(driver, data->driverName) &&
+       (!data->driverNameAlias || strcmp(driver, data->driverNameAlias)))
       data->ignoringDevice = data->inDevice;
    else if (kernel && (!data->kernelDriverName ||
                        strcmp(kernel, data->kernelDriverName)))
@@ -1440,6 +1441,7 @@ driParseConfigFiles(driOptionCache *cache, const driOptionCache *info,
    userData.cache = cache;
    userData.screenNum = params->screenNum;
    userData.driverName = params->driverName;
+   userData.driverNameAlias = params->driverNameAlias;
    userData.kernelDriverName = params->kernelDriverName;
    userData.deviceName = params->deviceName;
    userData.deviceVersion = params->deviceVersion;

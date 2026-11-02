@@ -1046,7 +1046,10 @@ hk_CreateDevice(VkPhysicalDevice physicalDevice,
    *pDevice = hk_device_to_handle(dev);
 
    simple_mtx_init(&dev->vdm.lock, mtx_plain);
-   list_inithead(&dev->vdm.slabs);
+   for (unsigned class = 0; class < HK_CMD_SLAB_COUNT; ++class) {
+      list_inithead(&dev->vdm.slabs[class]);
+      list_inithead(&dev->vdm.full[class]);
+   }
    simple_mtx_init(&dev->scratch.lock, mtx_plain);
    simple_mtx_init(&dev->shader_binary_cache.lock, mtx_plain);
    agx_scratch_init(&dev->dev, &dev->scratch.vs);

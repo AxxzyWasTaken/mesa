@@ -106,7 +106,10 @@ struct hk_shader_info {
           * or writes the sample mask. */
          bool may_kill;
          bool m5_inline_sample_shading;
-         uint8_t _pad[2];
+         /* G17P: the main part applies alpha-to-coverage in the coverage
+          * update that tests (agx_fs_epilog_key::a2c_in_main). */
+         bool a2c_in_main;
+         uint8_t _pad[1];
       } fs;
 
       struct {

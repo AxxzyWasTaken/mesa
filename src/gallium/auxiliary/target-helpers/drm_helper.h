@@ -353,9 +353,14 @@ const driOptionDescription asahi_driconf[] = {
       #include "asahi/driinfo_asahi.h"
 };
 DRM_DRIVER_DESCRIPTOR(asahi, asahi_driconf, ARRAY_SIZE(asahi_driconf))
+/* The kernel driver is "aurora"; "asahi" stays for older kernels and for
+ * MESA_LOADER_DRIVER_OVERRIDE and dri_driver settings that name it.
+ */
+DRM_DRIVER_DESCRIPTOR_ALIAS(asahi, aurora, asahi_driconf, ARRAY_SIZE(asahi_driconf))
 
 #else
 DRM_DRIVER_DESCRIPTOR_STUB(asahi)
+DRM_DRIVER_DESCRIPTOR_STUB(aurora)
 #endif
 
 #ifdef GALLIUM_ETNAVIV
