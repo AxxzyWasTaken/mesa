@@ -1870,10 +1870,11 @@ agx_nir_fs_epilog_g17p(nir_builder *b, const void *key_)
        * alpha-to-coverage, Apple's 2x/4x blended fragments therefore issue
        * one masked tile load/store pair rather than cloning the blend once
        * per sample. Keep the ordinary per-sample lowering for every other
-       * pixel-shaded epilog. */
+       * pixel-shaded epilog, and for spilled targets: their memory stores
+       * address each sample by its ID, which only the sample loop provides. */
       struct agx_fs_epilog_key pixel = *key;
       pixel.defer_monolithic_msaa = key->blend.alpha_to_coverage &&
-                                    key->nr_samples > 1;
+                                    key->nr_samples > 1 && !key->native_spills;
       agx_nir_fs_epilog_native(b, &pixel);
    }
 

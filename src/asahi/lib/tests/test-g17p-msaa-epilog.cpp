@@ -242,9 +242,11 @@ TEST_F(G17PMSAAEpilog, NativeSpillEpilogsCompile)
 {
    for (unsigned samples : {2u, 4u}) {
       for (unsigned targets : {4u, 8u}) {
-         for (bool blend : {false, true}) {
+         for (unsigned variant = 0; variant < 3; ++variant) {
+            const bool blend = variant == 1, a2c = variant == 2;
             agx_fs_epilog_key fs = {};
             fs.nr_samples = samples;
+            fs.blend.alpha_to_coverage = a2c;
             fs.max_sample_size_B = AGX_G17P_MAX_BYTES_PER_SAMPLE;
             fs.max_bytes_per_tile = 32768;
             fs.max_samples_per_tile = 2048;
@@ -274,7 +276,8 @@ TEST_F(G17PMSAAEpilog, NativeSpillEpilogsCompile)
             if (!agx_tilebuffer_spills(&tib))
                continue;
             SCOPED_TRACE(::testing::Message() << samples << " samples, "
-                         << targets << " targets, blend=" << blend);
+                         << targets << " targets, blend=" << blend
+                         << ", alpha-to-coverage=" << a2c);
             nir_builder b = nir_builder_init_simple_shader(
                MESA_SHADER_FRAGMENT, &agx_nir_options, "G17P spilled MRT epilog");
             agx_nir_fs_epilog_g17p(&b, &fs);
