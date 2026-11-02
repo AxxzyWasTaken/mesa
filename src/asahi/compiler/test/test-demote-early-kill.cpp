@@ -316,7 +316,7 @@ lower_g17p(enum shape s)
 {
    nir_shader *nir = build(s);
    agx_nir_lower_discard_zs_emit(nir);
-   agx_nir_lower_sample_mask_deferred_g17p(nir);
+   agx_nir_lower_sample_mask_deferred_g17p(nir, NULL);
    nir_validate_shader(nir, "G17P demote lowering");
    bool early = kill_is_early(nir);
    ralloc_free(nir);
@@ -366,7 +366,7 @@ TEST_F(DemoteEarlyKill, G17PUpdatesOnceOnEveryPathAfterTheLastDemote)
 
       nir_shader *nir = build(s);
       agx_nir_lower_discard_zs_emit(nir);
-      agx_nir_lower_sample_mask_deferred_g17p(nir);
+      agx_nir_lower_sample_mask_deferred_g17p(nir, NULL);
       updates u = count_updates(&nir_shader_get_entrypoint(nir)->body);
       EXPECT_EQ(u.min, 1u) << s;
       EXPECT_EQ(u.max, 1u) << s;
@@ -383,7 +383,7 @@ TEST_F(DemoteEarlyKill, G17PSplitsIfsAroundASingleTopLevelUpdate)
    for (enum shape s : {DEMOTE_IN_LOOP_IN_ARM, DEMOTES_IN_NESTED_ARMS}) {
       nir_shader *nir = build(s);
       agx_nir_lower_discard_zs_emit(nir);
-      agx_nir_lower_sample_mask_deferred_g17p(nir);
+      agx_nir_lower_sample_mask_deferred_g17p(nir, NULL);
       nir_validate_shader(nir, "split if");
       nir_function_impl *impl = nir_shader_get_entrypoint(nir);
 
@@ -407,6 +407,215 @@ TEST_F(DemoteEarlyKill, G17PSplitsIfsAroundASingleTopLevelUpdate)
    }
 }
 
+/* Where the alpha that alpha-to-coverage reads comes from. */
+enum a2c_alpha {
+   ALPHA_BELOW_DEMOTE,
+   ALPHA_IN_SPLIT_ARM,
+   ALPHA_THROUGH_SELECT,
+   ALPHA_FROM_LOAD_IN_ARM,
+   ALPHA_TOO_MUCH_WORK,
+   ALPHA_FROM_TEXTURE,
+   ALPHA_FROM_DERIVATIVE,
+   ALPHA_FROM_LOOP,
+   ALPHA_WITH_MEMORY_WRITE,
+};
+
+static nir_shader *
+build_a2c(enum a2c_alpha s)
+{
+   nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_FRAGMENT,
+                                                  &agx_nir_options, "a2c");
+   b.shader->info.fs.uses_discard = true;
+   b.shader->info.fs.needs_coarse_quad_helper_invocations = true;
+   b.shader->info.writes_memory = s == ALPHA_WITH_MEMORY_WRITE;
+
+   nir_def *xy = nir_load_frag_coord(&b);
+   nir_def *x = nir_channel(&b, xy, 0), *y = nir_channel(&b, xy, 1);
+   nir_def *c = nir_flt(&b, x, y);
+   nir_def *alpha;
+
+   if (s == ALPHA_IN_SPLIT_ARM) {
+      nir_if *nif = nir_push_if(&b, c);
+      nir_demote_if(&b, nir_flt_imm(&b, y, 3.0));
+      nir_def *v = lighting(&b, x);
+      nir_push_else(&b, nif);
+      nir_def *w = nir_fadd_imm(&b, y, 1.0);
+      nir_pop_if(&b, nif);
+      alpha = nir_if_phi(&b, v, w);
+   } else {
+      nir_demote_if(&b, c);
+
+      switch (s) {
+      case ALPHA_THROUGH_SELECT: {
+         nir_if *nif = nir_push_if(&b, nir_flt_imm(&b, y, 3.0));
+         nir_def *v = nir_fmul(&b, x, x);
+         nir_push_else(&b, nif);
+         nir_def *w = nir_fadd_imm(&b, y, 1.0);
+         nir_pop_if(&b, nif);
+         alpha = nir_if_phi(&b, v, w);
+         break;
+      }
+      case ALPHA_FROM_LOAD_IN_ARM: {
+         nir_if *nif = nir_push_if(&b, nir_flt_imm(&b, y, 3.0));
+         nir_def *v = nir_load_global_constant(&b, 1, 32,
+                                               nir_imm_int64(&b, 0x1000),
+                                               .access = ACCESS_CAN_REORDER);
+         nir_push_else(&b, nif);
+         nir_def *w = nir_fadd_imm(&b, y, 1.0);
+         nir_pop_if(&b, nif);
+         alpha = nir_if_phi(&b, v, w);
+         break;
+      }
+      case ALPHA_TOO_MUCH_WORK:
+         alpha = x;
+         for (unsigned i = 0; i < 8; ++i)
+            alpha = lighting(&b, nir_fadd_imm(&b, alpha, i));
+         break;
+      case ALPHA_FROM_TEXTURE: {
+         nir_tex_instr *tex = nir_tex_instr_create(b.shader, 2);
+         tex->op = nir_texop_txf;
+         tex->sampler_dim = GLSL_SAMPLER_DIM_2D;
+         tex->dest_type = nir_type_float32;
+         tex->coord_components = 2;
+         tex->src[0] = nir_tex_src_for_ssa(nir_tex_src_coord, nir_imm_ivec2(&b, 0, 0));
+         tex->src[1] = nir_tex_src_for_ssa(nir_tex_src_lod, nir_imm_int(&b, 0));
+         nir_def_init(&tex->instr, &tex->def, 4, 32);
+         nir_builder_instr_insert(&b, &tex->instr);
+         alpha = nir_channel(&b, &tex->def, 3);
+         break;
+      }
+      case ALPHA_FROM_DERIVATIVE:
+         alpha = nir_ddx(&b, y);
+         break;
+      case ALPHA_FROM_LOOP: {
+         nir_variable *v = nir_local_variable_create(b.impl, glsl_float_type(),
+                                                     "v");
+         nir_store_var(&b, v, x, 1);
+         nir_push_loop(&b);
+         nir_store_var(&b, v, nir_fmul(&b, nir_load_var(&b, v), y), 1);
+         nir_break_if(&b, nir_flt_imm(&b, nir_load_var(&b, v), 1.0));
+         nir_pop_loop(&b, NULL);
+         alpha = nir_load_var(&b, v);
+         break;
+      }
+      default:
+         alpha = nir_fmul(&b, x, y);
+         break;
+      }
+   }
+
+   nir_def *rgb = nir_ddx(&b, y);
+   agx_test_store_output(&b, nir_vec4(&b, rgb, rgb, rgb, alpha),
+                         nir_imm_int(&b, 0), nir_type_float32,
+                         FRAG_RESULT_DATA0);
+   nir_lower_vars_to_ssa(b.shader);
+   agx_nir_lower_discard_zs_emit(b.shader);
+   nir_lower_alpha_to_coverage(b.shader, false, NULL);
+   return b.shader;
+}
+
+static unsigned
+count_demotes(nir_shader *s)
+{
+   unsigned n = 0;
+   nir_foreach_block(block, nir_shader_get_entrypoint(s)) {
+      nir_foreach_instr(instr, block) {
+         n += instr->type == nir_instr_type_intrinsic &&
+              nir_instr_as_intrinsic(instr)->intrinsic ==
+                 nir_intrinsic_demote_samples;
+      }
+   }
+   return n;
+}
+
+/* Alpha-to-coverage reaches the one update whatever shape its alpha has, or
+ * stays out of the shader altogether. */
+static bool
+a2c_in_main(enum a2c_alpha s)
+{
+   nir_shader *nir = build_a2c(s);
+   bool a2c = true;
+   agx_nir_lower_sample_mask_deferred_g17p(nir, &a2c);
+   nir_validate_shader(nir, "alpha-to-coverage at the update");
+   /* A memory write keeps the late update and its dead-quad kills. */
+   if (s != ALPHA_WITH_MEMORY_WRITE) {
+      updates u = count_updates(&nir_shader_get_entrypoint(nir)->body);
+      EXPECT_EQ(u.min, 1u) << s;
+      EXPECT_EQ(u.max, 1u) << s;
+   }
+   EXPECT_EQ(count_demotes(nir), 0u) << s;
+   ralloc_free(nir);
+   return a2c;
+}
+
+TEST_F(DemoteEarlyKill, G17PKillsAlphaCoverageAtTheUpdate)
+{
+   EXPECT_TRUE(a2c_in_main(ALPHA_BELOW_DEMOTE));
+   EXPECT_TRUE(a2c_in_main(ALPHA_IN_SPLIT_ARM));
+   EXPECT_TRUE(a2c_in_main(ALPHA_THROUGH_SELECT));
+   EXPECT_TRUE(a2c_in_main(ALPHA_FROM_LOAD_IN_ARM));
+}
+
+/* A load out of a branch stays behind that branch's condition: it may read
+ * through a pointer that is only valid where the shader took the branch. */
+TEST_F(DemoteEarlyKill, G17PGuardsLoadsAlphaCoverageReads)
+{
+   nir_shader *nir = build_a2c(ALPHA_FROM_LOAD_IN_ARM);
+   bool a2c = true;
+   agx_nir_lower_sample_mask_deferred_g17p(nir, &a2c);
+   ASSERT_TRUE(a2c);
+   nir_validate_shader(nir, "guarded load");
+
+   nir_function_impl *impl = nir_shader_get_entrypoint(nir);
+   unsigned loads = 0;
+   nir_foreach_block(block, impl) {
+      nir_foreach_instr(instr, block) {
+         if (instr->type != nir_instr_type_intrinsic ||
+             nir_instr_as_intrinsic(instr)->intrinsic !=
+                nir_intrinsic_load_global_constant)
+            continue;
+         EXPECT_NE(block->cf_node.parent, &impl->cf_node);
+         loads++;
+      }
+   }
+   EXPECT_EQ(loads, 2u);
+   ralloc_free(nir);
+}
+
+TEST_F(DemoteEarlyKill, G17PLeavesAlphaCoverageToTheEpilogWhenItCannotMove)
+{
+   EXPECT_FALSE(a2c_in_main(ALPHA_TOO_MUCH_WORK));
+   EXPECT_FALSE(a2c_in_main(ALPHA_FROM_TEXTURE));
+   EXPECT_FALSE(a2c_in_main(ALPHA_FROM_DERIVATIVE));
+   EXPECT_FALSE(a2c_in_main(ALPHA_FROM_LOOP));
+   EXPECT_FALSE(a2c_in_main(ALPHA_WITH_MEMORY_WRITE));
+}
+
+/* The phi of an if below the update reads as a select of its arms. */
+TEST_F(DemoteEarlyKill, G17PSelectsThePhisAlphaCoverageReads)
+{
+   nir_shader *nir = build_a2c(ALPHA_THROUGH_SELECT);
+   bool a2c = true;
+   agx_nir_lower_sample_mask_deferred_g17p(nir, &a2c);
+   ASSERT_TRUE(a2c);
+
+   nir_function_impl *impl = nir_shader_get_entrypoint(nir);
+   bool select = false, update = false;
+   nir_foreach_block(block, impl) {
+      nir_foreach_instr(instr, block) {
+         if (instr->type == nir_instr_type_alu &&
+             nir_instr_as_alu(instr)->op == nir_op_bcsel)
+            select |= !update;
+         else if (instr->type == nir_instr_type_intrinsic &&
+                  nir_instr_as_intrinsic(instr)->intrinsic ==
+                     nir_intrinsic_sample_mask_agx)
+            update = true;
+      }
+   }
+   EXPECT_TRUE(select);
+   ralloc_free(nir);
+}
+
 TEST_F(DemoteEarlyKill, G17PKeepsTheUpdateLateWhereItIsObservable)
 {
    EXPECT_FALSE(lower_g17p(SUBGROUP_AFTER));
@@ -424,7 +633,7 @@ TEST_F(DemoteEarlyKill, G17PDepthWritesAndForcedEarlyTestsStayLate)
    for (enum shape s : {DEPTH_WRITE_AFTER, FORCED_EARLY_AFTER}) {
       nir_shader *nir = build(s);
       agx_nir_lower_discard_zs_emit(nir);
-      agx_nir_lower_sample_mask_deferred_g17p(nir);
+      agx_nir_lower_sample_mask_deferred_g17p(nir, NULL);
       nir_validate_shader(nir, "late coverage");
 
       nir_block *last = nir_impl_last_block(nir_shader_get_entrypoint(nir));

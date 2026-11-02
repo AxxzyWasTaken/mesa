@@ -853,7 +853,7 @@ agx_nir_fs_epilog_native(nir_builder *b, const void *key_)
 
    /* Alpha-to-coverage must be lowered before alpha-to-one */
    const bool discards_before_a2c = b->shader->info.fs.uses_discard;
-   if (key->blend.alpha_to_coverage)
+   if (key->blend.alpha_to_coverage && !key->a2c_in_main)
       NIR_PASS(_, b->shader, nir_lower_alpha_to_coverage, false,
                NULL);
 

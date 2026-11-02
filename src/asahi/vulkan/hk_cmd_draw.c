@@ -9666,6 +9666,18 @@ hk_g17p_relocated_blend_constant_base(const struct hk_shader *fs,
    return true;
 }
 
+/* The link key and the main part's test selector must agree on this. */
+static bool
+hk_fs_epilog_discards(const struct hk_shader *fs,
+                      const struct vk_dynamic_graphics_state *dyn,
+                      bool nontrivial_force_early)
+{
+   return agx_fs_epilog_may_discard(
+      fs ? &fs->info.fs.epilog_key : NULL,
+      dyn->ms.alpha_to_coverage_enable && !(fs && fs->info.fs.a2c_in_main),
+      nontrivial_force_early);
+}
+
 /* Everything outside a fragment shader that its fast-link key depends on. */
 struct hk_fs_link_inputs {
    const struct vk_dynamic_graphics_state *dyn;
@@ -9847,9 +9859,7 @@ hk_fs_link_key_build(const struct hk_device *dev, struct hk_shader *fs,
    bool nontrivial_force_early =
       fs && (fs->b.info.early_fragment_tests &&
              (fs->b.info.writes_sample_mask || fs->info.fs.writes_memory));
-   bool epilog_discards = agx_fs_epilog_may_discard(
-      fs ? &fs->info.fs.epilog_key : NULL,
-      dyn->ms.alpha_to_coverage_enable, nontrivial_force_early);
+   bool epilog_discards = hk_fs_epilog_discards(fs, dyn, nontrivial_force_early);
    bool defer_api_sample_mask = agx_native_graphics(&dev->dev) &&
                                 has_sample_mask && !nontrivial_force_early;
 
@@ -9921,6 +9931,7 @@ hk_fs_link_key_build(const struct hk_device *dev, struct hk_shader *fs,
       .link = fs->info.fs.epilog_key,
       .colour_unit_range = fs->info.fs.g17p_colour_unit_range,
       .nr_samples = samples,
+      .a2c_in_main = fs->info.fs.a2c_in_main,
       .blend.alpha_to_coverage = dyn->ms.alpha_to_coverage_enable,
       .blend.alpha_to_one = dyn->ms.alpha_to_one_enable,
       .blend.logicop_enable = dyn->cb.logic_op_enable,
@@ -10452,9 +10463,7 @@ hk_flush_dynamic_state_slow(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
       fs && (fs->b.info.early_fragment_tests &&
              (fs->b.info.writes_sample_mask || fs->info.fs.writes_memory));
 
-   bool epilog_discards = agx_fs_epilog_may_discard(
-      fs ? &fs->info.fs.epilog_key : NULL,
-      dyn->ms.alpha_to_coverage_enable, nontrivial_force_early);
+   bool epilog_discards = hk_fs_epilog_discards(fs, dyn, nontrivial_force_early);
 
    const unsigned early_reject_samples =
       MAX2(dyn->ms.rasterization_samples, 1);

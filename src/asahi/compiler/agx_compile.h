@@ -613,7 +613,7 @@ bool agx_nir_lower_sample_mask_m5(nir_shader *s);
  * brackets (M5 only). The backend stages one DEPTHF word for it. */
 #define AGX_ZS_COVERED_SAMPLE (4)
 bool agx_nir_lower_sample_mask_deferred(nir_shader *s);
-bool agx_nir_lower_sample_mask_deferred_g17p(nir_shader *s);
+bool agx_nir_lower_sample_mask_deferred_g17p(nir_shader *s, bool *a2c_in_main);
 bool agx_nir_lower_sample_mask_deferred_m5(nir_shader *s);
 bool agx_nir_lower_interpolation(nir_shader *s, bool layer_as_varying);
 
