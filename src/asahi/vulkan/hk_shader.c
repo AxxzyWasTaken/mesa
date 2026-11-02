@@ -130,6 +130,11 @@ struct hk_fs_key {
     */
    bool discard_color_outputs : 1;
 
+   /** G17P: multisampled with alpha-to-coverage statically on and every sample
+    * enabled, so the main part can apply it (agx_fs_epilog_key::a2c_in_main).
+    */
+   bool static_a2c : 1;
+
    uint8_t pad[3];
 };
 
@@ -658,6 +663,18 @@ hk_populate_fs_key(struct hk_fs_key *key,
        !state->ms->alpha_to_coverage_enable &&
        (agx_chip_g17_m5(chip) || hk_g17p_static_no_early_reject(state)))
       key->static_tests = true;
+
+   if (chip == AGX_CHIP_G17P && state->ms != NULL &&
+       !BITSET_TEST(state->dynamic,
+                    MESA_VK_DYNAMIC_MS_ALPHA_TO_COVERAGE_ENABLE) &&
+       !BITSET_TEST(state->dynamic, MESA_VK_DYNAMIC_MS_RASTERIZATION_SAMPLES) &&
+       !BITSET_TEST(state->dynamic, MESA_VK_DYNAMIC_MS_SAMPLE_MASK) &&
+       state->ms->alpha_to_coverage_enable &&
+       state->ms->rasterization_samples > 1 &&
+       (state->ms->sample_mask &
+        BITFIELD_MASK(state->ms->rasterization_samples)) ==
+          BITFIELD_MASK(state->ms->rasterization_samples))
+      key->static_a2c = true;
 
    if (state->pipeline_flags &
        VK_PIPELINE_CREATE_2_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT)
@@ -4708,26 +4725,45 @@ hk_compile_nir(struct hk_device *dev, const VkAllocationCallbacks *pAllocator,
          shader->info.fs.g17p_colour_unit_range =
             agx_nir_fs_colour_outputs_unit_range(nir);
 
+      /* Only a shader that already discards has an early coverage update to
+       * carry the kill. A shader with no way to apply it keeps it in the
+       * epilog. Early fragment tests and memory writes make the epilog
+       * lowering fold every demote into the exported sample mask, so the
+       * alpha-to-coverage demote would not survive to the coverage update:
+       * those shaders keep alpha-to-coverage in the epilog too. */
+      bool a2c_in_main = false;
+      if (dev->dev.chip == AGX_CHIP_G17P && key && key->fs.static_a2c &&
+          nir->info.fs.uses_discard && !nir->info.fs.early_fragment_tests &&
+          !nir->info.writes_memory &&
+          !(nir->info.outputs_written &
+            BITFIELD64_BIT(FRAG_RESULT_SAMPLE_MASK)))
+         NIR_PASS(a2c_in_main, nir, nir_lower_alpha_to_coverage, false, NULL);
+
       NIR_PASS(_, nir, agx_nir_lower_fs_output_to_epilog_for_device,
                dev->dev.chip, &shader->info.fs.epilog_key);
-      if (agx_chip_g17_m5(dev->dev.chip))
+      if (agx_chip_g17_m5(dev->dev.chip)) {
          NIR_PASS(_, nir, agx_nir_lower_sample_mask_deferred_m5);
-      else if (agx_native_graphics(&dev->dev))
+      } else if (dev->dev.chip == AGX_CHIP_G17P) {
+         NIR_PASS(_, nir, agx_nir_lower_sample_mask_deferred_g17p,
+                  a2c_in_main ? &a2c_in_main : NULL);
+         shader->info.fs.a2c_in_main = a2c_in_main;
+      } else if (agx_native_graphics(&dev->dev))
          NIR_PASS(_, nir, agx_nir_lower_sample_mask_deferred);
       else
          NIR_PASS(_, nir, agx_nir_lower_sample_mask);
 
-      /* With alpha-to-coverage statically off and no depth/stencil export,
-       * no epilog of this shader discards, so on the native AGX3 parts the
-       * main part always owns the depth/stencil tests while no read-only early
-       * reject can apply (hk_g17p_static_no_early_reject()): the draw-time
+      /* With alpha-to-coverage statically off or in the main part and no
+       * depth/stencil export, no epilog of this shader discards, so on the
+       * native AGX3 parts the main part always owns the depth/stencil tests
+       * while no read-only early reject can apply
+       * (hk_g17p_static_no_early_reject()): the draw-time
        * selector (hk_root_descriptor_table::draw.no_epilog_discard) is all
        * ones for every draw that can use it. Fold it, leaving the single
        * unconditional testing coverage update of the native form instead of
        * a uniform branch between a testing and a killing one. */
       if ((agx_chip_native_agx3(dev->dev.chip) ||
            agx_chip_g17_m5(dev->dev.chip)) &&
-          key && key->fs.static_tests &&
+          key && (key->fs.static_tests || a2c_in_main) &&
           !shader->info.fs.epilog_key.write_z &&
           !shader->info.fs.epilog_key.write_s) {
          bool folded = false;

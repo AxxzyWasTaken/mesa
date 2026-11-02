@@ -138,6 +138,10 @@ typedef void (*driShaderOptionCallback)(const void *hash_data,
 typedef struct {
    int screenNum;
    const char *driverName;
+   /* Optional second name a renamed driver still answers to in
+    * <device driver="...">, so existing configuration keeps applying.
+    */
+   const char *driverNameAlias;
    const char *kernelDriverName;
    const char *deviceName;
    uint32_t deviceVersion;

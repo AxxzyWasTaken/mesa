@@ -3562,10 +3562,15 @@ zink_internal_create_screen(const struct pipe_screen_config *config, int64_t dev
    if (config) {
       driParseConfigFiles(config->options, config->options_info,
                           &(driConfigFileParseParams) { .driverName = "zink" });
-      screen->driconf.dual_color_blend_by_location = driQueryOptionb(config->options, "dual_color_blend_by_location");
+      /* Software loader frontends may provide only the common DRI options.
+       * Keep the declared false defaults for unregistered Zink options. */
+      if (driCheckOption(config->options, "dual_color_blend_by_location", DRI_BOOL))
+         screen->driconf.dual_color_blend_by_location = driQueryOptionb(config->options, "dual_color_blend_by_location");
       //screen->driconf.inline_uniforms = driQueryOptionb(config->options, "radeonsi_inline_uniforms");
-      screen->driconf.emulate_point_smooth = driQueryOptionb(config->options, "zink_emulate_point_smooth");
-      screen->driconf.zink_shader_object_enable = driQueryOptionb(config->options, "zink_shader_object_enable");
+      if (driCheckOption(config->options, "zink_emulate_point_smooth", DRI_BOOL))
+         screen->driconf.emulate_point_smooth = driQueryOptionb(config->options, "zink_emulate_point_smooth");
+      if (driCheckOption(config->options, "zink_shader_object_enable", DRI_BOOL))
+         screen->driconf.zink_shader_object_enable = driQueryOptionb(config->options, "zink_shader_object_enable");
    }
 
    simple_mtx_lock(&instance_lock);

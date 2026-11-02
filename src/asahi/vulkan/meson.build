@@ -175,6 +175,11 @@ if with_tests
     suite : ['asahi'],
   )
 
+  test('hk_image_store_forward', executable('hk_image_store_forward_test',
+    files('tests/test-hk-image-store-forward.c', 'hk_nir_forward_image_stores.c'),
+    include_directories : [include_directories('.'), inc_include, inc_src],
+    dependencies : [idep_nir, idep_mesautil]), suite : ['asahi'])
+
   test('hk_root_size', executable('hk_root_size_test',
     files('tests/test-hk-root-size.c', 'hk_nir_root_size.c'),
     include_directories : [include_directories('.'), inc_include, inc_src],
@@ -486,6 +491,13 @@ libhk = static_library(
 hk_wrap_test_link_args = cc.get_supported_link_arguments('-fno-lto')
 
 if with_tests
+  test('hk_sparse_alias', executable('hk_sparse_alias_test',
+    files('tests/test-hk-sparse-alias.c'),
+    include_directories : [inc_gallium, inc_gallium_aux, inc_include, inc_src,
+      inc_asahi, inc_virtio_gpu, inc_virtio_vdrm, include_directories('.')],
+    dependencies : [hk_deps], link_with : [libhk],
+    link_args : [ld_args_gc_sections, '-Wl,--wrap=__vk_errorf']),
+    suite : ['asahi'])
   test('hk_rt_inlining', executable('hk_rt_inlining_test',
     files('tests/test-hk-rt-inlining.c'),
     include_directories : [inc_gallium, inc_gallium_aux, inc_include, inc_src,
@@ -743,8 +755,26 @@ if with_tests
   )
 
   executable(
+    'vulkan-msaa-mrt',
+    files('tests/vulkan_msaa_mrt.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
     'g17p-vulkan-multiview-clear',
     files('tests/g17p_vulkan_multiview_clear.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
+    'aurora-tilesubmit',
+    files('tests/aurora_tilesubmit.c'),
     include_directories : [inc_include],
     dependencies : [cc.find_library('vulkan')],
     c_args : [c_msvc_compat_args],

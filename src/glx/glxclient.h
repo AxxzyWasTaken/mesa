@@ -662,6 +662,7 @@ extern void __glXSendLargeCommand(struct glx_context *, const GLvoid *, GLint,
 
 /* Initialize the GLX extension for dpy */
 extern struct glx_display *__glXInitialize(Display *);
+extern Bool __glXDisplayIsOpen(Display *);
 
 /************************************************************************/
 

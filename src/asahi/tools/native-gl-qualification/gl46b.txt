@@ -1,0 +1,6 @@
+dEQP-GL45-ES31.functional.shaders.sample_variables.sample_mask.discard_half_per_sample.multisample_rbo_1
+dEQP-GL45-ES31.functional.shaders.sample_variables.sample_mask.discard_half_per_sample.multisample_rbo_2
+dEQP-GL45-ES31.functional.shaders.sample_variables.sample_mask.discard_half_per_sample.multisample_rbo_4
+dEQP-GL45-ES31.functional.shaders.sample_variables.sample_mask.discard_half_per_two_samples.multisample_rbo_4
+dEQP-GL45-ES31.functional.synchronization.in_invocation.image_alias_overwrite
+dEQP-GL45-ES31.functional.synchronization.inter_invocation.image_alias_overwrite

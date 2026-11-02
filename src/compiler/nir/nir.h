@@ -3845,7 +3845,9 @@ typedef struct nir_loop_info {
    /* Estimated cost (in number of instructions) of the loop */
    unsigned instr_cost;
 
-   /* Contains fp64 ops that will be lowered */
+   /* Contains fp64 ops that will be lowered, or constant local initializers
+    * which can expose their inputs before software lowering.
+    */
    bool has_soft_fp64;
 
    /* Guessed trip count based on array indexing */

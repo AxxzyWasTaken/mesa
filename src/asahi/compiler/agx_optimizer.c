@@ -1480,6 +1480,19 @@ agx_optimizer_ballot(agx_context *ctx, agx_instr **defs, agx_instr *I)
    bool quad = I->op == AGX_OPCODE_QUAD_BALLOT;
    assert(quad || I->op == AGX_OPCODE_BALLOT);
 
+   /* G17P's half-width quad ballot compares a register against zero. AGX2
+    * can fuse general integer/float comparisons, but those forms do not
+    * encode an AGX3 half-width quad result. Keep the predicate calculation
+    * for quad any/all and let lower_pseudo ballot its nonzero boolean.
+    */
+   if (quad && I->dest[0].size == AGX_SIZE_16 && ctx->key &&
+       ctx->key->dev.chip == AGX_CHIP_G17P &&
+       ctx->key->dev.shader_quad_control &&
+       (def->op != AGX_OPCODE_ICMP ||
+        def->src[1].type != AGX_INDEX_IMMEDIATE || def->src[1].value != 0 ||
+        (def->icond != AGX_ICOND_UEQ && def->icond != AGX_ICOND_SEQ)))
+      return;
+
    /* Replace with a fused instruction since the # of sources changes */
    agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
 
@@ -1578,13 +1591,21 @@ agx_optimizer_bitop(agx_context *ctx, agx_instr **defs, agx_instr *I)
  * Fuse sign-extends into addition-like instructions:
  */
 static void
-agx_optimizer_signext(agx_instr **defs, agx_instr *I)
+agx_optimizer_signext(agx_context *ctx, agx_instr **defs, agx_instr *I)
 {
    agx_foreach_ssa_src(I, s) {
       agx_index src = I->src[s];
       agx_instr *def = defs[src.value];
 
       if (def == NULL || def->op != AGX_OPCODE_SIGNEXT)
+         continue;
+
+      /* Integer abs means zero extension. Keep the intermediate signed
+       * word when G17P later zero-extends it: narrowing that operand would
+       * change the value for negative halves. The native legalization pass
+       * already knows how to materialize SIGNEXT without a signed-half
+       * source modifier. */
+      if (ctx->key && ctx->key->dev.chip == AGX_CHIP_G17P && src.abs)
          continue;
 
       agx_replace_src(I, s, def->src[0]);
@@ -1660,7 +1681,7 @@ agx_optimizer_forward(agx_context *ctx)
       } else if (I->op == AGX_OPCODE_BITOP) {
          agx_optimizer_bitop(ctx, defs, I);
       } else if (I->op == AGX_OPCODE_IADD || I->op == AGX_OPCODE_IMAD) {
-         agx_optimizer_signext(defs, I);
+         agx_optimizer_signext(ctx, defs, I);
       }
    }
 

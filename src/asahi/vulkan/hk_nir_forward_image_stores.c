@@ -139,6 +139,10 @@ gather_access(struct forward_state *state, nir_intrinsic_instr *intr)
       return;
    }
 
+   /* Volatile image reads must reach memory, not a remembered store. */
+   if (load && (nir_intrinsic_access(intr) & ACCESS_VOLATILE))
+      t->unsupported = true;
+
    const nir_alu_type type = load ? nir_intrinsic_dest_type(intr)
                                   : nir_intrinsic_src_type(intr);
    const nir_def *value = load ? &intr->def : intr->src[3].ssa;
@@ -343,6 +347,22 @@ forward_impl(nir_function_impl *impl, bool robust_images)
             continue;
 
          nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+         /* An image barrier can publish another invocation's writes, or
+          * a write through an aliased descriptor. The remembered value is
+          * no longer authoritative. Shared-only barriers leave it intact.
+          * Do not invalidate at unrelated image writes: forwarding is a
+          * correctness workaround for G17P, not just an optimization. */
+         if (intr->intrinsic == nir_intrinsic_barrier &&
+             (nir_intrinsic_memory_modes(intr) & nir_var_image)) {
+            b.cursor = nir_before_instr(instr);
+            for (unsigned i = 0; i < state.count; ++i) {
+               if (state.images[i].valid)
+                  nir_store_var(&b, state.images[i].valid,
+                                nir_imm_false(&b), 0x1);
+            }
+            continue;
+         }
+
          if (intr->intrinsic != nir_intrinsic_image_deref_load &&
              intr->intrinsic != nir_intrinsic_image_deref_store)
             continue;

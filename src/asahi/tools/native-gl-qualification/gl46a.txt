@@ -1,0 +1,13 @@
+KHR-GL46.framebuffer_blit.scissor_blit
+KHR-GL46.shader_group_vote.all_invocations
+KHR-GL46.shader_group_vote.all_invocations_equal
+KHR-GL46.shader_group_vote.any_invocation
+KHR-GL46.shader_group_vote.invocations_with_variables
+KHR-GL46.sparse_buffer_tests.BufferStorageTest_case_j
+KHR-GL46.sparse_buffer_tests.BufferStorageTest_cases_a1-a2_1
+KHR-GL46.sparse_buffer_tests.BufferStorageTest_cases_a3-a4_2
+KHR-GL46.sparse_buffer_tests.BufferStorageTest_cases_a3-a4_3
+KHR-GL46.sparse_buffer_tests.BufferStorageTest_cases_a5-a6_4
+KHR-Single-GL46.arrays_of_arrays_gl.SubroutineFunctionCalls2_var_type_index_12
+KHR-Single-GL46.arrays_of_arrays_gl.SubroutineFunctionCalls2_var_type_index_13
+KHR-Single-GL46.arrays_of_arrays_gl.SubroutineFunctionCalls2_var_type_index_14

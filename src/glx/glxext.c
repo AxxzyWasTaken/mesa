@@ -923,6 +923,20 @@ AllocAndFetchScreenConfigs(Display * dpy, struct glx_display * priv, enum glx_dr
    return GL_TRUE;
 }
 
+/** Whether GLX still has the display open, so its screens are valid. */
+Bool
+__glXDisplayIsOpen(Display *dpy)
+{
+   struct glx_display *d;
+
+   _XLockMutex(_Xglobal_lock);
+   for (d = glx_displays; d && d->dpy != dpy; d = d->next)
+      ;
+   _XUnlockMutex(_Xglobal_lock);
+
+   return d != NULL;
+}
+
 /*
 ** Initialize the client side extension code.
 */

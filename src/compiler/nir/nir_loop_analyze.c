@@ -68,6 +68,11 @@ is_const_after_unrolling(loop_info_state *state, nir_def *def)
    return instr->block->index >= nir_loop_first_block(state->loop)->index;
 }
 
+static unsigned
+find_array_access_via_induction(loop_info_state *state,
+                                nir_deref_instr *deref,
+                                nir_loop_induction_variable **array_index_out);
+
 /** Calculate an estimated cost in number of instructions
  *
  * We do this so that we don't unroll loops which will later get massively
@@ -79,8 +84,26 @@ static unsigned
 instr_cost(loop_info_state *state, nir_instr *instr,
            const nir_shader_compiler_options *options)
 {
-   if (instr->type == nir_instr_type_intrinsic ||
-       instr->type == nir_instr_type_tex)
+   if (instr->type == nir_instr_type_intrinsic) {
+      nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+      if (intr->intrinsic == nir_intrinsic_store_deref &&
+          (options->lower_doubles_options & nir_lower_fp64_full_software) &&
+          nir_src_is_const(intr->src[1])) {
+         nir_deref_instr *deref = nir_src_as_deref(intr->src[0]);
+         /* Expose constant local array initializers before software FP64
+          * inlining. Without this, a driver which delegates ordinary loops
+          * to its backend cannot propagate those constants into the double
+          * operations that consume the array.
+          */
+         if (nir_deref_mode_must_be(deref, nir_var_function_temp) &&
+             glsl_contains_double(deref->type) &&
+             find_array_access_via_induction(state, deref, NULL))
+            state->loop->info->has_soft_fp64 = true;
+      }
+      return 1;
+   }
+
+   if (instr->type == nir_instr_type_tex)
       return 1;
 
    if (instr->type != nir_instr_type_alu)

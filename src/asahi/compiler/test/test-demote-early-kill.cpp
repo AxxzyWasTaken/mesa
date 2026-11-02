@@ -8,10 +8,11 @@ extern "C" {
 #include "agx_nir.h"
 }
 
-/* agx_nir_lower_sample_mask_deferred keeps G17P demoted lanes alive as quad
- * helpers until the end of the shader unless it proves that demoted lanes
- * never reach a quad-dependent operation; then it kills and runs the
- * depth/stencil test right after the discard. */
+/* agx_nir_lower_sample_mask_deferred keeps demoted lanes alive as quad helpers
+ * until the end of the shader unless it proves that demoted lanes never reach
+ * a quad-dependent operation; then it kills and runs the depth/stencil test
+ * right after the discard. The G17P form accumulates demotes the same way but
+ * issues the update right after the last one, on every path. */
 enum shape {
    GUARDED_NOT,
    GUARDED_ELSE,
@@ -30,7 +31,22 @@ enum shape {
    ACTIVE_COUNT_AFTER,
    ACTIVE_INDEX_AFTER,
    LOWERED_QUAD_BALLOT_AFTER,
+   DEMOTE_IN_LOOP_IN_ARM,
+   DEMOTES_IN_NESTED_ARMS,
+   MEMORY_WRITE_AFTER,
+   SAMPLE_SHADING_AFTER,
+   DEPTH_WRITE_AFTER,
+   FORCED_EARLY_AFTER,
 };
+
+/* More work below a demote than splitting an if around the update costs. */
+static nir_def *
+lighting(nir_builder *b, nir_def *v)
+{
+   for (unsigned i = 0; i < 64; ++i)
+      v = nir_fmul(b, v, nir_fadd_imm(b, v, i));
+   return v;
+}
 
 static nir_shader *
 build(enum shape s)
@@ -56,7 +72,7 @@ build(enum shape s)
       nir_push_if(&b, c);
       nir_demote(&b);
       nir_pop_if(&b, NULL);
-   } else {
+   } else if (s != DEMOTE_IN_LOOP_IN_ARM && s != DEMOTES_IN_NESTED_ARMS) {
       nir_demote_if(&b, s == GUARDED_COMPLEMENT ? nir_ieq(&b, ix, iy) : c);
    }
 
@@ -171,6 +187,58 @@ build(enum shape s)
    case QUAD_ONLY_BEFORE:
       out = nir_fadd(&b, out, x);
       break;
+   case DEMOTE_IN_LOOP_IN_ARM: {
+      /* TF3's forward shaders: a cheap arm, and a lit arm whose only discard
+       * sits in the light loop ahead of the work that needs derivatives. */
+      nir_if *nif = nir_push_if(&b, c);
+      nir_push_else(&b, nif);
+      nir_loop *loop = nir_push_loop(&b);
+      nir_demote_if(&b, d);
+      nir_break_if(&b, nir_flt(&b, y, x));
+      nir_pop_loop(&b, loop);
+      v = nir_ddx(&b, lighting(&b, y));
+      nir_pop_if(&b, nif);
+      out = nir_if_phi(&b, two, v);
+      break;
+   }
+   case DEMOTES_IN_NESTED_ARMS: {
+      /* Lit twice below one if, a discard in each: phys_transp_nrml_map_light.
+       * Values and the inner condition cross the split. */
+      nir_if *outer = nir_push_if(&b, c);
+      nir_def *inner_cond = nir_flt(&b, nir_fadd(&b, x, y), two);
+      nir_if *inner = nir_push_if(&b, inner_cond);
+      nir_def *m = nir_fmul(&b, x, x);
+      nir_demote_if(&b, d);
+      v = nir_ddx(&b, lighting(&b, m));
+      nir_push_else(&b, inner);
+      nir_def *n = nir_fmul(&b, y, y);
+      nir_demote_if(&b, d);
+      nir_def *w = nir_ddy(&b, lighting(&b, n));
+      nir_pop_if(&b, inner);
+      v = nir_if_phi(&b, v, w);
+      v = nir_fadd(&b, v, nir_ddx(&b, x));
+      nir_push_else(&b, outer);
+      nir_def *u = nir_fadd(&b, y, one);
+      nir_pop_if(&b, outer);
+      out = nir_if_phi(&b, v, u);
+      break;
+   }
+   case MEMORY_WRITE_AFTER:
+      out = nir_ddx(&b, y);
+      b.shader->info.writes_memory = true;
+      break;
+   case SAMPLE_SHADING_AFTER:
+      out = nir_ddx(&b, y);
+      b.shader->info.fs.uses_sample_shading = true;
+      break;
+   case DEPTH_WRITE_AFTER:
+      out = nir_ddx(&b, y);
+      b.shader->info.outputs_written |= BITFIELD64_BIT(FRAG_RESULT_DEPTH);
+      break;
+   case FORCED_EARLY_AFTER:
+      out = nir_ddx(&b, y);
+      b.shader->info.fs.early_fragment_tests = true;
+      break;
    }
 
    agx_test_store_output(&b, out, nir_imm_int(&b, 0), nir_type_float32,
@@ -228,6 +296,359 @@ class DemoteEarlyKill : public ::testing::Test {
    }
 };
 
+static unsigned
+count_quad_ballots(nir_shader *s)
+{
+   unsigned n = 0;
+   nir_foreach_block(block, nir_shader_get_entrypoint(s)) {
+      nir_foreach_instr(instr, block) {
+         n += instr->type == nir_instr_type_intrinsic &&
+              nir_instr_as_intrinsic(instr)->intrinsic ==
+                 nir_intrinsic_quad_ballot_agx;
+      }
+   }
+   return n;
+}
+
+/* G17P updates coverage right after the last demote. */
+static bool
+lower_g17p(enum shape s)
+{
+   nir_shader *nir = build(s);
+   agx_nir_lower_discard_zs_emit(nir);
+   agx_nir_lower_sample_mask_deferred_g17p(nir, NULL);
+   nir_validate_shader(nir, "G17P demote lowering");
+   bool early = kill_is_early(nir);
+   ralloc_free(nir);
+   return early;
+}
+
+struct updates {
+   unsigned min, max;
+};
+
+/* Coverage updates over the paths through a list. */
+static updates
+count_updates(struct exec_list *list)
+{
+   updates u = {0, 0};
+   foreach_list_typed(nir_cf_node, node, node, list) {
+      updates n = {0, 0};
+      if (node->type == nir_cf_node_block) {
+         nir_foreach_instr(instr, nir_cf_node_as_block(node)) {
+            if (instr->type == nir_instr_type_intrinsic &&
+                nir_instr_as_intrinsic(instr)->intrinsic ==
+                   nir_intrinsic_sample_mask_agx)
+               n.min = ++n.max;
+         }
+      } else if (node->type == nir_cf_node_if) {
+         nir_if *nif = nir_cf_node_as_if(node);
+         updates a = count_updates(&nif->then_list);
+         updates b = count_updates(&nif->else_list);
+         n = {MIN2(a.min, b.min), MAX2(a.max, b.max)};
+      } else {
+         updates body = count_updates(&nir_cf_node_as_loop(node)->body);
+         EXPECT_EQ(body.max, 0u);
+      }
+      u.min += n.min;
+      u.max += n.max;
+   }
+   return u;
+}
+
+TEST_F(DemoteEarlyKill, G17PUpdatesOnceOnEveryPathAfterTheLastDemote)
+{
+   for (enum shape s :
+        {UNGUARDED, OTHER_CONDITION, QUAD_IN_LOOP, GUARDED_LOOP_AFTER,
+         QUAD_BEFORE_SECOND_DEMOTE, DEMOTE_IN_LOOP_IN_ARM,
+         DEMOTES_IN_NESTED_ARMS}) {
+      EXPECT_TRUE(lower_g17p(s)) << s;
+
+      nir_shader *nir = build(s);
+      agx_nir_lower_discard_zs_emit(nir);
+      agx_nir_lower_sample_mask_deferred_g17p(nir, NULL);
+      updates u = count_updates(&nir_shader_get_entrypoint(nir)->body);
+      EXPECT_EQ(u.min, 1u) << s;
+      EXPECT_EQ(u.max, 1u) << s;
+      EXPECT_EQ(count_quad_ballots(nir), 0u) << s;
+      ralloc_free(nir);
+   }
+}
+
+/* One SIMD group must not run two testing updates, so the update sits in
+ * top-level control flow, where every lane reaches it, and the derivatives
+ * below the demotes come after it. */
+TEST_F(DemoteEarlyKill, G17PSplitsIfsAroundASingleTopLevelUpdate)
+{
+   for (enum shape s : {DEMOTE_IN_LOOP_IN_ARM, DEMOTES_IN_NESTED_ARMS}) {
+      nir_shader *nir = build(s);
+      agx_nir_lower_discard_zs_emit(nir);
+      agx_nir_lower_sample_mask_deferred_g17p(nir, NULL);
+      nir_validate_shader(nir, "split if");
+      nir_function_impl *impl = nir_shader_get_entrypoint(nir);
+
+      unsigned top_level_updates = 0;
+      bool deriv_after_update = false;
+      nir_foreach_block(block, impl) {
+         nir_foreach_instr(instr, block) {
+            if (instr->type != nir_instr_type_intrinsic)
+               continue;
+            nir_intrinsic_op op = nir_instr_as_intrinsic(instr)->intrinsic;
+            if (op == nir_intrinsic_sample_mask_agx) {
+               EXPECT_EQ(block->cf_node.parent, &impl->cf_node) << s;
+               top_level_updates++;
+            }
+            deriv_after_update |= top_level_updates && op == nir_intrinsic_ddx;
+         }
+      }
+      EXPECT_EQ(top_level_updates, 1u) << s;
+      EXPECT_TRUE(deriv_after_update) << s;
+      ralloc_free(nir);
+   }
+}
+
+/* Where the alpha that alpha-to-coverage reads comes from. */
+enum a2c_alpha {
+   ALPHA_BELOW_DEMOTE,
+   ALPHA_IN_SPLIT_ARM,
+   ALPHA_THROUGH_SELECT,
+   ALPHA_FROM_LOAD_IN_ARM,
+   ALPHA_TOO_MUCH_WORK,
+   ALPHA_FROM_TEXTURE,
+   ALPHA_FROM_DERIVATIVE,
+   ALPHA_FROM_LOOP,
+   ALPHA_WITH_MEMORY_WRITE,
+};
+
+static nir_shader *
+build_a2c(enum a2c_alpha s)
+{
+   nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_FRAGMENT,
+                                                  &agx_nir_options, "a2c");
+   b.shader->info.fs.uses_discard = true;
+   b.shader->info.fs.needs_coarse_quad_helper_invocations = true;
+   b.shader->info.writes_memory = s == ALPHA_WITH_MEMORY_WRITE;
+
+   nir_def *xy = nir_load_frag_coord(&b);
+   nir_def *x = nir_channel(&b, xy, 0), *y = nir_channel(&b, xy, 1);
+   nir_def *c = nir_flt(&b, x, y);
+   nir_def *alpha;
+
+   if (s == ALPHA_IN_SPLIT_ARM) {
+      nir_if *nif = nir_push_if(&b, c);
+      nir_demote_if(&b, nir_flt_imm(&b, y, 3.0));
+      nir_def *v = lighting(&b, x);
+      nir_push_else(&b, nif);
+      nir_def *w = nir_fadd_imm(&b, y, 1.0);
+      nir_pop_if(&b, nif);
+      alpha = nir_if_phi(&b, v, w);
+   } else {
+      nir_demote_if(&b, c);
+
+      switch (s) {
+      case ALPHA_THROUGH_SELECT: {
+         nir_if *nif = nir_push_if(&b, nir_flt_imm(&b, y, 3.0));
+         nir_def *v = nir_fmul(&b, x, x);
+         nir_push_else(&b, nif);
+         nir_def *w = nir_fadd_imm(&b, y, 1.0);
+         nir_pop_if(&b, nif);
+         alpha = nir_if_phi(&b, v, w);
+         break;
+      }
+      case ALPHA_FROM_LOAD_IN_ARM: {
+         nir_if *nif = nir_push_if(&b, nir_flt_imm(&b, y, 3.0));
+         nir_def *v = nir_load_global_constant(&b, 1, 32,
+                                               nir_imm_int64(&b, 0x1000),
+                                               .access = ACCESS_CAN_REORDER);
+         nir_push_else(&b, nif);
+         nir_def *w = nir_fadd_imm(&b, y, 1.0);
+         nir_pop_if(&b, nif);
+         alpha = nir_if_phi(&b, v, w);
+         break;
+      }
+      case ALPHA_TOO_MUCH_WORK:
+         alpha = x;
+         for (unsigned i = 0; i < 8; ++i)
+            alpha = lighting(&b, nir_fadd_imm(&b, alpha, i));
+         break;
+      case ALPHA_FROM_TEXTURE: {
+         nir_tex_instr *tex = nir_tex_instr_create(b.shader, 2);
+         tex->op = nir_texop_txf;
+         tex->sampler_dim = GLSL_SAMPLER_DIM_2D;
+         tex->dest_type = nir_type_float32;
+         tex->coord_components = 2;
+         tex->src[0] = nir_tex_src_for_ssa(nir_tex_src_coord, nir_imm_ivec2(&b, 0, 0));
+         tex->src[1] = nir_tex_src_for_ssa(nir_tex_src_lod, nir_imm_int(&b, 0));
+         nir_def_init(&tex->instr, &tex->def, 4, 32);
+         nir_builder_instr_insert(&b, &tex->instr);
+         alpha = nir_channel(&b, &tex->def, 3);
+         break;
+      }
+      case ALPHA_FROM_DERIVATIVE:
+         alpha = nir_ddx(&b, y);
+         break;
+      case ALPHA_FROM_LOOP: {
+         nir_variable *v = nir_local_variable_create(b.impl, glsl_float_type(),
+                                                     "v");
+         nir_store_var(&b, v, x, 1);
+         nir_push_loop(&b);
+         nir_store_var(&b, v, nir_fmul(&b, nir_load_var(&b, v), y), 1);
+         nir_break_if(&b, nir_flt_imm(&b, nir_load_var(&b, v), 1.0));
+         nir_pop_loop(&b, NULL);
+         alpha = nir_load_var(&b, v);
+         break;
+      }
+      default:
+         alpha = nir_fmul(&b, x, y);
+         break;
+      }
+   }
+
+   nir_def *rgb = nir_ddx(&b, y);
+   agx_test_store_output(&b, nir_vec4(&b, rgb, rgb, rgb, alpha),
+                         nir_imm_int(&b, 0), nir_type_float32,
+                         FRAG_RESULT_DATA0);
+   nir_lower_vars_to_ssa(b.shader);
+   agx_nir_lower_discard_zs_emit(b.shader);
+   nir_lower_alpha_to_coverage(b.shader, false, NULL);
+   return b.shader;
+}
+
+static unsigned
+count_demotes(nir_shader *s)
+{
+   unsigned n = 0;
+   nir_foreach_block(block, nir_shader_get_entrypoint(s)) {
+      nir_foreach_instr(instr, block) {
+         n += instr->type == nir_instr_type_intrinsic &&
+              nir_instr_as_intrinsic(instr)->intrinsic ==
+                 nir_intrinsic_demote_samples;
+      }
+   }
+   return n;
+}
+
+/* Alpha-to-coverage reaches the one update whatever shape its alpha has, or
+ * stays out of the shader altogether. */
+static bool
+a2c_in_main(enum a2c_alpha s)
+{
+   nir_shader *nir = build_a2c(s);
+   bool a2c = true;
+   agx_nir_lower_sample_mask_deferred_g17p(nir, &a2c);
+   nir_validate_shader(nir, "alpha-to-coverage at the update");
+   /* A memory write keeps the late update and its dead-quad kills. */
+   if (s != ALPHA_WITH_MEMORY_WRITE) {
+      updates u = count_updates(&nir_shader_get_entrypoint(nir)->body);
+      EXPECT_EQ(u.min, 1u) << s;
+      EXPECT_EQ(u.max, 1u) << s;
+   }
+   EXPECT_EQ(count_demotes(nir), 0u) << s;
+   ralloc_free(nir);
+   return a2c;
+}
+
+TEST_F(DemoteEarlyKill, G17PKillsAlphaCoverageAtTheUpdate)
+{
+   EXPECT_TRUE(a2c_in_main(ALPHA_BELOW_DEMOTE));
+   EXPECT_TRUE(a2c_in_main(ALPHA_IN_SPLIT_ARM));
+   EXPECT_TRUE(a2c_in_main(ALPHA_THROUGH_SELECT));
+   EXPECT_TRUE(a2c_in_main(ALPHA_FROM_LOAD_IN_ARM));
+}
+
+/* A load out of a branch stays behind that branch's condition: it may read
+ * through a pointer that is only valid where the shader took the branch. */
+TEST_F(DemoteEarlyKill, G17PGuardsLoadsAlphaCoverageReads)
+{
+   nir_shader *nir = build_a2c(ALPHA_FROM_LOAD_IN_ARM);
+   bool a2c = true;
+   agx_nir_lower_sample_mask_deferred_g17p(nir, &a2c);
+   ASSERT_TRUE(a2c);
+   nir_validate_shader(nir, "guarded load");
+
+   nir_function_impl *impl = nir_shader_get_entrypoint(nir);
+   unsigned loads = 0;
+   nir_foreach_block(block, impl) {
+      nir_foreach_instr(instr, block) {
+         if (instr->type != nir_instr_type_intrinsic ||
+             nir_instr_as_intrinsic(instr)->intrinsic !=
+                nir_intrinsic_load_global_constant)
+            continue;
+         EXPECT_NE(block->cf_node.parent, &impl->cf_node);
+         loads++;
+      }
+   }
+   EXPECT_EQ(loads, 2u);
+   ralloc_free(nir);
+}
+
+TEST_F(DemoteEarlyKill, G17PLeavesAlphaCoverageToTheEpilogWhenItCannotMove)
+{
+   EXPECT_FALSE(a2c_in_main(ALPHA_TOO_MUCH_WORK));
+   EXPECT_FALSE(a2c_in_main(ALPHA_FROM_TEXTURE));
+   EXPECT_FALSE(a2c_in_main(ALPHA_FROM_DERIVATIVE));
+   EXPECT_FALSE(a2c_in_main(ALPHA_FROM_LOOP));
+   EXPECT_FALSE(a2c_in_main(ALPHA_WITH_MEMORY_WRITE));
+}
+
+/* The phi of an if below the update reads as a select of its arms. */
+TEST_F(DemoteEarlyKill, G17PSelectsThePhisAlphaCoverageReads)
+{
+   nir_shader *nir = build_a2c(ALPHA_THROUGH_SELECT);
+   bool a2c = true;
+   agx_nir_lower_sample_mask_deferred_g17p(nir, &a2c);
+   ASSERT_TRUE(a2c);
+
+   nir_function_impl *impl = nir_shader_get_entrypoint(nir);
+   bool select = false, update = false;
+   nir_foreach_block(block, impl) {
+      nir_foreach_instr(instr, block) {
+         if (instr->type == nir_instr_type_alu &&
+             nir_instr_as_alu(instr)->op == nir_op_bcsel)
+            select |= !update;
+         else if (instr->type == nir_instr_type_intrinsic &&
+                  nir_instr_as_intrinsic(instr)->intrinsic ==
+                     nir_intrinsic_sample_mask_agx)
+            update = true;
+      }
+   }
+   EXPECT_TRUE(select);
+   ralloc_free(nir);
+}
+
+TEST_F(DemoteEarlyKill, G17PKeepsTheUpdateLateWhereItIsObservable)
+{
+   EXPECT_FALSE(lower_g17p(SUBGROUP_AFTER));
+   EXPECT_FALSE(lower_g17p(ACTIVE_COUNT_AFTER));
+   EXPECT_FALSE(lower_g17p(ACTIVE_INDEX_AFTER));
+   EXPECT_FALSE(lower_g17p(LOWERED_QUAD_BALLOT_AFTER));
+   EXPECT_FALSE(lower_g17p(MEMORY_WRITE_AFTER));
+   EXPECT_FALSE(lower_g17p(SAMPLE_SHADING_AFTER));
+}
+
+/* These two have other reasons to keep a coverage update at the end: it is a
+ * pure kill there, with the tests already run or left to zs_emit. */
+TEST_F(DemoteEarlyKill, G17PDepthWritesAndForcedEarlyTestsStayLate)
+{
+   for (enum shape s : {DEPTH_WRITE_AFTER, FORCED_EARLY_AFTER}) {
+      nir_shader *nir = build(s);
+      agx_nir_lower_discard_zs_emit(nir);
+      agx_nir_lower_sample_mask_deferred_g17p(nir, NULL);
+      nir_validate_shader(nir, "late coverage");
+
+      nir_block *last = nir_impl_last_block(nir_shader_get_entrypoint(nir));
+      bool kill_in_last_block = false;
+      nir_foreach_instr(instr, last) {
+         kill_in_last_block |=
+            instr->type == nir_instr_type_intrinsic &&
+            nir_instr_as_intrinsic(instr)->intrinsic ==
+               nir_intrinsic_sample_mask_agx;
+      }
+      EXPECT_TRUE(kill_in_last_block) << s;
+      ralloc_free(nir);
+   }
+}
+
 TEST_F(DemoteEarlyKill, GuardedQuadOperationsAllowEarlyKill)
 {
    EXPECT_TRUE(lower(GUARDED_NOT));
@@ -251,20 +672,6 @@ TEST_F(DemoteEarlyKill, ReachableLaneDependentOperationsKeepDeferredKill)
 
 /* A fully demoted quad is killed right after the demote; a shader with a
  * non-quad subgroup operation keeps every demoted lane until the end. */
-static unsigned
-count_quad_ballots(nir_shader *s)
-{
-   unsigned n = 0;
-   nir_foreach_block(block, nir_shader_get_entrypoint(s)) {
-      nir_foreach_instr(instr, block) {
-         n += instr->type == nir_instr_type_intrinsic &&
-              nir_instr_as_intrinsic(instr)->intrinsic ==
-                 nir_intrinsic_quad_ballot_agx;
-      }
-   }
-   return n;
-}
-
 TEST_F(DemoteEarlyKill, FullyDemotedQuadsAreKilledEarly)
 {
    for (enum shape s : {UNGUARDED, OTHER_CONDITION, SUBGROUP_AFTER}) {

@@ -52,6 +52,7 @@ static const struct debug_named_value agx_debug_options[] = {
    {"nosched",   AGX_DBG_NOSCHED,   "Do not schedule the shader"},
    {"spill",     AGX_DBG_SPILL,     "Spill (almost) everything"},
    {"nopromote", AGX_DBG_NOPROMOTE, "Do not promote constants to uniforms"},
+   {"latecov",   AGX_DBG_LATECOV,   "Keep G17P coverage updates at the end of the fragment"},
    DEBUG_NAMED_VALUE_END
 };
 /* clang-format on */
@@ -6058,6 +6059,23 @@ agx_materialize_agx3_alu_constants(agx_context *ctx)
          I->src[1] = tmp;
       }
 
+      /* G17P has a register half multiply, but its immediate half form
+       * requires an addend. Keep a pure half multiply in the witnessed
+       * register domain instead of passing an unencodable immediate to the
+       * packer. The low-half product has the same modulo-2^16 value. */
+      if (ctx->key->dev.chip == AGX_CHIP_G17P &&
+          I->op == AGX_OPCODE_IMAD && I->nr_dests == 1 && I->nr_srcs == 3 &&
+          I->dest[0].size == AGX_SIZE_16 && I->shift == 0 && !I->saturate &&
+          agx_channels(I->dest[0]) == 1 &&
+          I->src[0].size == AGX_SIZE_16 && agx_channels(I->src[0]) == 1 &&
+          !I->src[0].abs && !I->src[0].neg &&
+          I->src[1].type == AGX_INDEX_IMMEDIATE &&
+          I->src[1].value <= UINT8_MAX &&
+          !I->src[1].abs && !I->src[1].neg &&
+          I->src[2].type == AGX_INDEX_IMMEDIATE &&
+          I->src[2].value == 0 && !I->src[2].abs && !I->src[2].neg)
+         I->src[1] = agx_mov_imm(&b, 16, I->src[1].value);
+
       /* Neither register nor immediate multiplication has a grounded
        * negative immediate addend. Split a * b - byte into the native
        * pure multiply followed by subtract-immediate, with the same
@@ -10929,11 +10947,8 @@ agx3_nir_lower_scratch_words(nir_shader *nir)
 }
 
 static void
-agx_preprocess_nir_internal(nir_shader *nir, bool g17p, bool native_fragment_depth)
+agx_preserve_quad_control(nir_shader *nir)
 {
-   if (!nir)
-      return;
-
    /* G17P has one native helper-capable fragment entry protocol: the first
     * coefficient load leaves its input-start marker clear and the linked
     * program disables triangle merging. Fresh applegpu_g17p derivatives and
@@ -10947,11 +10962,21 @@ agx_preprocess_nir_internal(nir_shader *nir, bool g17p, bool native_fragment_dep
     * derivative group to be the full quad. Preserve those source-level modes
     * explicitly instead of making the hardware protocol depend on whichever
     * intrinsics happen to remain at this point in lowering. */
-   if (g17p && nir->info.stage == MESA_SHADER_FRAGMENT &&
+   if (nir->info.stage == MESA_SHADER_FRAGMENT &&
        (nir->info.fs.require_full_quads || nir->info.fs.quad_derivatives)) {
       nir->info.fs.needs_coarse_quad_helper_invocations = true;
       nir->info.fs.needs_full_quad_helper_invocations = true;
    }
+}
+
+static void
+agx_preprocess_nir_internal(nir_shader *nir, bool g17p, bool native_fragment_depth)
+{
+   if (!nir)
+      return;
+
+   if (g17p)
+      agx_preserve_quad_control(nir);
 
    NIR_PASS(_, nir, nir_lower_vars_to_ssa);
 
@@ -12857,6 +12882,14 @@ bool
 agx_compile_shader_nir(nir_shader *nir, struct agx_shader_key *key,
                        struct agx_shader_part *out)
 {
+   /* Specialization or shader linking may gather info again after
+    * preprocessing, clearing the operation-derived helper flags. Execution
+    * modes survive that gather and must still reach the AGX3 entry protocol
+    * and the draw-time triangle-merge control, even without a surviving quad
+    * intrinsic. Keep the AGX2 compilation path unchanged. */
+   if (key->dev.chip == AGX_CHIP_G17P && key->dev.shader_quad_control)
+      agx_preserve_quad_control(nir);
+
    agx_compiler_debug = agx_get_compiler_debug();
    agx_refusal[0] = 0;
    /* The native constant-program decision is per compile

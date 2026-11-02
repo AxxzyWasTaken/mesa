@@ -3659,6 +3659,13 @@ zink_batch_rp(struct zink_context *ctx)
          update_tc_info(ctx);
       ctx->rp_tc_info_updated = false;
    }
+   /* A transfer can drain clears queued in an earlier tracked scope. Its
+    * renderpass info need not mention Z/S, but the pending clears still need
+    * a writable attachment in the rendering scope which applies them. */
+   if (ctx->track_renderpasses && (ctx->clears_enabled & PIPE_CLEAR_DEPTHSTENCIL)) {
+      ctx->dynamic_fb.tc_info.zsbuf_clear_partial = true;
+      ctx->rp_changed = true;
+   }
    bool maybe_has_query_ends = !ctx->track_renderpasses || ctx->dynamic_fb.tc_info.has_query_ends;
    ctx->queries_in_rp = maybe_has_query_ends;
    /* if possible, out-of-renderpass resume any queries that were stopped when previous rp ended */
