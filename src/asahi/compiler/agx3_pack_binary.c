@@ -11561,11 +11561,14 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
                       /* Native per-sample exports use halves
                        * 0..31 even for one/two targets. */
                       true,
-                      (enc == AGX_ISA_ENCODING_AGX3C && !load &&
-                       (I->src[0].kill || I->src[0].discard)) ||
-                         (enc != AGX_ISA_ENCODING_AGX3C &&
-                          ctx->key->g17p_emrt && !load &&
-                          I->src[0].value >= 16)) ||
+                      /* f13 releases the payload, which the unrolled
+                       * samples may share: set it only at the last use. On
+                       * an earlier store the later samples read zero, on
+                       * G17P as on M5. */
+                      !load && (I->src[0].kill || I->src[0].discard) &&
+                         (enc == AGX_ISA_ENCODING_AGX3C ||
+                          (ctx->key->g17p_emrt &&
+                           I->src[0].value >= 16))) ||
                    (!load && last &&
                     (!agx3_pixel_release(
                         enc, interleaved_zs ? 0 : g17p_mrt.combined_classes,

@@ -320,6 +320,10 @@ struct agx_fs_epilog_key {
     * this epilog before ordinary API blending. */
    bool smooth_line_alpha;
 
+   /* The main fragment shader applied alpha-to-coverage in the coverage update
+    * that tests, so this epilog neither kills nor tests for it. */
+   bool a2c_in_main;
+
    /* Colour attachment remapping for Vulkan. Negative values indicate that an
     * attachment is discarded. Positive values indicate the output location we
     * want to store at the indexed colour attachment.

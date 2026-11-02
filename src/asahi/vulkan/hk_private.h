@@ -51,6 +51,15 @@
 #define HK_MAX_BUFFER_SIZE        (1ull << 37)
 #define HK_MAX_SHARED_SIZE        (32 * 1024)
 
+/* Device slabs of command memory, one kind per BO placement. */
+enum hk_cmd_slab_class {
+   HK_CMD_SLAB_VDM,
+   HK_CMD_SLAB_MAIN,
+   HK_CMD_SLAB_USC,
+   HK_CMD_SLAB_IOTO,
+   HK_CMD_SLAB_COUNT,
+};
+
 struct hk_addr_range {
    uint64_t addr;
    uint64_t range;

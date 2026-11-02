@@ -2654,7 +2654,10 @@ agx_screen_create(int fd, struct renderonly *ro,
 
    /* parse driconf configuration now for device specific overrides */
    driParseConfigFiles(config->options, config->options_info,
-                       &(driConfigFileParseParams) { .driverName = "asahi" });
+                       &(driConfigFileParseParams) {
+                          .driverName = "aurora",
+                          .driverNameAlias = "asahi",
+                       });
 
    agx_screen->dev.fd = fd;
    agx_screen->dev.ro = ro;

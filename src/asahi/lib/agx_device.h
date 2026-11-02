@@ -6,6 +6,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <string.h>
 #ifdef HAVE_LIBDRM
 #include <xf86drm.h>
 #endif
@@ -34,6 +35,20 @@
 struct vdrm_device;
 struct asahi_ccmd_submit_res;
 #endif
+
+/* DRM name of the native kernel driver. Kernels before the Aurora rename
+ * report "asahi", so both are accepted and Mesa and the kernel can update in
+ * either order.
+ */
+#define AGX_DRM_DRIVER_NAME        "aurora"
+#define AGX_DRM_DRIVER_NAME_LEGACY "asahi"
+
+static inline bool
+agx_is_native_drm_driver(const char *name)
+{
+   return name && (!strcmp(name, AGX_DRM_DRIVER_NAME) ||
+                   !strcmp(name, AGX_DRM_DRIVER_NAME_LEGACY));
+}
 
 enum agx_dbg {
    AGX_DBG_TRACE = BITFIELD_BIT(0),
@@ -529,6 +544,15 @@ agx_is_m4_pro(const struct agx_device *dev)
 {
    return dev->chip == AGX_CHIP_G17P && dev->params.chip_id == 0x6040 &&
           dev->params.gpu_generation == 16 && dev->params.gpu_variant == 'S';
+}
+
+/* Product capability rollout must not follow the shared G17P architecture
+ * profile: T6040 also uses that profile. Device admission checked USC/HAL. */
+static inline bool
+agx_is_a18_pro(const struct agx_device *dev)
+{
+   return dev->chip == AGX_CHIP_G17P && dev->params.chip_id == 0x8140 &&
+          dev->params.gpu_generation == 17 && dev->params.gpu_variant == 'P';
 }
 
 struct agx_va *agx_va_alloc(struct agx_device *dev, uint64_t size_B,

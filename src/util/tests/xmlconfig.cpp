@@ -259,6 +259,35 @@ TEST_F(xmlconfig_test, drirc_env_override)
 }
 
 #if WITH_XMLCONFIG
+TEST_F(xmlconfig_test, drirc_driver_alias)
+{
+   driInjectExecName("app_alias");
+
+   driOptionDescription driconf[] = {
+      DRI_CONF_SECTION_MISCELLANEOUS
+      DRI_CONF_OPT_I(mesa_drirc_option, 0, 0, 200, "description")
+   };
+   driParseOptionInfo(&options, driconf, ARRAY_SIZE(driconf));
+
+   /* A section for "driver" applies to a driver renamed to "renamed" that
+    * keeps "driver" as its alias, and not to one without the alias.
+    */
+   driOptionCache cache;
+   driConfigFileParseParams params = {
+      .driverName = "renamed",
+      .driverNameAlias = "driver",
+      .kernelDriverName = "drm",
+   };
+   driParseConfigFiles(&cache, &options, &params);
+   EXPECT_EQ(driQueryOptioni(&cache, "mesa_drirc_option"), 11);
+   driDestroyOptionCache(&cache);
+
+   params.driverNameAlias = NULL;
+   driParseConfigFiles(&cache, &options, &params);
+   EXPECT_EQ(driQueryOptioni(&cache, "mesa_drirc_option"), 0);
+   driDestroyOptionCache(&cache);
+}
+
 TEST_F(xmlconfig_test, drirc_app_versioned)
 {
    driOptionCache cache = drirc_init("driver", "drm",
