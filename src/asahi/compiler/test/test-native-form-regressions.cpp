@@ -5260,14 +5260,22 @@ TEST(NativeForms, M5QuadHelpersKeepFragmentEntryUnmarked)
 }
 
 
-TEST(NativeForms, M5MultisampleTileDataRemainsLiveUntilLastStore)
+/* A G17P eMRT epilog shares one high-register payload across samples too
+ * (vulkan-msaa-mrt rgba16f,r32f 2 4 load). */
+TEST(NativeForms, MultisampleTileDataRemainsLiveUntilLastStore)
 {
+   for (bool g17p : {false, true})
    for (unsigned targets : {1u, 4u}) {
       SCOPED_TRACE(targets);
+      SCOPED_TRACE(g17p);
+      const enum agx_isa_encoding enc =
+         g17p ? AGX_ISA_ENCODING_AGX3B : AGX_ISA_ENCODING_AGX3C;
+      const unsigned data_reg = g17p ? 24 : 0;
       void *mem = ralloc_context(NULL);
       agx_shader_key key = {};
-      key.dev.encoding = AGX_ISA_ENCODING_AGX3C;
-      key.dev.chip = AGX_CHIP_G17S;
+      key.dev.encoding = enc;
+      key.dev.chip = g17p ? AGX_CHIP_G17P : AGX_CHIP_G17S;
+      key.g17p_emrt = g17p;
       key.secondary = true;
       key.no_preamble = true;
       key.fs.nr_samples = 4;
@@ -5282,14 +5290,14 @@ TEST(NativeForms, M5MultisampleTileDataRemainsLiveUntilLastStore)
       for (unsigned sample = 0; sample < 4; ++sample) {
          for (unsigned target = targets; target-- > 0;) {
             const bool last = sample == 3 && target == 0;
-            agx_index data = agx_register(0, AGX_SIZE_16);
+            agx_index data = agx_register(data_reg, AGX_SIZE_16);
             data.channels_m1 = 1;
             data.discard = last;
             const agx_index coverage = agx_register(16 + sample, AGX_SIZE_16);
             agx_st_tile(b, data, coverage, agx_null(), AGX_FORMAT_U8NORM,
                         15, target * 4, false, target);
             uint8_t bytes[AGX3_TILE_MAX_LENGTH], length;
-            ASSERT_TRUE(agx3_tile_store_f13(AGX_ISA_ENCODING_AGX3C, 0,
+            ASSERT_TRUE(agx3_tile_store_f13(enc, data_reg,
                AGX3_TILE_W8, 15, target * 4,
                agx3_tile_sample_reg(16 + sample, false), 0, last,
                bytes, &length));
