@@ -911,12 +911,13 @@ agx_open_device(void *memctx, struct agx_device *dev)
     * is implemented; otherwise a newly-recognised chip can silently reach an
     * encoder from the wrong generation.
     */
+   const bool m5 = agx_params_m5_supported(&dev->params);
    const bool m5_bringup =
-      debug_get_bool_option("ASAHI_M5_BRINGUP", false) &&
+      !m5 && debug_get_bool_option("ASAHI_M5_BRINGUP", false) &&
       agx_params_m5_bringup_supported(&dev->params);
    if (m5_bringup)
       fprintf(stderr, "Experimental M5 HAL300 integration enabled; general rendering is unqualified\n");
-   if (!agx_params_driver_supported(&dev->params) && !m5_bringup) {
+   if (!agx_params_driver_supported(&dev->params) && !m5 && !m5_bringup) {
       if (dev->chip == AGX_CHIP_UNKNOWN) {
          fprintf(stderr,
                  "Unsupported Apple GPU architecture G%u (variant 0x%x, %u "
