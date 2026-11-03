@@ -13184,7 +13184,7 @@ agx_compile_shader_nir(nir_shader *nir, struct agx_shader_key *key,
                key->reserved_preamble,
                info->agx3_uniform_dma_count ? info->agx3_uniform_dma[0].dest
                                             : push_count,
-               &push_count);
+               &push_count, is_g17p);
       info->push_count = push_count;
    }
 
