@@ -7904,6 +7904,10 @@ agx_nir_preserve_position_order(nir_shader *nir)
    }
    util_dynarray_fini(&state.todo);
    _mesa_set_destroy(state.seen, NULL);
+
+   /* Only ALU math-control flags changed: no instruction, def or block did. */
+   nir_foreach_function_impl(impl, nir)
+      nir_progress(progress, impl, nir_metadata_all);
    return progress;
 }
 
