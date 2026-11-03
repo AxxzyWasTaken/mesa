@@ -506,6 +506,18 @@ write_buffer_desc(struct hk_descriptor_set *set,
 {
    const struct hk_buffer_address desc = get_buffer_address(info, read_only);
 
+   /* A null descriptor in a mutable slot reads as null through any type, so it
+    * must not keep the previous descriptor's heap index past the buffer
+    * record. All zero is the null of every type on G17P. */
+   const uint32_t stride = set->layout->binding[binding].stride;
+   if (info->buffer == VK_NULL_HANDLE && stride > sizeof(desc) &&
+       set->layout->descriptor_generation == 9) {
+      uint8_t packed[HK_MAX_DESCRIPTOR_SIZE] = {0};
+      memcpy(packed, &desc, sizeof(desc));
+      write_desc(set, binding, elem, packed, MIN2(stride, sizeof(packed)));
+      return;
+   }
+
    write_desc(set, binding, elem, &desc, sizeof(desc));
 }
 
