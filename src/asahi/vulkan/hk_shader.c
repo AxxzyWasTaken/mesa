@@ -3122,14 +3122,13 @@ hk_lower_nir(struct hk_device *dev, nir_shader *nir,
    }
 
    if (dev->vk.enabled_features.sparseResidencyBuffer &&
-       (agx_chip_g17_m5(dev->dev.chip) || agx_native_graphics(&dev->dev))) {
+       agx_chip_g17_m5(dev->dev.chip)) {
       NIR_PASS(_, nir, nir_shader_intrinsics_pass,
                lower_physical_sparse_load, nir_metadata_none, NULL);
    }
 
    NIR_PASS(_, nir, hk_nir_lower_descriptors, rs, set_layout_count,
-            set_layouts, dev->vk.enabled_features.sparseResidencyBuffer,
-            dev->dev.sparse_ro_offset,
+            set_layouts, false, dev->dev.sparse_ro_offset,
             hk_device_physical(dev)->scaled_sampling,
             agx_chip_sampler_has_lod_bias(dev->dev.chip));
    NIR_PASS(_, nir, nir_lower_explicit_io, nir_var_mem_global,
