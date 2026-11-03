@@ -155,6 +155,53 @@ if with_tests and with_tools.contains('drm-shim')
     build_by_default : false,
   )
 
+  asahi_priority_test = executable(
+    'asahi-priority',
+    files('tests/test-agx-priority.c'),
+    include_directories : [
+      inc_gallium_aux, inc_gallium, inc_include, inc_src, inc_asahi,
+      inc_virtio_gpu, inc_virtio_vdrm,
+    ],
+    dependencies : [
+      idep_nir, idep_mesautil, idep_agx_pack, dep_libdrm, idep_libagx,
+      idep_libagx_shaders_h, idep_xmlconfig,
+    ],
+    link_with : [
+      libasahi, libasahiwinsys, libasahi_compiler, libasahi_lib,
+      libasahi_layout, libasahi_decode, libgallium, libgalliumvl_stub,
+    ],
+  )
+  foreach policy : ['allow', 'deny', 'once']
+    test(
+      'asahi-priority-' + policy,
+      prog_python,
+      args : [files('tests/run-shim.py'), libasahi_noop_drm_shim, asahi_priority_test],
+      env : ['ASAHI_SHIM_CHIP=g13g'] + (policy == 'allow' ? [] : ['ASAHI_SHIM_HIGH_PRIORITY=' + policy]),
+      suite : ['asahi'],
+    )
+  endforeach
+
+  if with_egl and with_glvnd
+    asahi_egl_priority_test = executable(
+      'asahi-egl-priority',
+      files('tests/test-agx-egl-priority.c'),
+      include_directories : [inc_include],
+      dependencies : [dep_dl],
+    )
+    foreach policy : ['allow', 'deny', 'once']
+      test(
+        'asahi-egl-priority-' + policy,
+        prog_python,
+        args : [files('tests/run-shim.py'), libasahi_noop_drm_shim, asahi_egl_priority_test],
+        env : [
+          'ASAHI_SHIM_CHIP=g13g',
+          '__EGL_VENDOR_LIBRARY_FILENAMES=' + join_paths(meson.project_build_root(), 'src/egl/devenv_glvnd_egl.json'),
+        ] + (policy == 'allow' ? [] : ['ASAHI_SHIM_HIGH_PRIORITY=' + policy]),
+        suite : ['asahi'],
+      )
+    endforeach
+  endif
+
   asahi_submit_test = executable(
     'asahi-submit',
     files('tests/test-agx-submit.c'),

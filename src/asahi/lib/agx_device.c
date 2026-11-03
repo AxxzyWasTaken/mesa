@@ -1479,6 +1479,27 @@ agx_close_device(struct agx_device *dev)
    dev->fd = -1;
 }
 
+bool
+agx_probe_high_priority(struct agx_device *dev)
+{
+   /* Bypass the debug shared-queue cache: it could be MEDIUM and cannot be
+    * destroyed through agx_destroy_command_queue in 1queue mode.
+    */
+   struct drm_asahi_queue_create create = {
+      .vm_id = dev->vm_id,
+      .priority = DRM_ASAHI_PRIORITY_HIGH,
+      .usc_exec_base = dev->shader_base,
+   };
+   unsigned request = DRM_IOCTL_ASAHI_QUEUE_CREATE;
+   request = _IOC(_IOC_DIR(request), _IOC_TYPE(request), _IOC_NR(request),
+                  offsetof(struct drm_asahi_queue_create, render_scs_layout));
+   if (dev->ops.simple_ioctl(dev, request, &create))
+      return false;
+
+   struct drm_asahi_queue_destroy destroy = {.queue_id = create.queue_id};
+   return dev->ops.simple_ioctl(dev, DRM_IOCTL_ASAHI_QUEUE_DESTROY, &destroy) == 0;
+}
+
 uint32_t
 agx_create_command_queue(struct agx_device *dev,
                          enum drm_asahi_priority priority)

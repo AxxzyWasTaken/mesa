@@ -1953,7 +1953,7 @@ agx_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 
    ctx->queue_id = agx_create_command_queue(agx_device(screen), priority);
 
-   /* Kernels grant HIGH only on G17, to CAP_SYS_NICE or DRM-master callers;
+   /* HIGH requires backend support and CAP_SYS_NICE or DRM master;
     * otherwise fall back to MEDIUM.
     */
    if (ctx->queue_id == UINT32_MAX && priority == DRM_ASAHI_PRIORITY_HIGH) {
@@ -1965,6 +1965,11 @@ agx_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
       ralloc_free(ctx);
       return NULL;
    }
+   pctx->context_priority = priority == DRM_ASAHI_PRIORITY_LOW
+                               ? PIPE_CONTEXT_PRIORITY_LOW
+                               : priority == DRM_ASAHI_PRIORITY_HIGH
+                                    ? PIPE_CONTEXT_PRIORITY_HIGH
+                                    : PIPE_CONTEXT_PRIORITY_MEDIUM;
    ctx->virt_ring_idx = priority + 1;
 
    pctx->destroy = agx_destroy_context;
@@ -2386,8 +2391,14 @@ agx_init_screen_caps(struct pipe_screen *pscreen)
    caps->tes_layer_viewport = true;
 
    caps->context_priority_mask =
-      PIPE_CONTEXT_PRIORITY_LOW | PIPE_CONTEXT_PRIORITY_MEDIUM |
-      PIPE_CONTEXT_PRIORITY_HIGH | PIPE_CONTEXT_PRIORITY_REALTIME;
+      PIPE_CONTEXT_PRIORITY_LOW | PIPE_CONTEXT_PRIORITY_MEDIUM;
+
+   /* A chip/HAL match cannot establish the caller's authorization. The probe
+    * uses a private queue and immediately destroys it, without submitting work.
+    * Recheck creation normally: credentials/master can change after this probe.
+    */
+   if (agx_probe_high_priority(agx_device(pscreen)))
+      caps->context_priority_mask |= PIPE_CONTEXT_PRIORITY_HIGH;
 
    caps->min_line_width = caps->min_line_width_aa = caps->min_point_size =
       caps->min_point_size_aa = 1;
