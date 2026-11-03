@@ -457,6 +457,10 @@ agx_optimizer_inline_imm(agx_context *ctx, agx_instr **defs, agx_instr *I)
             (I->lod_mode == AGX_LOD_MODE_LOD_MIN ||
              I->lod_mode == AGX_LOD_MODE_AUTO_LOD_BIAS)))
          continue;
+      /* AGX3 sampler indices past 15 have only a register form. */
+      if (I->op == AGX_OPCODE_TEXTURE_SAMPLE && s == 4 &&
+          ctx->key->dev.encoding != AGX_ISA_ENCODING_AGX2 && def->imm > 15)
+         continue;
       if ((I->op == AGX_OPCODE_DEVICE_STORE ||
            I->op == AGX_OPCODE_LOCAL_STORE || I->op == AGX_OPCODE_ATOMIC ||
            I->op == AGX_OPCODE_LOCAL_ATOMIC) &&

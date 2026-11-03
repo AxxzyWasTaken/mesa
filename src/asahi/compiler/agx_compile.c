@@ -7161,6 +7161,16 @@ agx_emit_tex(agx_builder *b, nir_tex_instr *instr)
    else if (!agx_is_null(compare))
       compare_offset = compare;
 
+   /* AGX3 encodes texture and sampler table indices up to 15 as immediates;
+    * a larger constant index (a descriptor heap offset) takes the register
+    * form, a 64-bit index. */
+   if (b->shader->key->dev.encoding != AGX_ISA_ENCODING_AGX2) {
+      if (texture.type == AGX_INDEX_IMMEDIATE && texture.value > 15)
+         texture = agx_mov_imm(b, 64, texture.value);
+      if (sampler.type == AGX_INDEX_IMMEDIATE && sampler.value > 15)
+         sampler = agx_mov_imm(b, 64, sampler.value);
+   }
+
    agx_index tmp = agx_vec_temp(b->shader, dst.size, instr->is_sparse ? 8 : 4);
    agx_instr *I = agx_texture_sample_to(
       b, tmp, coords, lod, bindless, texture, sampler, compare_offset,
