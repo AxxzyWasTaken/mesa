@@ -1180,6 +1180,30 @@ lower_tex(nir_builder *b, nir_tex_instr *tex,
          }
          border = nir_vec(b, channels, 4);
       }
+      /* See hk_border_swizzle_word(). A combined image sampler applied the
+       * mapping when it was written. */
+      if (ctx->descriptor_generation == 9 && texture != sampler) {
+         nir_def *word = load_resource_deref_desc(
+            b, 1, 32, nir_src_as_deref(nir_src_for_ssa(texture)),
+            plane_offset_B + native.texture + 32 +
+               offsetof(struct hk_sampled_image_descriptor_sw, border), ctx);
+         nir_def *known = nir_ine_imm(b, nir_iand_imm(b, word, BITFIELD_BIT(31)), 0);
+         nir_def *one = T == nir_type_float ? nir_imm_float(b, 1.0f)
+                                            : nir_imm_int(b, 1);
+         nir_def *channels[4];
+         for (unsigned c = 0; c < 4; ++c) {
+            nir_def *code = nir_iand_imm(b, nir_ushr_imm(b, word, 3 * c), 7);
+            nir_def *value = nir_bcsel(b, nir_ieq_imm(b, code, 5), one,
+                                       nir_imm_int(b, 0));
+            for (unsigned i = 0; i < 4; ++i) {
+               value = nir_bcsel(b, nir_ieq_imm(b, code, i),
+                                 nir_channel(b, border, i), value);
+            }
+            channels[c] = nir_bcsel(b, known, value, nir_channel(b, border, c));
+         }
+         border = nir_vec(b, channels, 4);
+      }
+
       border = nir_convert_to_bit_size(b, border, T, tex->def.bit_size);
 
       nir_def_replace(&tex->def, border);
