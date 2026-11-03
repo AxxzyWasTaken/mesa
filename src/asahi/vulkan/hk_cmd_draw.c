@@ -3241,17 +3241,18 @@ hk_g17p_zls_elide_store(struct hk_cmd_buffer *cmd, VkImageAspectFlags aspects)
    }
 }
 
-/* G17P and M5: a colour attachment that a single-stream pass (single-sample
- * on G17P) loads and stores, but that no draw or clear wrote and no fragment
- * shader read, keeps its memory contents as they are. Its end-of-tile
- * stores, partial-render ones included, are dropped, and the main background
- * program clears its tile instead of loading it: the end-of-tile program
- * then carries no operation for it, as for storeOp DONT_CARE, and the
- * background program a load-op clear, as for loadOp CLEAR. The partial-render
- * background program still reloads it, from the memory no store touched.
- * The rebuild is exact only for attachments without clear, resolve or flags,
- * so other passes keep their programs. A continuation of the pass restores
- * the full programs (hk_m5_pass_merge_begin()). */
+/* G17P and M5: a colour attachment that a single-stream pass loads and stores,
+ * but that no draw or clear wrote and no fragment shader read, keeps its
+ * memory contents as they are. Its end-of-tile stores, partial-render ones
+ * included, are dropped, and the main background program clears its tile
+ * instead of loading it: the end-of-tile program then carries no operation for
+ * it, as for storeOp DONT_CARE, and the background program a load-op clear, as
+ * for loadOp CLEAR. The partial-render background program still reloads it,
+ * from the memory no store touched. The rebuild is exact only for attachments
+ * without clear or flags, so other passes keep their programs. On M5 that also
+ * excludes resolves; a G17P pass without a direct resolve resolves after the
+ * pass, from the memory this store would have left unchanged. A continuation
+ * of the pass restores the full programs (hk_m5_pass_merge_begin()). */
 static void
 hk_g17p_elide_untouched_color(struct hk_cmd_buffer *cmd, struct hk_cs *cs)
 {
@@ -3265,8 +3266,7 @@ hk_g17p_elide_untouched_color(struct hk_cmd_buffer *cmd, struct hk_cs *cs)
        cs != render->zls_first_cs || cmd->in_meta || render->color_read ||
        render->view_mask || render->layer_count > 1 ||
        (m5 ? !hk_m5_color_imageblock_supported(&render->tilebuffer)
-           : (render->tilebuffer.nr_samples > 1 ||
-              agx_tilebuffer_spills(&render->tilebuffer) ||
+           : (agx_tilebuffer_spills(&render->tilebuffer) ||
               render->g17p_direct_color_resolve)) ||
        (render->flags & (VK_RENDERING_SUSPENDING_BIT |
                          VK_RENDERING_RESUMING_BIT |
@@ -3277,14 +3277,17 @@ hk_g17p_elide_untouched_color(struct hk_cmd_buffer *cmd, struct hk_cs *cs)
    uint8_t elide = 0, covered = 0;
    for (uint32_t i = 0; i < render->color_att_count; ++i) {
       const struct hk_attachment *att = &render->color_att[i];
-      if (att->load_op == VK_ATTACHMENT_LOAD_OP_CLEAR ||
-          att->resolve_mode != VK_RESOLVE_MODE_NONE || att->flags)
+      if (att->load_op == VK_ATTACHMENT_LOAD_OP_CLEAR || att->flags ||
+          (m5 && att->resolve_mode != VK_RESOLVE_MODE_NONE))
          return;
 
       atts[i] = (VkRenderingAttachmentInfo){
          .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
          .imageView = hk_image_view_to_handle(att->iview),
          .imageLayout = att->layout,
+         /* A resolve after the pass needs the source stored. */
+         .resolveMode = att->resolve_mode,
+         .resolveImageView = hk_image_view_to_handle(att->resolve_iview),
          .loadOp = att->load_op,
          .storeOp = att->store_op,
       };
