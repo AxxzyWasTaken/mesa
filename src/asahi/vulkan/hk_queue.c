@@ -568,6 +568,7 @@ queue_submit_looped(struct hk_device *dev, struct hk_queue *queue,
       }
 
       /* We need to fix up the barriers since barriers are ioctl-relative */
+      uint16_t slice_before[2] = {0, 0};
       for (unsigned scan = base_offs; scan < offs;) {
          struct drm_asahi_cmd_header *cmd = (void *)(cmdbuf + scan);
          scan += sizeof(*cmd) + cmd->size;
@@ -575,6 +576,16 @@ queue_submit_looped(struct hk_device *dev, struct hk_queue *queue,
          if (cmd->cmd_type != DRM_ASAHI_CMD_RENDER &&
              cmd->cmd_type != DRM_ASAHI_CMD_COMPUTE)
             continue;
+
+         /* A serialized command waits for every earlier one: the commands
+          * before it in this ioctl, or with none, all earlier ioctls (0).
+          * Its whole-submit index may not fit in 16 bits. */
+         if (queue->sync.serialize && !queue->sync.exact_prior) {
+            cmd->vdm_barrier = slice_before[0];
+            cmd->cdm_barrier = slice_before[1];
+            slice_before[cmd->cmd_type == DRM_ASAHI_CMD_COMPUTE]++;
+            continue;
+         }
 
          if (!hk_drm_rebase_prior(cmd, cmd + 1, submitted_vdm,
                                   submitted_cdm, prior_base,
