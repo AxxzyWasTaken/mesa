@@ -878,7 +878,11 @@ hk_CreateDevice(VkPhysicalDevice physicalDevice,
 
    dev->perftest = debug_get_flags_option("HK_PERFTEST", hk_perf_options, 0);
 
-   if (instance->drirc.misc.disable_border_emulation) {
+   /* Native graphics compiles the emulation in only once a custom border
+    * sampler exists, and most samples then pay one branch, so D3D content keeps
+    * its correct borders there. */
+   if (instance->drirc.misc.disable_border_emulation &&
+       !agx_native_graphics(&pdev->dev)) {
       dev->perftest |= HK_PERF_NOBORDER;
    }
 
