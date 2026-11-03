@@ -1924,11 +1924,12 @@ static struct pipe_context *
 agx_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 {
    struct agx_context *ctx = rzalloc(NULL, struct agx_context);
-   struct pipe_context *pctx = &ctx->base;
    int ret;
 
    if (!ctx)
       return NULL;
+
+   struct pipe_context *pctx = &ctx->base;
 
    pctx->screen = screen;
    pctx->priv = priv;
@@ -1938,7 +1939,7 @@ agx_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 
    pctx->stream_uploader = u_upload_create_default(pctx);
    if (!pctx->stream_uploader) {
-      FREE(pctx);
+      ralloc_free(ctx);
       return NULL;
    }
    pctx->const_uploader = pctx->stream_uploader;
