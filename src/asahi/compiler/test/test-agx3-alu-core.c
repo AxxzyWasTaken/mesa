@@ -1363,6 +1363,26 @@ static void test_u16_to_f32(void)
    assert(agx3_alu_s16_to_f32(AGX_ISA_ENCODING_AGX3C,2,3,
                              AGX3_ALU_HINT_DISCARD,128,bytes,&len));
    assert(len == sizeof(m5_signed) && !memcmp(bytes,m5_signed,len));
+   /* G18G llama.cpp mul_mat_vec_q6_k_f32_f32 (M6, 2026-11-03): the register
+    * allocator placed the u16->f32 conversion at half 136 with a discarded
+    * source at half 42, and the >=128 guard refused to encode it, failing
+    * vkCreateComputePipelines for the whole shader. The checked-in agx3c
+    * int2flt form binds every dest and source half through 254 (8-bit
+    * fields, probe against the form itself), so these vectors pin the
+    * encoding at the form level. No live G18G capture at half >=128 yet:
+    * a capture with an int2flt above half 127, or the hardware run, is the
+    * confirming evidence. */
+   const uint8_t y_g5_hiregs[] =
+      {0x27,0x02,0x08,0x62,0x22,0x80,0xaf,0x12,0x20,0x00};
+   const uint8_t y_g5_hiregs_signed[] =
+      {0x27,0x03,0x08,0x62,0x22,0x80,0xaf,0x12,0x60,0x00};
+   assert(agx3_alu_u16_to_f32(AGX_ISA_ENCODING_AGX3C,136,42,
+                             AGX3_ALU_HINT_DISCARD,0,bytes,&len));
+   assert(len == sizeof(y_g5_hiregs) && !memcmp(bytes,y_g5_hiregs,len));
+   assert(agx3_alu_s16_to_f32(AGX_ISA_ENCODING_AGX3C,136,43,
+                             AGX3_ALU_HINT_DISCARD,0,bytes,&len));
+   assert(len == sizeof(y_g5_hiregs_signed) &&
+          !memcmp(bytes,y_g5_hiregs_signed,len));
    assert(!agx3_alu_u16_to_f32(AGX_ISA_ENCODING_AGX3C,0,0,0,256,bytes,&len));
    assert(!agx3_alu_u16_to_f32(AGX_ISA_ENCODING_AGX2,0,0,0,0,bytes,&len));
    assert(!agx3_alu_u16_to_f32(AGX_ISA_ENCODING_AGX3B,1,0,0,0,bytes,&len));

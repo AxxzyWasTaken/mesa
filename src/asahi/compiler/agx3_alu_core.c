@@ -1182,8 +1182,14 @@ agx3_alu_int16_to_f32(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
                     uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
 {
    const bool gpu1 = enc == AGX_ISA_ENCODING_AGX3C;
-   if (!out || !len || (!gpu1 && enc != AGX_ISA_ENCODING_AGX3B) || dest >= (gpu1 ? 128 : 192) ||
-       (dest & 1) || src >= (gpu1 ? 128 : 192) || (unsigned)hint > AGX3_ALU_HINT_CACHE ||
+   /* AGX3c int2flt fields are 8-bit half indices (the checked-in form binds
+    * every even dest and any src through 254, like the sibling encodings
+    * above); the old >=128 cap failed vkCreateComputePipelines for G18G
+    * llama.cpp shaders. No live capture at half >=128 yet: a G18G capture
+    * or the hardware run confirms. */
+   if (!out || !len || (!gpu1 && enc != AGX_ISA_ENCODING_AGX3B) ||
+       dest >= (gpu1 ? 256 : 192) || src >= (gpu1 ? 256 : 192) ||
+       (dest & 1) || (unsigned)hint > AGX3_ALU_HINT_CACHE ||
        (wait_mask & ~(gpu1 ? UINT16_C(0xff) : UINT16_C(0x3f))))
       return false;
 
