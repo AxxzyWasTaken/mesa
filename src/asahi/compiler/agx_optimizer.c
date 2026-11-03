@@ -1431,6 +1431,10 @@ agx3b_ballot_compare_encodable(const agx_instr *def)
    if (def->src[1].type != AGX_INDEX_IMMEDIATE)
       return false;
    const uint32_t value = def->src[1].value;
+   /* A 16-bit source has only the equal-to-zero form. */
+   if (def->src[0].size == AGX_SIZE_16)
+      return def->op == AGX_OPCODE_ICMP && !def->invert_cond && value == 0 &&
+             (def->icond == AGX_ICOND_UEQ || def->icond == AGX_ICOND_SEQ);
    if (def->op == AGX_OPCODE_FCMP)
       return value == 0;
    switch (def->icond) {
@@ -1527,8 +1531,8 @@ agx_optimizer_ballot(agx_context *ctx, agx_instr **defs, agx_instr *I)
    /* Likewise for a constant the immediate form cannot take (see
     * agx3_emit_subgroup_ballot): `x != N` for a nonzero N (the register-zero
     * equality form it would otherwise take is measured wrong on G17P), signed
-    * and float comparisons against anything but zero, `!(x < 0)` and
-    * `!(x > 0xffff)`. Ballot the opposite compare instead, exactly as for a
+    * and float comparisons against anything but zero, `!(x < 0)`,
+    * `!(x > 0xffff)`, and any 16-bit source but `x == 0`. Ballot the opposite compare instead, exactly as for a
     * register operand below. */
    if (!quad && ctx->key && ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3B &&
        !agx3b_ballot_compare_encodable(def)) {
