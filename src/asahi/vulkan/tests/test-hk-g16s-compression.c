@@ -244,7 +244,9 @@ check_colour_msaa_spill_policy(void)
 
       for (unsigned samples = 1; samples <= 4; samples *= 2) {
          for (unsigned layers = 1; layers <= 4; layers *= 4) {
-            VkImageCreateInfo i = image((VkFormat)f, 64, 64, 1,
+            /* 512x512: above the size below which a never-attachment image
+             * stays plain (HK_G17P_MIP_PBE_MIN_TEXELS). */
+            VkImageCreateInfo i = image((VkFormat)f, 512, 512, 1,
                VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
             i.samples = (VkSampleCountFlagBits)samples;
@@ -270,13 +272,17 @@ check_colour_msaa_spill_policy(void)
 static void
 check_layered_and_msaa(void)
 {
+   /* Large enough that the small never-attachment rule does not apply. */
    VkImageCreateInfo i =
-      image(VK_FORMAT_R8G8B8A8_SRGB, 256, 256, 1,
+      image(VK_FORMAT_R8G8B8A8_SRGB, 512, 512, 1,
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                VK_IMAGE_USAGE_SAMPLED_BIT);
    i.arrayLayers = 12;
    i.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
    CHECK(ELIGIBLE(i));
+   VkImageCreateInfo small = i;
+   small.extent.width = small.extent.height = 256;
+   CHECK(!ELIGIBLE(small));
    i.mipLevels = 5;
    CHECK(!ELIGIBLE(i));
    i.mipLevels = 1;
@@ -364,9 +370,11 @@ check_minecraft(void)
    CHECK(ELIGIBLE(color));
    CHECK(ELIGIBLE(atlas));
    CHECK(ELIGIBLE(depth));
-   /* Small blit-generated RGBA8/BGRA8 UNORM mip chains the application
-    * never renders to stay on the raw compute path; from
-    * HK_G17P_MIP_PBE_MIN_TEXELS texels, and everything else, compresses. */
+   /* Small colour images the application never renders to stay plain:
+    * each upload into a compressed image is a render pass, and a small
+    * blit-generated RGBA8/BGRA8 UNORM mip chain stays on the raw compute
+    * path. From HK_G17P_MIP_PBE_MIN_TEXELS texels, and attachments at any
+    * size, compress. */
    const VkImageUsageFlags texture_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
       VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
    const VkFormat compute_blit[] = {VK_FORMAT_R8G8B8A8_UNORM,
@@ -375,7 +383,9 @@ check_minecraft(void)
       VkImageCreateInfo t = image(compute_blit[f], 256, 256, 9, texture_usage);
       CHECK(!ELIGIBLE(t));
       t.mipLevels = 1;
-      CHECK(ELIGIBLE(t));
+      CHECK(!ELIGIBLE(t));
+      VkImageCreateInfo single = image(compute_blit[f], 512, 256, 1, texture_usage);
+      CHECK(ELIGIBLE(single));
       t.mipLevels = 9;
       t.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
       CHECK(ELIGIBLE(t));
@@ -390,9 +400,13 @@ check_minecraft(void)
    }
    VkImageCreateInfo srgb = image(VK_FORMAT_R8G8B8A8_SRGB, 256, 256, 9,
                                   texture_usage);
+   CHECK(!ELIGIBLE(srgb));
+   srgb.extent.width = 512;
    CHECK(ELIGIBLE(srgb));
    VkImageCreateInfo half = image(VK_FORMAT_R16G16B16A16_SFLOAT, 256, 256, 9,
                                   texture_usage);
+   CHECK(!ELIGIBLE(half));
+   half.extent.width = 512;
    CHECK(ELIGIBLE(half));
 
    /* The swapchain is external/WSI memory and stays plain. */

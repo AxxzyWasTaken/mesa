@@ -246,11 +246,16 @@ hk_hal200_compression_eligible(enum agx_chip chip, unsigned plane,
        * wins: on the A18 Pro a 2048x2048 texture uploads in 0.55-0.64 of
        * the time, generates its mips in 0.40-0.57 and samples in
        * 0.69-0.84. Keep only the small ones plain. Images that are also
-       * attachments are compressed at any size. */
-      if ((info->format == VK_FORMAT_R8G8B8A8_UNORM ||
-           info->format == VK_FORMAT_B8G8R8A8_UNORM) &&
-          info->mipLevels > 1 &&
-          !(info->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) &&
+       * attachments are compressed at any size.
+       *
+       * The same holds without mips and for every compressed colour format:
+       * each upload into a compressed image is a render pass. On the M4 Max
+       * (T6041) an R8 130x130 texture taking 64 tile uploads per command
+       * buffer (aurora-tilesubmit, a glyph-cache pattern) spent 1.37 ms per
+       * submit compressed against 34 us plain. */
+      if (!(info->usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                           VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                           VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) &&
           !hk_g17p_mip_level_through_pbe(info->extent.width,
                                          info->extent.height))
          return false;
