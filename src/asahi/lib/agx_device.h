@@ -317,7 +317,7 @@ agx_bo_sync_for_device(struct agx_bo *bo, size_t offset, size_t size)
  * for sparse_ro_offset.
  */
 static inline bool
-agx_addr_is_ro(struct agx_device *dev, uint64_t addr)
+agx_addr_is_ro(const struct agx_device *dev, uint64_t addr)
 {
    return (addr & dev->sparse_ro_offset);
 }
@@ -342,7 +342,7 @@ agx_fill_bind_flags(const struct agx_device *dev)
 }
 
 static inline uint64_t
-agx_rw_addr_to_ro(struct agx_device *dev, uint64_t addr)
+agx_rw_addr_to_ro(const struct agx_device *dev, uint64_t addr)
 {
    assert(!agx_addr_is_ro(dev, addr));
    return addr + dev->sparse_ro_offset;
