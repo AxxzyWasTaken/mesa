@@ -579,7 +579,13 @@ write_buffer_view_desc(struct hk_descriptor_set *set,
          desc.pbe = view->pbe;
       heap_index = view->sampled_heap_index;
    } else {
-      hk_set_null_native_texture(generation, &desc.tex);
+      /* A mutable slot can be read as any type, and vkd3d-proton nulls it with
+       * a null texel buffer. G17P finds a texture by heap index and index 0 is
+       * the null texture, so keep the bytes zero: read as a storage or uniform
+       * buffer they are then the null buffer, not a size taken from a packed
+       * texture word. */
+      if (generation != 9)
+         hk_set_null_native_texture(generation, &desc.tex);
       hk_set_null_native_pbe(generation, &desc.pbe);
    }
 
