@@ -1422,6 +1422,28 @@ agx_optimizer_cmpsel(agx_context *ctx, agx_instr **defs, agx_instr *I)
  *
  *    ballot(cmp(x, y)) -> ballot_cmp(x, y)
  */
+
+/* Whether the AGX3B packer has an immediate form for a ballot of this
+ * comparison (agx3_emit_subgroup_ballot, non-quad). */
+static bool
+agx3b_ballot_compare_encodable(const agx_instr *def)
+{
+   if (def->src[1].type != AGX_INDEX_IMMEDIATE)
+      return false;
+   const uint32_t value = def->src[1].value;
+   if (def->op == AGX_OPCODE_FCMP)
+      return value == 0;
+   switch (def->icond) {
+   case AGX_ICOND_UEQ: return !def->invert_cond || value == 0;
+   case AGX_ICOND_SEQ:
+   case AGX_ICOND_SLT:
+   case AGX_ICOND_SGT: return value == 0;
+   case AGX_ICOND_ULT: return !def->invert_cond || value != 0;
+   case AGX_ICOND_UGT: return !def->invert_cond || value != UINT16_MAX;
+   default: return false;
+   }
+}
+
 static void
 agx_optimizer_ballot(agx_context *ctx, agx_instr **defs, agx_instr *I)
 {
@@ -1502,17 +1524,14 @@ agx_optimizer_ballot(agx_context *ctx, agx_instr **defs, agx_instr *I)
     * ballot the lanes where it is zero: the witnessed simd_broadcast_first()
     * form.
     */
-   /* `x != N` for a nonzero N has no immediate form, and the register-zero
-    * equality form it would otherwise take is measured wrong on G17P (see
-    * agx3_emit_subgroup_ballot). Ballot the opposite compare instead, exactly
-    * as for a register operand below. */
-   const bool agx3_inverted_eq_imm =
-      def->op == AGX_OPCODE_ICMP && def->invert_cond &&
-      (def->icond == AGX_ICOND_UEQ || def->icond == AGX_ICOND_SEQ) &&
-      def->src[1].type == AGX_INDEX_IMMEDIATE && def->src[1].value != 0;
-
+   /* Likewise for a constant the immediate form cannot take (see
+    * agx3_emit_subgroup_ballot): `x != N` for a nonzero N (the register-zero
+    * equality form it would otherwise take is measured wrong on G17P), signed
+    * and float comparisons against anything but zero, `!(x < 0)` and
+    * `!(x > 0xffff)`. Ballot the opposite compare instead, exactly as for a
+    * register operand below. */
    if (!quad && ctx->key && ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3B &&
-       (def->src[1].type != AGX_INDEX_IMMEDIATE || agx3_inverted_eq_imm)) {
+       !agx3b_ballot_compare_encodable(def)) {
       agx_index opposite = agx_temp(ctx, AGX_SIZE_16);
 
       if (def->op == AGX_OPCODE_ICMP) {

@@ -879,6 +879,34 @@ TEST_F(Optimizer, G17PBallotOfTwoRegistersKeepsTheComparison)
    ASSERT_SHADER_EQUAL(actual->shader, expected->shader);
 }
 
+/* Astro Bot's mesh shader: ballot(x < 6), signed. AGX3B has no immediate
+ * ballot form for a signed comparison against a nonzero constant. */
+TEST_F(Optimizer, G17PBallotOfSignedCompareWithConstantKeepsTheComparison)
+{
+   agx_builder *actual = agx_test_builder(mem_ctx);
+   agx_builder *expected = agx_test_builder(mem_ctx);
+   struct agx_shader_key key = {};
+   key.dev.encoding = AGX_ISA_ENCODING_AGX3B;
+   actual->shader->key = &key;
+   expected->shader->key = &key;
+
+   agx_index out = agx_temp(actual->shader, AGX_SIZE_32);
+   agx_ballot_to(actual, out,
+                 agx_icmp(actual, wx, agx_immediate(6), AGX_ICOND_SLT, false));
+   agx_unit_test(actual, out);
+
+   out = agx_temp(expected->shader, AGX_SIZE_32);
+   agx_temp(expected->shader, AGX_SIZE_16);
+   agx_index opposite = agx_temp(expected->shader, AGX_SIZE_16);
+   agx_icmp_to(expected, opposite, wx, agx_immediate(6), AGX_ICOND_SLT, true);
+   agx_icmp_ballot_to(expected, out, opposite, agx_zero(), AGX_ICOND_UEQ,
+                      false);
+   agx_unit_test(expected, out);
+
+   agx_optimize_and_dce(actual->shader);
+   ASSERT_SHADER_EQUAL(actual->shader, expected->shader);
+}
+
 TEST_F(Optimizer, G17PBallotOfHalfPredicateWidens)
 {
    agx_builder *actual = agx_test_builder(mem_ctx);
