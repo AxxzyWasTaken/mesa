@@ -16,6 +16,10 @@
 
 #include "vk_format.h"
 
+/* LOD has six fractional bits, so one step moves x.5 to the upper level
+ * (hk_d3d_nearest_mip). */
+#define HK_D3D_NEAREST_MIP_BIAS (1.0f / 64.0f)
+
 struct hk_sampler {
    struct vk_sampler vk;
    VkClearColorValue custom_border;

@@ -231,12 +231,11 @@ hk_CreateSampler(VkDevice device,
    struct hk_sampler *sampler;
    VkResult result;
 
-   /* LOD has six fractional bits, so one step moves x.5 to the upper level. */
    VkSamplerCreateInfo d3d_info;
    if (hk_physical_device_instance(pdev)->drirc.misc.d3d_nearest_mip &&
        info->mipmapMode == VK_SAMPLER_MIPMAP_MODE_NEAREST) {
       d3d_info = *info;
-      d3d_info.mipLodBias += 1.0f / 64.0f;
+      d3d_info.mipLodBias += HK_D3D_NEAREST_MIP_BIAS;
       info = &d3d_info;
    }
 
