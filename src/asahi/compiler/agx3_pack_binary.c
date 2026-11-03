@@ -11136,7 +11136,8 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
              * quad either; Apple's own witness for the form is a compute
              * kernel. */
             const bool compute_gradient = ctx->stage == MESA_SHADER_COMPUTE &&
-               I->lod_mode == AGX_LOD_MODE_LOD_GRAD;
+               (I->lod_mode == AGX_LOD_MODE_LOD_GRAD ||
+                I->lod_mode == AGX_LOD_MODE_LOD_GRAD_MIN);
             /* Native runtime-indexed vertex pipelines ground both a per-lane
              * explicit level and explicit gradients in every noncube sample
              * dimension, including depth comparisons and array layers. */
