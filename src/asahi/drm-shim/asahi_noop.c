@@ -1476,6 +1476,11 @@ asahi_ioctl_get_param(int fd, unsigned long request, void *arg)
       size_t size = MIN2((size_t)gp->size, sizeof(struct drm_asahi_params_global));
       struct drm_asahi_params_global params = *shim_params();
       params.features = shim_features();
+      if (shim_params() == &params_g15g &&
+          shim_env_on("ASAHI_SHIM_G15G_HAL200")) {
+         params.gpu_hal_generation = DRM_ASAHI_GPU_HAL_200;
+         params.vm_end = UINT64_C(0x3ffffff8000);
+      }
       const char *command_limit = getenv("ASAHI_SHIM_COMMAND_LIMIT");
       if (command_limit) {
          unsigned limit = strtoul(command_limit, NULL, 0);

@@ -8,6 +8,8 @@
 
 #include <stddef.h>
 
+#include "util/bitscan.h"
+
 enum agx_chip
 agx_chip_from_params(const struct drm_asahi_params_global *params)
 {
@@ -443,6 +445,41 @@ agx_chip_driver_supported(enum agx_chip chip)
    }
 }
 
+/* The firmware interface version does not determine the GPU record layout.
+ * Both T8122 interfaces consume G15 records and Gen4 sampler words. Keep the
+ * physical chip as G15G so compiler scheduling and hardware workarounds agree.
+ */
+static bool
+agx_t8122_params_supported(const struct drm_asahi_params_global *params)
+{
+   if (params->chip_id != 0x8122 || params->num_dies != 1 ||
+       params->num_clusters_total != 1 ||
+       params->usc_generation != AGX_ISA_AGX3)
+      return false;
+
+   if (params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_LEGACY)
+      return true;
+
+   if (params->gpu_hal_generation != DRM_ASAHI_GPU_HAL_200 ||
+       params->gpu_revision != 0x20 || params->num_cores_per_cluster != 10)
+      return false;
+
+   const uint64_t mask = params->core_masks[0];
+   const unsigned cores = util_bitcount64(mask);
+   if ((mask >> 10) || (cores != 8 && cores != 10))
+      return false;
+   for (unsigned i = 1; i < DRM_ASAHI_MAX_CLUSTERS; ++i) {
+      if (params->core_masks[i])
+         return false;
+   }
+
+   return agx_chip_command_stream_generation(AGX_CHIP_G15G) ==
+             AGX_CS_GENERATION_G15 &&
+          agx_chip_sampler_generation(AGX_CHIP_G15G) ==
+             AGX_SAMPLER_GENERATION_GEN4 &&
+          agx_chip_sampler_heap_element_size(AGX_CHIP_G15G) == 32;
+}
+
 bool
 agx_params_driver_supported(const struct drm_asahi_params_global *params)
 {
@@ -469,13 +506,7 @@ agx_params_driver_supported(const struct drm_asahi_params_global *params)
              params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_200;
    }
    case AGX_CHIP_G15G:
-      /* T8122/M3: one die, one cluster, AGX3 shaders on the legacy firmware
-       * interface (14.8.3), through the kernel's T8122 runtime. agx_open_device
-       * admits it only with ASAHI_M3_EXPERIMENTAL=1. */
-      return params->chip_id == 0x8122 && params->num_dies == 1 &&
-             params->num_clusters_total == 1 &&
-             params->usc_generation == AGX_ISA_AGX3 &&
-             params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_LEGACY;
+      return agx_t8122_params_supported(params);
    case AGX_CHIP_G15S:
       /* T6030/M3 Pro: one die, two clusters, AGX3 shaders on the legacy
        * (pre-HAL200) firmware interface. */

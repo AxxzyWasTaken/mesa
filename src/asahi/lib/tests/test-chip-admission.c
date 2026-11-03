@@ -383,9 +383,51 @@ main(void)
    bad.num_clusters_total = 2;
    assert(!agx_params_driver_supported(&bad));
 
-   bad = g15g;
-   bad.gpu_hal_generation = DRM_ASAHI_GPU_HAL_200;
+   struct drm_asahi_params_global modern = g15g;
+   modern.gpu_hal_generation = DRM_ASAHI_GPU_HAL_200;
+   modern.gpu_revision = 0x20;
+   assert(agx_params_driver_supported(&modern));
+   assert(agx_params_native_kernel_abi_supported(&modern));
+   enum agx_chip modern_chip = agx_chip_from_params(&modern);
+   assert(modern_chip == AGX_CHIP_G15G);
+   assert(agx_chip_command_stream_generation(modern_chip) ==
+          AGX_CS_GENERATION_G15);
+   assert(agx_chip_sampler_generation(modern_chip) ==
+          AGX_SAMPLER_GENERATION_GEN4);
+   assert(agx_chip_sampler_heap_element_size(modern_chip) == 32);
+   assert(agx_chip_isa_encoding(modern_chip) ==
+          agx_chip_isa_encoding(agx_chip_from_params(&g15g)));
+   assert(agx_chip_cdm_wide_visibility(modern_chip));
+   assert(!agx_chip_sampler_has_lod_bias(modern_chip));
+   modern.core_masks[0] = 0x3cf;
+   assert(agx_params_driver_supported(&modern));
+   modern.core_masks[0] = 0x3ff;
+
+   bad = modern;
+   bad.gpu_hal_generation = DRM_ASAHI_GPU_HAL_300;
    assert(!agx_params_driver_supported(&bad));
+   bad = modern;
+   bad.gpu_revision = 0x21;
+   assert(!agx_params_driver_supported(&bad));
+   bad = modern;
+   bad.num_cores_per_cluster = 9;
+   assert(!agx_params_driver_supported(&bad));
+   bad = modern;
+   bad.core_masks[0] = 0x1ff;
+   assert(!agx_params_driver_supported(&bad));
+   bad = modern;
+   bad.core_masks[0] = 0x7ff;
+   assert(!agx_params_driver_supported(&bad));
+   bad = modern;
+   bad.core_masks[1] = 1;
+   assert(!agx_params_driver_supported(&bad));
+   bad = modern;
+   bad.gpu_variant = 'S';
+   assert(!agx_params_driver_supported(&bad));
+   bad = modern;
+   bad.features = DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS |
+                  DRM_ASAHI_FEATURE_PER_COMMAND_INPUT_SYNCS;
+   assert(!agx_params_native_kernel_abi_supported(&bad));
 
    bad = g15g;
    bad.usc_generation = 2;
