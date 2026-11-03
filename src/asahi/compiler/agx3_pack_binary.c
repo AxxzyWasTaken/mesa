@@ -16494,15 +16494,15 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
                                          I->src[0].kill || I->src[0].discard,
                                          bytes, &length);
             }
-            /* M5 allocate_uvb completes on scoreboard slot 1: every native
-             * G17G write_uvb helper waits slot 1 on the instruction right
-             * after it (cndst f4, e.g. 1e00002e). UVSTs issued before that
-             * completion lost the exports of alternate mesh workgroups on
-             * hardware (workgroups 2, 4, 6 of 8). Retire any older slot-1
+            /* allocate_uvb completes on scoreboard slot 1: every native
+             * write_uvb helper waits slot 1 on the instruction right after it
+             * (cndst f4: 1e00002e on G17G, 0f155401 on G16S). UVSTs issued
+             * before that completion lost the exports of alternate mesh
+             * workgroups on M5 (workgroups 2, 4, 6 of 8) and the later
+             * vertices of some workgroups on G16S. Retire any older slot-1
              * generation before the allocation claims the slot, then wait
              * for the allocation itself. */
-            const bool alloc_slot = I->op == AGX_OPCODE_ALLOCATE_UVB_M5 &&
-                                    enc == AGX_ISA_ENCODING_AGX3C;
+            const bool alloc_slot = I->op == AGX_OPCODE_ALLOCATE_UVB_M5;
             const uint16_t pre_wait = alloc_slot ? (wait | (outstanding_here & 1u)) : wait;
             if (!encoded || (pre_wait && !agx3_retire_slots_noop(emission, enc, pre_wait)) ||
                 !agx3_append(emission, bytes, length))
