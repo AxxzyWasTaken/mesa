@@ -230,6 +230,7 @@ bool agx_nir_lower_g17p_sampled_storage(
 bool agx_nir_lower_to_per_sample_agx2(struct nir_shader *shader);
 bool agx_nir_lower_monolithic_msaa_agx2(struct nir_shader *shader, uint8_t nr_samples);
 
+bool agx_nir_lower_denorm_preserve(struct nir_shader *shader);
 bool agx_nir_fma_rte_applies(const struct nir_shader *shader);
 bool agx_nir_lower_fma_rte(struct nir_shader *shader);
 struct nir_def *agx_nir_fma_rte_fixup(struct nir_builder *b, struct nir_def *a,

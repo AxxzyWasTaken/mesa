@@ -13064,6 +13064,7 @@ agx_compile_shader_nir(nir_shader *nir, struct agx_shader_key *key,
    NIR_PASS(_, nir, nir_lower_alu_to_scalar, NULL, NULL);
    NIR_PASS(_, nir, nir_lower_load_const_to_scalar);
 
+   NIR_PASS(_, nir, agx_nir_lower_denorm_preserve);
    if (key->dev.chip == AGX_CHIP_G17P)
       NIR_PASS(_, nir, agx_nir_lower_fma_rte);
 
