@@ -225,12 +225,26 @@ load_descriptor(nir_builder *b, unsigned num_components, unsigned bit_size,
       unsigned desc_align_offset = binding_layout->offset + offset_B;
       desc_align_offset %= desc_align_mul;
 
+      /* Unless it may be partly bound, a statically used descriptor is valid
+       * on every path, so G17P can hoist constant reads through it past the
+       * branches that guard them, see agx_nir_opt_preamble.
+       */
+      const bool always_valid =
+         ctx->descriptor_generation == AGX_DESCRIPTOR_GENERATION_9 &&
+         nir_def_is_const(index) &&
+         (binding_layout->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+          binding_layout->type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) &&
+         !(binding_layout->flags &
+           (VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+            VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT));
+
       nir_def *desc;
       nir_def *set_addr = nir_load_descriptor_set_agx(b, set);
       desc = nir_load_global_constant_offset(
          b, load_components, bit_size, set_addr, desc_ubo_offset,
          .align_mul = desc_align_mul, .align_offset = desc_align_offset,
-         .access = ACCESS_CAN_SPECULATE);
+         .access = ACCESS_CAN_SPECULATE |
+                   (always_valid ? ACCESS_BUFFER_DESCRIPTOR_AGX : 0));
 
       if (binding_layout->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
           binding_layout->type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
@@ -269,6 +283,8 @@ load_descriptor_for_idx_intrin(nir_builder *b, nir_intrinsic_instr *intrin,
 {
    nir_def *index = nir_imm_int(b, 0);
 
+   /* load_descriptor tells a constant index from a dynamic one. */
+   b->constant_fold_alu = true;
    while (intrin->intrinsic == nir_intrinsic_vulkan_resource_reindex) {
       index = nir_iadd(b, index, intrin->src[1].ssa);
       intrin = nir_src_as_intrinsic(intrin->src[0]);
@@ -278,6 +294,7 @@ load_descriptor_for_idx_intrin(nir_builder *b, nir_intrinsic_instr *intrin,
    uint32_t set = nir_intrinsic_desc_set(intrin);
    uint32_t binding = nir_intrinsic_binding(intrin);
    index = nir_iadd(b, index, intrin->src[0].ssa);
+   b->constant_fold_alu = false;
 
    /* A buffer descriptor is a vec4 (address, size, ...); an acceleration
     * structure is a bare 64-bit BVH address, and rq_initialize consumes it

@@ -7193,6 +7193,10 @@ typedef struct nir_opt_peephole_select_options {
    unsigned limit; /* Set to max to flatten all control flow. */
    bool indirect_load_ok;
    bool expensive_alu_ok;
+   /* With expensive_alu_ok, flatten an if holding expensive ALU only up to
+    * this many instructions. Zero means no such limit.
+    */
+   unsigned expensive_limit;
    bool discard_ok;
 } nir_opt_peephole_select_options;
 

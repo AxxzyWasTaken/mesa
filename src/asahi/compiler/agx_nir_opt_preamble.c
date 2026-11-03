@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "asahi/lib/agx_abi.h"
 #include "compiler/nir/nir_builder.h"
+#include "util/format/u_format.h"
 #include "util/macros.h"
 #include "util/u_debug.h"
 #include "agx_compiler.h"
@@ -662,6 +664,116 @@ agx_nir_export_select_flags_as_halves(nir_shader *nir)
    return true;
 }
 
+/*
+ * A constant read of a buffer under non-uniform control flow would serve the
+ * constant program as well as any other, but hoisting it makes the read happen
+ * for fragments that never take the branch. Without soft faults that needs
+ * care: a binding may be smaller than the block, as long as the branch that
+ * reads past it never runs, and reading past the end of the allocation faults.
+ *
+ * The descriptor says how much is bound, so read the zero page instead when the
+ * load would leave the binding. That costs nothing on a path that really runs,
+ * and it is added only to the loads that do move: a load left in the main
+ * program stays under its branch, as it was.
+ */
+static nir_intrinsic_instr *
+speculative_descriptor(const nir_intrinsic_instr *load, unsigned *end)
+{
+   if ((load->intrinsic != nir_intrinsic_load_agx &&
+        load->intrinsic != nir_intrinsic_load_constant_agx) ||
+       !(nir_intrinsic_access(load) & ACCESS_CAN_REORDER) ||
+       !nir_src_is_const(load->src[1]) || load->def.bit_size != 32 ||
+       nir_intrinsic_format(load) != PIPE_FORMAT_R32_UINT)
+      return NULL;
+
+   nir_alu_instr *pack = nir_def_as_alu_or_null(load->src[0].ssa);
+   if (!pack || pack->op != nir_op_pack_64_2x32_split ||
+       pack->src[0].src.ssa != pack->src[1].src.ssa ||
+       pack->src[0].swizzle[0] != 0 || pack->src[1].swizzle[0] != 1)
+      return NULL;
+
+   nir_intrinsic_instr *desc = nir_def_as_intrinsic_or_null(pack->src[0].src.ssa);
+   if (!desc || desc->intrinsic != nir_intrinsic_load_constant_agx ||
+       desc->def.num_components != 4 ||
+       !(nir_intrinsic_access(desc) & ACCESS_BUFFER_DESCRIPTOR_AGX))
+      return NULL;
+
+   uint64_t index = nir_src_as_uint(load->src[1]);
+   uint64_t bytes = (index * 4 << nir_intrinsic_base(load)) +
+                    load->def.num_components * 4;
+   *end = bytes;
+   return bytes <= AGX_ZERO_PAGE_SIZE ? desc : NULL;
+}
+
+/* A load that moves takes its pointer with it, so one that then finds no slot
+ * leaves the main program rebuilding that pointer from the descriptor. Allow
+ * only what fits in the storage left free by everything that moves anyway.
+ */
+static bool
+allow_speculative_load(nir_builder *b, nir_intrinsic_instr *load, void *data)
+{
+   unsigned *free_halves = data;
+   const unsigned halves = load->def.num_components * 2;
+   unsigned end;
+   if (load->instr.block->cf_node.parent->type == nir_cf_node_function ||
+       !speculative_descriptor(load, &end) || halves > *free_halves)
+      return false;
+
+   *free_halves -= halves;
+   nir_intrinsic_set_access(
+      load, nir_intrinsic_access(load) | ACCESS_CAN_SPECULATE);
+   return true;
+}
+
+static unsigned
+free_preamble_halves(const nir_shader *nir,
+                     const nir_opt_preamble_options *options,
+                     const unsigned *sizes)
+{
+   unsigned used[nir_preamble_num_classes];
+   memcpy(used, sizes, sizeof(used));
+
+   nir_shader *clone = nir_shader_clone(NULL, nir);
+   nir_opt_preamble(clone, options, used);
+   ralloc_free(clone);
+
+   const unsigned total =
+      options->preamble_storage_size[nir_preamble_class_general];
+   return used[nir_preamble_class_general] < total
+             ? total - used[nir_preamble_class_general]
+             : 0;
+}
+
+/* What stayed in the main program must not be flattened past its branch now. */
+static bool
+disallow_speculative_load(nir_builder *b, nir_intrinsic_instr *load, void *data)
+{
+   if ((load->intrinsic != nir_intrinsic_load_agx &&
+        load->intrinsic != nir_intrinsic_load_constant_agx) ||
+       !(nir_intrinsic_access(load) & ACCESS_CAN_REORDER))
+      return false;
+
+   nir_intrinsic_set_access(
+      load, nir_intrinsic_access(load) & ~ACCESS_CAN_SPECULATE);
+   return true;
+}
+
+static bool
+guard_speculative_load(nir_builder *b, nir_intrinsic_instr *load, void *data)
+{
+   unsigned end;
+   nir_intrinsic_instr *desc = speculative_descriptor(load, &end);
+   if (!desc || !(nir_intrinsic_access(load) & ACCESS_CAN_SPECULATE))
+      return false;
+
+   b->cursor = nir_before_instr(&load->instr);
+   nir_def *bound = nir_channel(b, &desc->def, 2);
+   nir_src_rewrite(&load->src[0],
+                   nir_bcsel(b, nir_uge_imm(b, bound, end), load->src[0].ssa,
+                             nir_imm_int64(b, AGX_ZERO_PAGE_ADDRESS)));
+   return true;
+}
+
 /* A G17P constant program writes uniforms a word at a time, from an aligned
  * register pair. A half exported from the top of a pair, or into the top of a
  * word, cannot be packed, and that refusal costs the shader its whole constant
@@ -717,7 +829,26 @@ agx_nir_opt_preamble(nir_shader *nir, unsigned *sizes, bool g17p,
       options.instr_cost_cb = agx3c ? instr_cost : instr_cost_g17p;
       options.rewrite_cost_cb = agx3c ? rewrite_cost_agx3c : rewrite_cost_g17p;
    }
+   bool speculative = false;
+   if (g17p && !agx3c && nir->info.stage == MESA_SHADER_FRAGMENT) {
+      unsigned free_halves = free_preamble_halves(nir, &options, sizes);
+      NIR_PASS(speculative, nir, nir_shader_intrinsics_pass,
+               allow_speculative_load, nir_metadata_all, &free_halves);
+   }
+
    NIR_PASS(progress, nir, nir_opt_preamble, &options, sizes);
+
+   if (speculative) {
+      nir_function_intrinsics_pass(nir_shader_get_entrypoint(nir),
+                                   disallow_speculative_load, nir_metadata_all,
+                                   NULL);
+      if (progress) {
+         nir_function_intrinsics_pass(nir_shader_get_preamble(nir),
+                                      guard_speculative_load,
+                                      nir_metadata_control_flow, NULL);
+      }
+   }
+
    if (progress && g17p)
       NIR_PASS(_, nir, agx_nir_export_select_flags_as_halves);
    if (progress && g17p && !agx3c)

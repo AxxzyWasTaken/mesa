@@ -58,6 +58,7 @@
 
 static bool
 block_check_for_allowed_instrs(nir_block *block, unsigned *count,
+                               bool *expensive,
                                const nir_opt_peephole_select_options *options)
 {
    bool alu_ok = options->limit != 0;
@@ -280,6 +281,7 @@ block_check_for_allowed_instrs(nir_block *block, unsigned *count,
             if (!alu_ok || !options->expensive_alu_ok)
                return false;
 
+            *expensive = true;
             break;
 
          default:
@@ -325,6 +327,15 @@ block_check_for_allowed_instrs(nir_block *block, unsigned *count,
    return true;
 }
 
+static bool
+within_limits(unsigned count, bool expensive,
+              const nir_opt_peephole_select_options *options)
+{
+   return count <= options->limit &&
+          (!expensive || !options->expensive_limit ||
+           count <= options->expensive_limit);
+}
+
 static nir_opt_peephole_select_options
 get_options_for_if(nir_if *if_stmt,
                    const nir_opt_peephole_select_options *options)
@@ -336,6 +347,7 @@ get_options_for_if(nir_if *if_stmt,
       if_options.limit = UINT_MAX - 1; /* Maximum without unsafe flattening. */
       if_options.indirect_load_ok = true;
       if_options.expensive_alu_ok = true;
+      if_options.expensive_limit = 0;
    } else if (if_stmt->control == nir_selection_control_dont_flatten) {
       if_options.limit = 0;
       if_options.indirect_load_ok = false;
@@ -462,10 +474,11 @@ nir_opt_collapse_if(nir_if *if_stmt, nir_shader *shader,
    nir_block *first = nir_if_first_then_block(parent_if);
    nir_opt_peephole_select_options if_options = get_options_for_if(parent_if, options);
    unsigned count = 0;
-   if (!block_check_for_allowed_instrs(first, &count, &if_options))
+   bool expensive = false;
+   if (!block_check_for_allowed_instrs(first, &count, &expensive, &if_options))
       return false;
 
-   if (count > if_options.limit)
+   if (!within_limits(count, expensive, &if_options))
       return false;
 
    /* trivialize succeeding phis */
@@ -542,11 +555,14 @@ nir_opt_peephole_select_block(nir_block *block, nir_shader *shader,
 
    /* ... and those blocks must only contain "allowed" instructions. */
    unsigned count = 0;
-   if (!block_check_for_allowed_instrs(then_block, &count, &if_options) ||
-       !block_check_for_allowed_instrs(else_block, &count, &if_options))
+   bool expensive = false;
+   if (!block_check_for_allowed_instrs(then_block, &count, &expensive,
+                                       &if_options) ||
+       !block_check_for_allowed_instrs(else_block, &count, &expensive,
+                                       &if_options))
       return false;
 
-   if (count > if_options.limit)
+   if (!within_limits(count, expensive, &if_options))
       return false;
 
    /* At this point, we know that the previous CFG node is an if-then
