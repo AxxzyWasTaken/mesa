@@ -24,6 +24,10 @@ def declare_options():
         B("hk_fake_minmax", False,
           "Fake support for min/max filtering",
           c_name="fake_minmax"),
+        B("hk_d3d_nearest_mip", False,
+          "Round a nearest mip selection halfway between levels up, as "
+          "Direct3D does, rather than down, as Vulkan does",
+          c_name="d3d_nearest_mip"),
         B("hk_image_view_min_lod", False,
           "Emulate VK_EXT_image_view_min_lod (conformant but slower)",
           c_name="image_view_min_lod"),
