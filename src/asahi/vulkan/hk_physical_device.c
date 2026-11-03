@@ -1103,15 +1103,11 @@ hk_get_device_properties(const struct agx_device *dev,
                                (agx_chip_native_agx3(dev->chip) ? 15 : 0),
       .maxUniformBufferRange = 65536,
 
-      /* From a hardware perspective, storage buffers are lowered to global
-       * address arithmetic so there is no hard limit. However, making efficient
-       * use of the hardware addressing modes depends on no signed wrapping in
-       * any `amul` operations, which are themselves bounded by
-       * maxStorageBufferRange. Therefore, limit storage buffers to INT32_MAX
-       * bytes instead of UINT32_MAX. This is believed to be acceptable for
-       * Direct3D.
+      /* Storage buffers are lowered to global address arithmetic with a
+       * zero-extended 32-bit offset, so the whole 32-bit range works. Direct3D
+       * views reach just under 4 GiB.
        */
-      .maxStorageBufferRange = INT32_MAX,
+      .maxStorageBufferRange = UINT32_MAX,
       .maxPushConstantsSize = HK_MAX_PUSH_SIZE,
       .maxMemoryAllocationCount = 4096,
       .maxSamplerAllocationCount = 4000,

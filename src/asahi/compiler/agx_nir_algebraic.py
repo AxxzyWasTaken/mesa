@@ -313,30 +313,26 @@ for s_ in range(1, 5):
 
         # A + (b 2^s + c d 2^s) = A + (b + cd) 2^s with relaxation.
         #
-        # amul is bounded by the buffer size by definition, and both the GL & VK
-        # limit UBOs and SSBOs to INT32_MAX bytes. Therefore, amul has no signed
-        # wrap.
+        # amul is bounded by the buffer size by definition, and buffers are at
+        # most UINT32_MAX bytes, so amul has no unsigned wrap. The 32-bit sum
+        # is zero-extended, so as an unsigned value
         #
-        # Further, because we are zero-extending the 32-bit result, the 32-bit
-        # sum must be nonnegative -- if it were negative, it would represent an
-        # offset above INT32_MAX which would be invalid given the amul and
-        # max buffer size. Thus with signed math
+        #   0 <= b 2^s + cd 2^s < 2^32
         #
-        #   0 <= b 2^s + cd 2^s < INT32_MAX
+        # ..and hence, with b and d multiples of 2^s,
         #
-        # ..and hence
-        #
-        #   0 <= b + cd < INT32_MAX
+        #   0 <= b + cd < 2^(32 - s)
         #
         # Those bounds together with distributivity mean that
         #
         #   (b 2^s + cd 2^s) mod 2^32 = 2^s ((b + cd) mod 2^32)
         #
-        # ...which is exactly what we need to factor out the shift.
+        # ...which is exactly what we need to factor out the shift. The shifts
+        # are unsigned: a constant offset past 2 GiB keeps its top bit.
         (('iadd', 'a@64', ('u2u64', ('iadd', f'#b{is_mult}',
                                      ('amul', 'c@32', f'#d{is_mult}')))),
-         ('ulea_agx', a, ('iadd', ('ishr', b, s),
-                                  ('amul', 'c@32', ('ishr', d, s))), s)),
+         ('ulea_agx', a, ('iadd', ('ushr', b, s),
+                                  ('amul', 'c@32', ('ushr', d, s))), s)),
     ]
 
 # 8-bit rules are lowest precedence since we really like to fuse shifts
