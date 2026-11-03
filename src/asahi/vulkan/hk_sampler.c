@@ -199,7 +199,15 @@ pack_sampler(const struct hk_physical_device *pdev,
          info->flags & VK_SAMPLER_CREATE_NON_SEAMLESS_CUBE_MAP_BIT_EXT,
    };
 
-   return hk_pack_native_sampler(pdev->dev.chip, out, &state);
+   /* A point sampler reads one texel, so min and max reduce to that texel. */
+   struct hk_native_sampler_state point_state = state;
+   if (info->magFilter == VK_FILTER_NEAREST &&
+       info->minFilter == VK_FILTER_NEAREST &&
+       info->mipmapMode == VK_SAMPLER_MIPMAP_MODE_NEAREST &&
+       !info->anisotropyEnable && !info->compareEnable)
+      point_state.reduction_mode = HK_SAMPLER_REDUCTION_WEIGHTED_AVERAGE;
+
+   return hk_pack_native_sampler(pdev->dev.chip, out, &point_state);
 }
 
 /* hk_pack_native_sampler() only reports success, so print the full sampler
