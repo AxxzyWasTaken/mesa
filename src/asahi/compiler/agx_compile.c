@@ -8150,6 +8150,44 @@ agx3_inline_cheap_vertex_preamble(nir_shader *nir)
    nir_progress(true, main, nir_metadata_none);
 }
 
+/* The hardware takes a derivative from the neighbouring lanes' registers, so
+ * every lane of the quad must have computed the operand. A source loaded before
+ * a branch but sunk into it is computed only by the lanes that branch, and a
+ * derivative inside that branch then reads garbage from the others. Explicit
+ * derivatives in control flow are rare, so keep sinking everywhere else. */
+static bool
+agx_has_derivative_in_control_flow(nir_shader *nir)
+{
+   if (nir->info.stage != MESA_SHADER_FRAGMENT)
+      return false;
+
+   nir_foreach_function_impl(impl, nir) {
+      nir_foreach_block(block, impl) {
+         if (block->cf_node.parent == &impl->cf_node)
+            continue;
+
+         nir_foreach_instr(instr, block) {
+            if (instr->type != nir_instr_type_intrinsic)
+               continue;
+
+            switch (nir_instr_as_intrinsic(instr)->intrinsic) {
+            case nir_intrinsic_ddx:
+            case nir_intrinsic_ddx_fine:
+            case nir_intrinsic_ddx_coarse:
+            case nir_intrinsic_ddy:
+            case nir_intrinsic_ddy_fine:
+            case nir_intrinsic_ddy_coarse:
+               return true;
+            default:
+               break;
+            }
+         }
+      }
+   }
+   return false;
+}
+
+
 static bool agx3_nir_lower_uniform_dma(nir_shader *nir,
                                        const struct agx_shader_key *key,
                                        struct agx_shader_info *info);
@@ -8478,6 +8516,9 @@ agx_optimize_nir(nir_shader *nir, bool soft_fault, bool uniform_atomics,
                                nir_move_load_input | nir_move_load_frag_coord |
                                nir_move_comparisons | nir_move_copies |
                                nir_move_load_ssbo | nir_move_alu;
+   if (agx_has_derivative_in_control_flow(nir))
+      move_all &= ~(nir_move_load_input | nir_move_load_frag_coord |
+                    nir_move_alu);
 
    /* Sinking a G17P buffer load into the arm that reads it saves the load when
     * the arm is skipped. Sink leaves it at the top of that block; moving it on
@@ -11080,6 +11121,9 @@ agx_preprocess_nir_internal(nir_shader *nir, bool g17p, bool native_fragment_dep
                                nir_move_load_input | nir_move_load_frag_coord |
                                nir_move_comparisons | nir_move_copies |
                                nir_move_load_ssbo | nir_move_alu;
+   if (agx_has_derivative_in_control_flow(nir))
+      move_all &= ~(nir_move_load_input | nir_move_load_frag_coord |
+                    nir_move_alu);
 
    NIR_PASS(_, nir, nir_opt_sink, move_all);
    NIR_PASS(_, nir, nir_opt_move, move_all);
