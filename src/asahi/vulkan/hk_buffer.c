@@ -80,6 +80,11 @@ hk_get_buffer_alignment(const struct hk_physical_device *pdev,
                        VK_BUFFER_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT))
       alignment = MAX2(alignment, 16384);
 
+   /* D3D12 heaps and tiles sit on 64 KiB boundaries, and vkd3d-proton backs
+    * its heaps with sparse-capable buffers. */
+   if (create_flags & VK_BUFFER_CREATE_SPARSE_BINDING_BIT)
+      alignment = MAX2(alignment, 64 * 1024);
+
    return alignment;
 }
 

@@ -1750,6 +1750,6 @@ agx_gather_device_key(struct agx_device *dev)
       .encoding = agx_chip_isa_encoding(dev->chip),
       .needs_g13x_coherency = u_tristate_make(g13x_coh),
       .soft_fault = agx_has_soft_fault(dev),
-      .shader_quad_control = agx_is_a18_pro(dev),
+      .shader_quad_control = dev->chip == AGX_CHIP_G17P,
    };
 }

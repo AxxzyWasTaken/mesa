@@ -940,7 +940,7 @@ hk_get_device_features(
        * offset for each mapping and its RO shadow; G17P's transactional
        * VM_BIND path retains each mapping independently. Residency metadata
        * is per resource VA, not per backing allocation. */
-      features->sparseResidencyAliased = agx_is_a18_pro(dev);
+      features->sparseResidencyAliased = sparse;
       features->sparseResidencyImage2D = sparse;
       /* The sparse binder and SSTT use the same slice layout for 3D images
        * as for 2D arrays. Report the nonstandard, one-slice block shape rather
@@ -968,7 +968,7 @@ hk_get_device_features(
        * quad encodings. The execution modes also select helper-capable
        * fragment entry and prevent merging triangles across derivative quads.
        */
-      features->shaderQuadControl = agx_is_a18_pro(dev);
+      features->shaderQuadControl = dev->chip == AGX_CHIP_G17P;
 
       /* Qualified on A18 Pro only. */
       if (dev->chip == AGX_CHIP_G17P) {
@@ -1579,8 +1579,8 @@ hk_get_device_properties(const struct agx_device *dev,
        * G17P uses the same lane instructions in native vertex/fragment
        * programs and the compute programs implementing tessellation and
        * geometry. Other AGX3 targets retain their stage restriction. */
-      properties->subgroupQuadOperationsInAllStages = agx_is_a18_pro(dev);
-      properties->sparseResidencyNonResidentStrict = false;
+      properties->subgroupQuadOperationsInAllStages =
+         dev->chip == AGX_CHIP_G17P;
    }
 
    snprintf(properties->deviceName, sizeof(properties->deviceName), "%s",
@@ -2032,7 +2032,7 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
 
    if (agx_native_graphics(&pdev->dev)) {
       supported_extensions.KHR_shader_quad_control =
-         agx_is_a18_pro(&pdev->dev);
+         pdev->dev.chip == AGX_CHIP_G17P;
    }
 
    /* VK_KHR_shader_fma makes shaderFmaFloat32 mandatory. */

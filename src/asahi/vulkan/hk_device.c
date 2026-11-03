@@ -923,7 +923,7 @@ hk_CreateDevice(VkPhysicalDevice physicalDevice,
              dev->dev.user_timestamp_to_ns.den &&
           "user timestamps are in ns");
 
-   if (agx_chip_g17_m5(dev->dev.chip) &&
+   if ((agx_chip_g17_m5(dev->dev.chip) || agx_native_graphics(&dev->dev)) &&
        dev->vk.enabled_features.sparseResidencyBuffer) {
       const uint64_t pages = dev->dev.main_heap_size / AIL_PAGESIZE;
       const uint64_t bytes = align64(16 + DIV_ROUND_UP(pages, 8), AIL_PAGESIZE);
