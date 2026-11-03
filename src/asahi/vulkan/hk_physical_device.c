@@ -1110,7 +1110,7 @@ hk_get_device_properties(const struct agx_device *dev,
       .maxStorageBufferRange = UINT32_MAX,
       .maxPushConstantsSize = HK_MAX_PUSH_SIZE,
       .maxMemoryAllocationCount = 4096,
-      .maxSamplerAllocationCount = 4000,
+      .maxSamplerAllocationCount = 1 << 20,
       .bufferImageGranularity = 0x400,
       .sparseAddressSpaceSize = agx_chip_g17_m5(dev->chip)
                                    ? HK_M5_SPARSE_ADDR_SPACE_SIZE
@@ -1436,7 +1436,7 @@ hk_get_device_properties(const struct agx_device *dev,
       .maxPushDescriptors = HK_MAX_PUSH_DESCRIPTORS,
 
       /* VK_EXT_custom_border_color */
-      .maxCustomBorderColorSamplers = 4000,
+      .maxCustomBorderColorSamplers = 1 << 20,
 
       /* VK_EXT_extended_dynamic_state3 */
       .dynamicPrimitiveTopologyUnrestricted = true,
