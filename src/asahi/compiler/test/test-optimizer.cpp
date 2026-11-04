@@ -961,6 +961,31 @@ TEST_F(Optimizer, G17PBallotOfHalfPredicateWidens)
    ASSERT_SHADER_EQUAL(actual->shader, expected->shader);
 }
 
+/* Astro Bot's fragment shaders with a constant program: ballot of a 16-bit
+ * value the preamble computed, so a uniform by the time the optimizer runs. */
+TEST_F(Optimizer, G17PBallotOfHalfUniformWidens)
+{
+   agx_builder *actual = agx_test_builder(mem_ctx);
+   agx_builder *expected = agx_test_builder(mem_ctx);
+   struct agx_shader_key key = {};
+   key.dev.encoding = AGX_ISA_ENCODING_AGX3B;
+   actual->shader->key = &key;
+   expected->shader->key = &key;
+
+   agx_index out = agx_temp(actual->shader, AGX_SIZE_32);
+   agx_ballot_to(actual, out, agx_uniform(6, AGX_SIZE_16));
+   agx_unit_test(actual, out);
+
+   out = agx_temp(expected->shader, AGX_SIZE_32);
+   agx_index wide = agx_temp(expected->shader, AGX_SIZE_32);
+   agx_mov_to(expected, wide, agx_uniform(6, AGX_SIZE_16));
+   agx_ballot_to(expected, out, wide);
+   agx_unit_test(expected, out);
+
+   agx_optimize_and_dce(actual->shader);
+   ASSERT_SHADER_EQUAL(actual->shader, expected->shader);
+}
+
 TEST_F(Optimizer, G17PQuadBallotOfConstantIsARegister)
 {
    agx_builder *actual = agx_test_builder(mem_ctx);

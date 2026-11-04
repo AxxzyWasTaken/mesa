@@ -1479,15 +1479,15 @@ agx_optimizer_ballot(agx_context *ctx, agx_instr **defs, agx_instr *I)
       return;
    }
 
-   if (I->src[0].type != AGX_INDEX_NORMAL)
-      return;
-
-   agx_instr *def = defs[I->src[0].value];
+   agx_instr *def =
+      I->src[0].type == AGX_INDEX_NORMAL ? defs[I->src[0].value] : NULL;
 
    /* The same register-against-zero ballot is witnessed on G17P for a 16-bit
     * source only in its equal-to-zero form, while an unfused ballot counts
     * the lanes where its predicate is nonzero. Widen a half predicate so it
-    * reaches the 32-bit form instead.
+    * reaches the 32-bit form instead. That includes a uniform predicate
+    * (one the constant program computed), which register allocation would
+    * otherwise copy into a half register.
     */
    if (I->op == AGX_OPCODE_BALLOT && ctx->key &&
        ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3B &&
