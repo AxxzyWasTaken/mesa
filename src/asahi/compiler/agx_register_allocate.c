@@ -3276,7 +3276,8 @@ agx_ra_impl(agx_context *ctx, bool disable_remat)
 
          if (I->op == AGX_OPCODE_TEXTURE_SAMPLE &&
              (I->lod_mode == AGX_LOD_MODE_LOD_GRAD ||
-              I->lod_mode == AGX_LOD_MODE_LOD_GRAD_MIN) &&
+              I->lod_mode == AGX_LOD_MODE_LOD_GRAD_MIN ||
+              I->lod_mode == AGX_LOD_MODE_AUTO_LOD_BIAS_MIN) &&
              I->src[1].type == AGX_INDEX_NORMAL)
             BITSET_SET(texture_gpr, I->src[1].value);
 
