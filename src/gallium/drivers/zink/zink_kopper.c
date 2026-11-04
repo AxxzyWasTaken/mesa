@@ -280,8 +280,16 @@ zink_kopper_wl_drawable_unref(struct pipe_screen *pscreen, const struct kopper_l
    struct zink_screen *screen = zink_screen(pscreen);
    const VkWaylandSurfaceCreateInfoKHR *wl = (const VkWaylandSurfaceCreateInfoKHR *)&info->bos;
    simple_mtx_lock(&screen->dt_lock);
+   /* A drawable may reach teardown without a matching Wayland registration. */
+   if (!screen->wl_drawables.table) {
+      simple_mtx_unlock(&screen->dt_lock);
+      return;
+   }
    struct hash_entry *entry = _mesa_hash_table_search(&screen->wl_drawables, wl->surface);
-   assert(entry && (uintptr_t)entry->data > 0);
+   if (!entry || !(uintptr_t)entry->data) {
+      simple_mtx_unlock(&screen->dt_lock);
+      return;
+   }
    uintptr_t count = (uintptr_t)entry->data - 1;
    if (count) {
       entry->data = (void *)count;
