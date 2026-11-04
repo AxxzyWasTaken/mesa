@@ -116,7 +116,7 @@ if with_tests and with_tools.contains('drm-shim')
     build_by_default : false,
   )
 
-  foreach chip : ['g13g', 'g15c', 'g15s', 'g17p', 't6041']
+  foreach chip : ['g13g', 'g15c', 'g15s', 'g17p', 't6041', 't6041x']
     foreach mode : ['vs', 'query']
       test(
         'asahi-' + chip + '-gallium-' + mode,
@@ -212,7 +212,7 @@ if with_tests and with_tools.contains('drm-shim')
     )
   endforeach
 
-  foreach chip : ['g13g', 'g17p', 't6041']
+  foreach chip : ['g13g', 'g17p', 't6041', 't6041x']
     test(
       'asahi-' + chip + '-gallium-submit',
       prog_python,
@@ -258,7 +258,7 @@ if with_tests and with_tools.contains('drm-shim')
     )
   endforeach
 
-  foreach chip : ['g17p', 't6041']
+  foreach chip : ['g17p', 't6041', 't6041x']
     test(
       'asahi-' + chip + '-gallium-blit',
       prog_python,

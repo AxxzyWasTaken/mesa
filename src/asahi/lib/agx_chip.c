@@ -68,11 +68,12 @@ agx_chip_from_params(const struct drm_asahi_params_global *params)
             return AGX_CHIP_G17P;
          return AGX_CHIP_G16S;
       case 'C':
+      case 'X':
          if (params->chip_id == 0x6041 &&
              params->usc_generation == AGX_ISA_AGX3 &&
              params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_200)
             return AGX_CHIP_G17P;
-         return AGX_CHIP_G16C;
+         return params->gpu_variant == 'C' ? AGX_CHIP_G16C : AGX_CHIP_UNKNOWN;
       default: return AGX_CHIP_UNKNOWN;
       }
    case 17:
@@ -328,6 +329,23 @@ agx_params_driver_supported(const struct drm_asahi_params_global *params)
    default:
       return true;
    }
+}
+
+bool
+agx_params_fixup_upstream_uapi(struct drm_asahi_params_global *params)
+{
+   if (!params || params->usc_generation != 0)
+      return false;
+
+   params->features &= DRM_ASAHI_FEATURE_SOFT_FAULTS;
+
+   if (params->chip_id == 0x6041 && params->gpu_generation == 16 &&
+       params->gpu_hal_generation == 0) {
+      params->usc_generation = AGX_ISA_AGX3;
+      params->gpu_hal_generation = DRM_ASAHI_GPU_HAL_200;
+   }
+
+   return true;
 }
 
 const char *
