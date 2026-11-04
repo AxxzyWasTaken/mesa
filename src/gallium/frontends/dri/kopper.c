@@ -486,6 +486,7 @@ kopper_init_drawable(struct dri_drawable *drawable, bool isPixmap, int alphaBits
       screen->kopper_loader->SetSurfaceCreateInfo(drawable->loaderPrivate,
                                                   &drawable->info);
    drawable->is_window = !isPixmap && drawable->info.bos.sType != 0;
+   zink_kopper_wl_drawable_ref(kopper_get_zink_screen(screen->base.screen), &drawable->info);
 
 #ifdef VK_USE_PLATFORM_XCB_KHR
    if (drawable->info.bos.sType == VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR) {
@@ -502,6 +503,12 @@ kopper_init_drawable(struct dri_drawable *drawable, bool isPixmap, int alphaBits
          xcb_register_for_special_xge(conn, &xcb_present_id, eid, NULL);
    }
 #endif
+}
+
+void
+kopper_release_drawable(struct dri_drawable *drawable)
+{
+   zink_kopper_wl_drawable_unref(kopper_get_zink_screen(drawable->screen->base.screen), &drawable->info);
 }
 
 void
