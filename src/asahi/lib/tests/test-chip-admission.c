@@ -111,9 +111,75 @@ main(void)
    assert(agx_chip_from_params(&bad) == AGX_CHIP_G16S);
    assert(!agx_params_driver_supported(&bad));
 
+   const char variants[] = {'C'};
+   for (unsigned v = 0; v < sizeof(variants); ++v) {
+      struct drm_asahi_params_global t6041 = g15_params(variants[v], 0x6041, 4);
+      t6041.gpu_generation = 16;
+      t6041.gpu_hal_generation = DRM_ASAHI_GPU_HAL_200;
+      assert(agx_chip_from_params(&t6041) == AGX_CHIP_G17P);
+      assert(agx_params_driver_supported(&t6041));
+
+      bad = t6041;
+      bad.core_masks[1] = 0x1ff;
+      assert(agx_params_driver_supported(&bad));
+
+      bad = t6041;
+      bad.num_clusters_total = 2;
+      assert(!agx_params_driver_supported(&bad));
+
+      bad = t6041;
+      bad.num_dies = 2;
+      assert(!agx_params_driver_supported(&bad));
+
+      bad = t6041;
+      bad.usc_generation = 0;
+      bad.gpu_hal_generation = 0;
+      assert(agx_chip_from_params(&bad) != AGX_CHIP_G17P);
+      assert(!agx_params_driver_supported(&bad));
+
+      bad = t6041;
+      bad.chip_id = 0x6042;
+      assert(!agx_params_driver_supported(&bad));
+   }
+
    bad = t6040;
    bad.gpu_hal_generation = DRM_ASAHI_GPU_HAL_LEGACY;
    assert(agx_chip_from_params(&bad) == AGX_CHIP_G16S);
+
+   {
+      const uint64_t g17_features =
+         DRM_ASAHI_FEATURE_VM_STATUS | DRM_ASAHI_FEATURE_INDEPENDENT_QUEUES |
+         DRM_ASAHI_FEATURE_PER_COMMAND_INPUT_SYNCS |
+         DRM_ASAHI_FEATURE_VM_STATUS_MIRROR |
+         DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS |
+         DRM_ASAHI_FEATURE_FRAGMENT_BARRIERS |
+         DRM_ASAHI_FEATURE_BOUNDED_AS_BUILD |
+         DRM_ASAHI_FEATURE_CUMULATIVE_SIGNALS;
+      const char letters[] = {'C'};
+      for (unsigned v = 0; v < sizeof(letters); ++v) {
+         struct drm_asahi_params_global aurora =
+            g15_params(letters[v], 0x6041, 4);
+         aurora.gpu_generation = 16;
+         aurora.gpu_hal_generation = DRM_ASAHI_GPU_HAL_200;
+         aurora.gpu_revision = 0x11;
+         aurora.features = g17_features;
+         const struct drm_asahi_params_global before = aurora;
+         assert(agx_chip_from_params(&aurora) == AGX_CHIP_G17P);
+         assert(agx_params_driver_supported(&aurora));
+         assert(agx_chip_usc_base_page_fill_returns_for(
+            AGX_CHIP_G17P, aurora.num_clusters_total));
+         assert(agx_chip_usc_helper_table_slots(
+                   AGX_CHIP_G17P, aurora.num_cores_per_cluster) == 10);
+
+         struct drm_asahi_params_global other = before;
+         other.gpu_hal_generation = DRM_ASAHI_GPU_HAL_300;
+         assert(!agx_params_driver_supported(&other));
+         other = before;
+         other.usc_generation = 2;
+         assert(agx_chip_from_params(&other) != AGX_CHIP_G17P);
+         assert(!agx_params_driver_supported(&other));
+      }
+   }
 
    /* G17P helper tables have a slot per core of a cluster, never fewer than
     * the A18 Pro's six: six there, ten on the M4 Pro. */
