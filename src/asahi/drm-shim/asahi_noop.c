@@ -1461,6 +1461,14 @@ shim_features(void)
    return features;
 }
 
+static uint64_t
+shim_vm_end(const struct drm_asahi_params_global *params)
+{
+   if (params == &params_g15g && shim_env_on("ASAHI_SHIM_G15G_HAL200"))
+      return UINT64_C(0x3ffffff8000);
+   return params->vm_end;
+}
+
 static int
 asahi_ioctl_get_param(int fd, unsigned long request, void *arg)
 {
@@ -1479,7 +1487,7 @@ asahi_ioctl_get_param(int fd, unsigned long request, void *arg)
       if (shim_params() == &params_g15g &&
           shim_env_on("ASAHI_SHIM_G15G_HAL200")) {
          params.gpu_hal_generation = DRM_ASAHI_GPU_HAL_200;
-         params.vm_end = UINT64_C(0x3ffffff8000);
+         params.vm_end = shim_vm_end(shim_params());
       }
       const char *command_limit = getenv("ASAHI_SHIM_COMMAND_LIMIT");
       if (command_limit) {
@@ -1578,6 +1586,7 @@ asahi_ioctl_vm_bind_unlocked(int fd, unsigned long request, void *arg)
 {
    const struct drm_asahi_vm_bind *bind = arg;
    const struct drm_asahi_params_global *params = shim_params();
+   const uint64_t vm_end = shim_vm_end(params);
 
    for (uint32_t i = 0; i < bind->num_binds; ++i) {
       const struct drm_asahi_gem_bind_op *op =
@@ -1593,13 +1602,13 @@ asahi_ioctl_vm_bind_unlocked(int fd, unsigned long request, void *arg)
          return -EINVAL;
       }
 
-      if (end < start || start < params->vm_start || end > params->vm_end) {
+      if (end < start || start < params->vm_start || end > vm_end) {
          fprintf(stderr,
                  "shim: gem_bind: Invalid map range %#llx..%#llx "
                  "(not contained in user range %#llx..%#llx)\n",
                  (unsigned long long)start, (unsigned long long)end,
                  (unsigned long long)params->vm_start,
-                 (unsigned long long)params->vm_end);
+                 (unsigned long long)vm_end);
          return -EINVAL;
       }
 
