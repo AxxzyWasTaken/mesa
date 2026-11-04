@@ -1435,7 +1435,9 @@ agx_open_device(void *memctx, struct agx_device *dev)
                                           dev->params.num_clusters_total))
             goto fail;
       } else {
-         agx3_build_usc_base_page(map, usc_base_size, dev->chip, dev->params.num_cores_per_cluster);
+         agx3_build_usc_base_page(map, usc_base_size, dev->chip,
+                                  dev->params.num_cores_per_cluster,
+                                  dev->params.num_clusters_total);
       }
       agx_bo_assert_range(usc_base, 0, usc_base_size);
 

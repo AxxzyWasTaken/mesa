@@ -223,16 +223,18 @@ agx3_build_container_lead(uint8_t *image, enum agx_chip chip,
  * plain lead. */
 void
 agx3_build_usc_base_page(uint8_t *image, size_t size, enum agx_chip chip,
-                         unsigned cores_per_cluster)
+                         unsigned cores_per_cluster, unsigned num_clusters)
 {
    assert(size >= AGX3_CONTAINER_LEAD + 0x10);
 
    memset(image, 0, size);
    agx3_build_container_lead(image, chip, cores_per_cluster);
 
-   if (agx_chip_usc_base_page_fill_returns(chip)) {
-      assert(agx_chip_usc_helper_table_slots(chip, cores_per_cluster) == 10);
-      agx3_fill_helper_terminals(image, 0x2c0, AGX3_CONTAINER_LEAD);
+   if (agx_chip_usc_base_page_fill_returns_for(chip, num_clusters)) {
+      const unsigned slots =
+         agx_chip_usc_helper_table_slots(chip, cores_per_cluster);
+      agx3_fill_helper_terminals(image, 0x200 + (slots + 2) * 0x10,
+                                 AGX3_CONTAINER_LEAD);
       agx3_fill_helper_terminals(image, AGX3_CONTAINER_LEAD + 0x10, size);
    }
 }
