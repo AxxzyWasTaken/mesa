@@ -1667,7 +1667,7 @@ hk_env_cmp(const void *a, const void *b)
    return strcmp(*(const char *const *)a, *(const char *const *)b);
 }
 
-static uint64_t
+uint64_t
 hk_codegen_env_hash(void)
 {
    static const char *const runtime_only[] = {
@@ -1689,7 +1689,9 @@ hk_codegen_env_hash(void)
          for (size_t o = 0; o + l <= name_len && !skip; ++o)
             skip = !strncmp(*e + o, runtime_only[i], l);
       }
-      if (!skip)
+      /* HK_PERFTEST includes code-generation choices such as noborder. */
+      if (!skip || (name_len == strlen("HK_PERFTEST") &&
+                    !strncmp(*e, "HK_PERFTEST", name_len)))
          list[n++] = *e;
    }
    qsort(list, n, sizeof(list[0]), hk_env_cmp);

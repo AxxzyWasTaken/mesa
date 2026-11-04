@@ -1553,6 +1553,7 @@ agx_create_command_queue_with_render_scs(struct agx_device *dev,
 
    if (dev->debug & AGX_DBG_1QUEUE) {
       dev->queue_id = queue_create.queue_id;
+      dev->queue_priority = priority;
       dev->queue_layouts[0] = layouts[0];
       dev->queue_layouts[1] = layouts[1];
       simple_mtx_unlock(&dev->vma_lock);

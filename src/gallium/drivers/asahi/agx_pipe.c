@@ -1965,6 +1965,9 @@ agx_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
       ralloc_free(ctx);
       return NULL;
    }
+   if (agx_device(screen)->debug & AGX_DBG_1QUEUE)
+      priority = agx_device(screen)->queue_priority;
+
    pctx->context_priority = priority == DRM_ASAHI_PRIORITY_LOW
                                ? PIPE_CONTEXT_PRIORITY_LOW
                                : priority == DRM_ASAHI_PRIORITY_HIGH

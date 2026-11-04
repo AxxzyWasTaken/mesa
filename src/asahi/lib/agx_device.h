@@ -193,6 +193,7 @@ struct agx_device {
    uint32_t queue_id;
    /* AGX_DBG_1QUEUE: render SCS layouts the shared queue was created with. */
    uint64_t queue_layouts[2];
+   enum drm_asahi_priority queue_priority;
 
    /* VMA heaps */
    simple_mtx_t vma_lock;

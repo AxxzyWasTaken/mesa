@@ -109,6 +109,8 @@ VkResult hk_create_drm_physical_device(struct vk_instance *vk_instance,
 
 void hk_physical_device_destroy(struct vk_physical_device *vk_device);
 
+uint64_t hk_codegen_env_hash(void);
+
 void hk_border_emulation_recall(struct hk_physical_device *pdev);
 void hk_border_emulation_remember(struct hk_physical_device *pdev);
 

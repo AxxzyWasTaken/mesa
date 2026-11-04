@@ -62,6 +62,8 @@ int main(void)
       CHECK(ctx);
       unsigned expected = i == 1 ? PIPE_CONTEXT_PRIORITY_LOW : PIPE_CONTEXT_PRIORITY_MEDIUM;
       if (i == 2 && !policy) expected = PIPE_CONTEXT_PRIORITY_HIGH;
+      if (getenv("ASAHI_MESA_DEBUG") && strstr(getenv("ASAHI_MESA_DEBUG"), "1queue"))
+         expected = PIPE_CONTEXT_PRIORITY_MEDIUM;
       CHECK(ctx->context_priority == expected);
       ctx->destroy(ctx);
    }

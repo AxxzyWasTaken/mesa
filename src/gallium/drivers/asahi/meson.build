@@ -181,6 +181,14 @@ if with_tests and with_tools.contains('drm-shim')
     )
   endforeach
 
+  test(
+    'asahi-priority-shared',
+    prog_python,
+    args : [files('tests/run-shim.py'), libasahi_noop_drm_shim, asahi_priority_test],
+    env : ['ASAHI_SHIM_CHIP=g13g', 'ASAHI_MESA_DEBUG=1queue'],
+    suite : ['asahi'],
+  )
+
   if with_egl and with_glvnd
     asahi_egl_priority_test = executable(
       'asahi-egl-priority',
