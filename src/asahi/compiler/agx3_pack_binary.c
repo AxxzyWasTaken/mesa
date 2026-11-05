@@ -15753,7 +15753,7 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
          }
 
          if (enc == AGX_ISA_ENCODING_AGX3C && I->op == AGX_OPCODE_HADD &&
-             I->nr_dests == 1 && I->nr_srcs == 2 && !I->saturate &&
+             I->nr_dests == 1 && I->nr_srcs == 2 &&
              agx3_half_reg(I->dest[0]) && agx_channels(I->dest[0]) == 1) {
             const bool swap = I->src[0].type == AGX_INDEX_IMMEDIATE;
             const agx_index src = I->src[swap ? 1 : 0], imm = I->src[swap ? 0 : 1];
@@ -15763,8 +15763,9 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
                 !imm.abs && !imm.neg && !imm.memory) {
                uint8_t bytes[AGX3_ALU_MAX_LENGTH], len;
                if (!agx3_alu_hadd_minifloat(enc, I->dest[0].value, src.value,
-                      imm.value, src.neg, agx3_post_ra_hint(src),
-                      I->dest[0].cache, wait, bytes, &len) ||
+                      imm.value, src.neg, I->saturate,
+                      agx3_post_ra_hint(src), I->dest[0].cache, wait, bytes,
+                      &len) ||
                    !agx3_append(emission, bytes, len))
                   AGX3_REFUSE(I);
                continue;
