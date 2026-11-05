@@ -413,6 +413,14 @@ agx_chip_usc_base_page_fill_returns(enum agx_chip chip)
    return chip == AGX_CHIP_G15C;
 }
 
+static inline bool
+agx_chip_usc_base_page_fill_returns_for(enum agx_chip chip,
+                                        unsigned num_clusters)
+{
+   return agx_chip_usc_base_page_fill_returns(chip) ||
+          (agx_chip_native_agx3(chip) && num_clusters > 2);
+}
+
 /* Robust image accesses on native chips need explicit Vulkan view bounds:
  * native 2D accesses outside the view alias other texels of the image. G17P
  * lowers them together with its own hardware defects; G15 and G16 parts
@@ -538,6 +546,8 @@ bool agx_chip_driver_supported(enum agx_chip chip);
  * HAL fields added to drm_asahi_params_global. */
 bool agx_params_driver_supported(
    const struct drm_asahi_params_global *params);
+
+bool agx_params_fixup_upstream_uapi(struct drm_asahi_params_global *params);
 
 /* Exact product name when the chip identity maps to one unambiguous SoC.
  * Variant letters are not marketing tiers: notably, G17P is A18 Pro rather

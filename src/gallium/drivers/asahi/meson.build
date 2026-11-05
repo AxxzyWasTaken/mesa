@@ -116,7 +116,7 @@ if with_tests and with_tools.contains('drm-shim')
     build_by_default : false,
   )
 
-  foreach chip : ['g13g', 'g15c', 'g15s', 'g17p']
+  foreach chip : ['g13g', 'g15c', 'g15s', 'g17p', 't6041', 't6041x']
     foreach mode : ['vs', 'query']
       test(
         'asahi-' + chip + '-gallium-' + mode,
@@ -212,7 +212,7 @@ if with_tests and with_tools.contains('drm-shim')
     )
   endforeach
 
-  foreach chip : ['g13g', 'g17p']
+  foreach chip : ['g13g', 'g17p', 't6041', 't6041x']
     test(
       'asahi-' + chip + '-gallium-submit',
       prog_python,
@@ -224,7 +224,7 @@ if with_tests and with_tools.contains('drm-shim')
 
   # The shim has to be preloaded before libc's open(), so the test runs the
   # binary through a wrapper that sets LD_PRELOAD and the chip selector.
-  foreach chip : ['g13g', 'g17p']
+  foreach chip : ['g13g', 'g17p', 't6041']
     test(
       'asahi-' + chip + '-gallium-xfb-program',
       prog_python,
@@ -258,22 +258,24 @@ if with_tests and with_tools.contains('drm-shim')
     )
   endforeach
 
-  test(
-    'asahi-g17p-gallium-blit',
-    prog_python,
-    args : [
-      files('tests/run-shim.py'),
-      libasahi_noop_drm_shim,
-      asahi_g17p_blit_test,
-    ],
-    env : [
-      'ASAHI_SHIM_CHIP=g17p',
-      'ASAHI_SHIM_VALIDATE_G17P_STREAM=1',
-      'ASAHI_SHIM_G17P_EXPECT_COMPUTE=1',
-      'ASAHI_SHIM_G17P_EXPECT_STRONG_COMPUTE_BARRIER=1',
-    ],
-    suite : ['asahi'],
-  )
+  foreach chip : ['g17p', 't6041', 't6041x']
+    test(
+      'asahi-' + chip + '-gallium-blit',
+      prog_python,
+      args : [
+        files('tests/run-shim.py'),
+        libasahi_noop_drm_shim,
+        asahi_g17p_blit_test,
+      ],
+      env : [
+        'ASAHI_SHIM_CHIP=' + chip,
+        'ASAHI_SHIM_VALIDATE_G17P_STREAM=1',
+        'ASAHI_SHIM_G17P_EXPECT_COMPUTE=1',
+        'ASAHI_SHIM_G17P_EXPECT_STRONG_COMPUTE_BARRIER=1',
+      ],
+      suite : ['asahi'],
+    )
+  endforeach
 
   test(
     'asahi-g17p-gallium-blit-encode',

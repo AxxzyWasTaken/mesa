@@ -721,7 +721,8 @@ zink_init_compute_caps(struct zink_screen *screen)
    caps->max_subgroups = screen->info.props13.maxComputeWorkgroupSubgroups;
 }
 
-/* The A18 Pro (0x8140) and the M4 Pro (0x6040) run the Borealis G17P path.
+/* The A18 Pro (0x8140), M4 Pro (0x6040) and M4 Max (0x6041) run the
+ * Borealis G17P path.
  * Upstream Honeykrisp has no G17P path, so only the Borealis ID matches.
  */
 static bool
@@ -729,7 +730,8 @@ zink_borealis_g17p(const struct zink_screen *screen)
 {
    return zink_driverid(screen) == VK_DRIVER_ID_AURORA_BOREALIS &&
           (screen->info.props.deviceID == 0x8140 ||
-           screen->info.props.deviceID == 0x6040);
+           screen->info.props.deviceID == 0x6040 ||
+           screen->info.props.deviceID == 0x6041);
 }
 
 static void

@@ -390,7 +390,11 @@ fn set_kernel_arg(
         // arg_size != sizeof(cl_mem) or if arg_size is zero and the argument is declared with the
         // local qualifier or if the argument is a sampler and arg_size != sizeof(cl_sampler).
         match arg.kind {
-            KernelArgType::MemLocal => {}
+            KernelArgType::MemLocal => {
+                if arg_size == 0 {
+                    return Err(CL_INVALID_ARG_SIZE);
+                }
+            }
             KernelArgType::MemGlobal
             | KernelArgType::MemConstant
             | KernelArgType::Image
