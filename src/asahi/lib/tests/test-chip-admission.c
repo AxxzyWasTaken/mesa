@@ -164,7 +164,7 @@ main(void)
    t6040.gpu_generation = 16;
    t6040.gpu_hal_generation = DRM_ASAHI_GPU_HAL_200;
    assert(agx_chip_from_params(&t6040) == AGX_CHIP_G17P);
-   assert(!agx_params_driver_supported(&t6040));
+   assert(agx_params_driver_supported(&t6040));
 
    bad = t6040;
    bad.num_clusters_total = 3;
@@ -349,7 +349,7 @@ main(void)
    m4.chip_id = 0x8132;
    m4.num_clusters_total = 1;
    assert(agx_chip_driver_supported(AGX_CHIP_G16G));
-   assert(!agx_params_driver_supported(&m4));
+   assert(agx_params_driver_supported(&m4));
 
    /* T8122 (G15G) is admitted by default for its exact identity and
     * supported legacy firmware/kernel contract. */

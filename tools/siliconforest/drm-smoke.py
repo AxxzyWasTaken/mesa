@@ -23,8 +23,8 @@ with tempfile.TemporaryDirectory(prefix='siliconforest-vulkan-smoke-') as direct
     cases = [(chip, None, False) for chip in
              ['g13g', 'g15s', 'g15c', 'g17p', 'g15g']]
     # The obsolete opt-in variable must not turn a supported Air off. It must
-    # not admit an unrelated, unqualified GPU either.
-    cases += [('g15g', '0', False), ('g15g', '1', False), ('g16g', '1', True)]
+    # not change Aurora's independently admitted M4 profile either.
+    cases += [('g15g', '0', False), ('g15g', '1', False), ('g16g', '1', False)]
     for chip, old_opt_in, refused in cases:
         env = os.environ.copy()
         env.update(LD_PRELOAD=str(shim), VK_DRIVER_FILES=str(icds[0]),

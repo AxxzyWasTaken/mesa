@@ -4,7 +4,6 @@
  */
 
 #include "agx_chip.h"
-#include "util/u_debug.h"
 
 #include <stddef.h>
 
@@ -556,9 +555,7 @@ agx_params_native_kernel_abi_supported(
 
    const uint64_t required = DRM_ASAHI_FEATURE_PER_COMMAND_INPUT_SYNCS |
                              DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS;
-   const uint64_t legacy_feature_assignments = UINT64_C(0xfc00);
-   return (params->features & required) == required &&
-          !(params->features & legacy_feature_assignments);
+   return (params->features & required) == required;
 }
 
 bool
@@ -737,4 +734,3 @@ agx_command_stream_generation_name(
       return "unknown";
    }
 }
-
