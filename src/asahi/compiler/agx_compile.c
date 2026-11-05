@@ -6,6 +6,7 @@
  */
 
 #include "agx_compile.h"
+#include "c11/threads.h"
 #include "asahi/clc/asahi_clc.h"
 #include "asahi/isa/disasm.h"
 #include "asahi/layout/layout.h"
@@ -83,18 +84,50 @@ agx_get_compiler_debug(void)
    return debug_get_option_agx_compiler_debug();
 }
 
-static __thread char agx_refusal[192];
+/* The last compile refusal of this thread. It lives in thread-specific storage
+ * rather than a __thread array: libgallium and libvulkan_asahi use the
+ * initial-exec TLS model, and a dlopen() of either only gets glibc's small
+ * static TLS surplus, which an 896-byte array exhausts (EGL then fails to load
+ * with "cannot allocate memory in static TLS block"). */
+#define AGX_REFUSAL_SIZE 896
+static tss_t agx_refusal_key;
+static once_flag agx_refusal_once = ONCE_FLAG_INIT;
+
+static void
+agx_refusal_key_init(void)
+{
+   tss_create(&agx_refusal_key, free);
+}
+
+static char *
+agx_refusal_buffer(bool create)
+{
+   call_once(&agx_refusal_once, agx_refusal_key_init);
+   char *buf = tss_get(agx_refusal_key);
+   if (!buf && create) {
+      buf = calloc(1, AGX_REFUSAL_SIZE);
+      if (buf && tss_set(agx_refusal_key, buf) != thrd_success) {
+         free(buf);
+         buf = NULL;
+      }
+   }
+   return buf;
+}
 
 const char *
 agx_last_compile_refusal(void)
 {
-   return agx_refusal;
+   const char *buf = agx_refusal_buffer(false);
+   return buf ? buf : "";
 }
 
 static void
 agx_set_refusal(const agx_context *ctx, const char *what, unsigned line)
 {
-   snprintf(agx_refusal, sizeof(agx_refusal), "%s%s (%s:%u)", what,
+   char *buf = agx_refusal_buffer(true);
+   if (!buf)
+      return;
+   snprintf(buf, AGX_REFUSAL_SIZE, "%s%s (%s:%u)", what,
             ctx ? (ctx->is_preamble ? " [constant program]" : " [main]") : "",
             __FILE__, line);
 }
@@ -10708,7 +10741,7 @@ agx_compile_function_nir_attempt(nir_shader *nir, nir_function_impl *impl,
        * If the encoder refuses an instruction, discard the emitted prefix and
        * report compilation failure. */
       if (!agx3_pack_binary(ctx, binary)) {
-         char what[160];
+         char what[768];
          snprintf(what, sizeof(what), "AGX3 binary packer refused %s",
                   agx3_last_pack_refusal()[0] ? agx3_last_pack_refusal()
                                               : "an instruction");
@@ -12963,7 +12996,9 @@ agx_compile_shader_nir(nir_shader *nir, struct agx_shader_key *key,
       agx_preserve_quad_control(nir);
 
    agx_compiler_debug = agx_get_compiler_debug();
-   agx_refusal[0] = 0;
+   char *refusal = agx_refusal_buffer(false);
+   if (refusal)
+      refusal[0] = 0;
    /* The native constant-program decision is per compile
     * (agx_shader_key::g17p_native_uniforms, read through ctx); the global
     * agx_compiler_debug is never modified here. */
