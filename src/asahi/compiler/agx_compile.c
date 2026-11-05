@@ -11041,6 +11041,7 @@ agx_nir_fragment_output_temporaries(nir_shader *nir)
    nir_variable *exports[256] = {0};
    bool has_tile_store = false, has_export = false, needed = false;
    unsigned tile_writes[8] = {0}, export_writes[256] = {0};
+   unsigned export_bits[256] = {0};
    nir_foreach_function_impl(impl, nir) {
       nir_foreach_block(block, impl) {
          nir_foreach_instr(instr, block) {
@@ -11050,11 +11051,15 @@ agx_nir_fragment_output_temporaries(nir_shader *nir)
             if (intr->intrinsic == nir_intrinsic_load_local_pixel_agx)
                return false;
             if (intr->intrinsic == nir_intrinsic_export_agx) {
-               if (intr->src[0].ssa->bit_size != 32 ||
+               const unsigned bits = intr->src[0].ssa->bit_size;
+               if ((bits != 32 && bits != 16) ||
                    intr->src[0].ssa->num_components != 1 ||
                    nir_intrinsic_base(intr) >= ARRAY_SIZE(exports))
                   return false;
                unsigned index = nir_intrinsic_base(intr);
+               if (export_bits[index] && export_bits[index] != bits)
+                  return false;
+               export_bits[index] = bits;
                needed |= export_writes[index]++ != 0 ||
                   block != nir_impl_last_block(impl);
                if (!exec_node_is_tail_sentinel(instr->node.next)) {
@@ -11112,7 +11117,9 @@ agx_nir_fragment_output_temporaries(nir_shader *nir)
             unsigned index = nir_intrinsic_base(intr);
             if (!exports[index])
                exports[index] = nir_local_variable_create(
-                  impl, glsl_float_type(), NULL);
+                  impl, export_bits[index] == 16 ? glsl_float16_t_type()
+                                                 : glsl_float_type(),
+                  NULL);
             b.cursor = nir_before_instr(instr);
             nir_store_var(&b, exports[index], intr->src[0].ssa, 1);
             nir_instr_remove(instr);
