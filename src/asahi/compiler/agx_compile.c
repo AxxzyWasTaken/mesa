@@ -22,6 +22,7 @@
 #include "util/u_dynarray.h"
 #include "agx_builder.h"
 #include "agx_compiler.h"
+#include "agx_nir_texture.h"
 #include "agx_debug.h"
 #include "agx_nir.h"
 #include "agx3_matrix_core.h"
@@ -34,9 +35,6 @@
 #include "nir_intrinsics.h"
 #include "nir_intrinsics_indices.h"
 #include "shader_enums.h"
-
-/* Cache-line align shader programs. This matches the prop compiler. */
-#define AGX_CODE_ALIGN 0x80
 
 /* clang-format off */
 static const struct debug_named_value agx_debug_options[] = {
@@ -743,11 +741,15 @@ agx_emit_load_vary_agx3(agx_builder *b, agx_index dest, agx_index cf,
       return false;
    }
 
-   /* G17P and G17G use the native projective RHW/RCP/MUL sequence for centre,
-    * sample and centroid inputs alike. */
+   /* G17P uses the native projective RHW/RCP/MUL sequence for centre, sample
+    * and centroid inputs alike. G17G's Gallium fragment path keeps the
+    * generic sequence: the native f32mul has no 16-bit destination form,
+    * which fp16 varyings need, and the generic sequence is what the G17G GL
+    * line was validated with. */
    const bool native_projective =
       b->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3B ||
-      b->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3C;
+      (b->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3C &&
+       b->shader->key->dev.chip != AGX_CHIP_G17G);
    agx_index reciprocal_w = agx_null();
    if (perspective) {
       agx_index rhw_cf = agx_get_cf(b->shader, VARYING_SLOT_POS, 3);
@@ -7668,6 +7670,12 @@ agx_emit_tex(agx_builder *b, nir_tex_instr *instr)
          break;
 
       case nir_tex_src_texture_handle:
+         if (instr->backend_flags & AGX_TEXTURE_FLAG_TABLE_INDEX) {
+            /* The handle fed the descriptor crawl; the operation itself is
+             * bindful, as G17G's native fragment fetches are. */
+            texture = agx_immediate(instr->texture_index);
+            break;
+         }
          texture =
             agx_translate_bindless_handle(b, &instr->src[i].src, &bindless);
          break;
@@ -11198,6 +11206,12 @@ agx_compile_function_nir_attempt(nir_shader *nir, nir_function_impl *impl,
       ctx->any_cf = key->fs.inside_sample_loop;
       ctx->force_early_tests_pending = nir->info.fs.early_fragment_tests;
 
+      /* A G17G epilog runs inside the pixel transaction its main opened:
+       * agx_nir_fs_epilog marks a main that holds the read class. */
+      if (key->dev.encoding == AGX_ISA_ENCODING_AGX3C &&
+          nir->info.internal && nir->info.fs.pixel_interlock_ordered)
+         ctx->already_pixel_waited = 0x8;
+
       nir_foreach_block(block, impl) {
          nir_foreach_instr(instr, block) {
             ctx->zs_writes_left +=
@@ -11713,6 +11727,7 @@ agx_compile_function_nir_attempt(nir_shader *nir, nir_function_impl *impl,
       out->agx3_staging_known = ctx->agx3_staging_known;
       out->agx3_fltnorm_start = ctx->agx3_fltnorm_start;
       out->agx3_colour_link = ctx->agx3_colour_link;
+      out->agx3_pixel_held = ctx->already_pixel_waited;
    }
 
    if (impl->function->is_preamble) {

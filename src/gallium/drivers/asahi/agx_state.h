@@ -171,6 +171,10 @@ struct PACKED agx_draw_uniforms {
    /* Provoking vertex: 0, 1, 2 */
    uint16_t provoking_vertex;
 
+   /* G17G: the layer a split layered draw is bound to (agx_g17g_bind_layer),
+    * which a fragment gl_Layer read returns. */
+   uint16_t layer_id;
+
    /* Mapping from varying slots written by the last vertex stage to UVS
     * indices. This mapping must be compatible with the fragment shader.
     */
@@ -276,6 +280,11 @@ struct agx_compiled_shader {
    /* The variant contains Honeykrisp-style custom-border emulation. */
    bool g17p_custom_border_emulation;
 
+   /* G17G: the fragment runs per sample by repeating its body once per
+    * sample, each with its own colour exports, and its epilog repeats the
+    * same way; the link adds no external sample loop. */
+   bool g17g_samples_unrolled;
+
    /* Uniforms the driver must push */
    unsigned push_range_count;
    struct agx_push_range push[AGX_MAX_PUSH_RANGES];
@@ -328,6 +337,7 @@ struct agx_uncompiled_shader {
    struct {
       uint64_t inputs_flat_shaded;
       uint64_t inputs_linear_shaded;
+      uint64_t inputs_read;
       uint8_t cull_distance_size;
       bool has_edgeflags;
       bool uses_fbfetch;
@@ -358,6 +368,21 @@ struct agx_uncompiled_shader {
    uint32_t xfb_strides[4];
    bool has_xfb_info;
    bool is_xfb_passthrough;
+
+   /* G17G: this vertex shader for the draw module, which captures transform
+    * feedback on the CPU (agx_xfb_cpu.c). */
+   struct draw_vertex_shader *xfb_cpu_vs;
+
+   /* G17G: this shader for the draw module running the stages before
+    * rasterization on the CPU (agx_swtnl.c), created on first use. */
+   void *swtnl_shader;
+   bool swtnl_failed;
+
+   /* G17G fragment shaders: the varyings each split MRT pass's program still
+    * reads once its other colour outputs are gone (agx_g17g_split_mrt);
+    * bit rt of g17g_mrt_inputs_valid marks g17g_mrt_inputs[rt] computed. */
+   uint64_t g17g_mrt_inputs[PIPE_MAX_COLOR_BUFS];
+   uint8_t g17g_mrt_inputs_valid;
 
    enum mesa_prim gs_mode;
 
@@ -435,12 +460,22 @@ uint16_t agx_sampler_heap_add(struct agx_device *dev,
                               struct agx_sampler_heap *heap,
                               struct agx_sampler_packed *sampler);
 
+/* agx_launch_gs_prerast() issues at most five: vertex-as-compute, geometry
+ * count, prefix sum, pre-GS and the geometry shader itself. */
+#define AGX_MAX_CDM_DISPATCHES 8
+
 struct agx_encoder {
    struct agx_bo *bo;
    uint64_t g17p_vdm_alias;
    uint8_t *current;
    uint8_t *end;
 };
+
+/* Primitives per G17G render; see agx_draw_vbo(). 128K tessellated
+ * primitives in one render timed out the submission (GLES31
+ * primitive_bounding_box.depth.user_defined_depth.per_primitive_bbox_equal,
+ * two 64K-primitive draws); 64K passed. Keep a margin below that. */
+#define AGX_G17G_RENDER_PRIMS (32 * 1024)
 
 struct agx_batch {
    struct agx_context *ctx;
@@ -458,6 +493,9 @@ struct agx_batch {
    struct agx_compiled_shader *g17p_fragment_shader;
    struct agx_linked_shader *g17p_fragment_linked;
 
+   /* G17G: primitives drawn into this render (see AGX_G17G_RENDER_PRIMS) */
+   uint64_t g17g_prims;
+
    struct agx_tilebuffer_layout tilebuffer_layout;
 
    /* PIPE_CLEAR_* bitmask */
@@ -467,6 +505,19 @@ struct agx_batch {
    /* Only a loader-provided resolve may seed the multisample tile reload. */
    bool g17p_resolve_reload;
    bool g17p_resolve_preserve;
+
+   /* Set when a descriptor or state in this batch has no proven native
+    * encoding on the current chip. Nothing from the batch may reach the
+    * hardware; agx_batch_submit drops it without a context reset.
+    */
+   bool native_rejected;
+
+   /* Draws the G17G profile refused. A batch whose render carries none of its
+    * draws has nothing valid to rasterize: its VDM stream never received
+    * them, and submitting it anyway fails UAPI translation with a silent
+    * EINVAL. A batch with no refusals and no draws is an ordinary clear and
+    * still needs its render. */
+   unsigned draws_refused;
 
    uint64_t uploaded_clear_color[PIPE_MAX_COLOR_BUFS];
    union pipe_color_union clear_color[PIPE_MAX_COLOR_BUFS];
@@ -519,11 +570,31 @@ struct agx_batch {
    struct agx_pool pool, pipeline_pool;
    struct util_dynarray g17p_vdm_aliases;
 
+   /* With AGX_DBG_FAULTTRACE, retain the small DRM command wrapper while this
+    * batch is in flight. Its referenced BOs and encoders already remain live
+    * until batch cleanup, allowing an asynchronous queue fault to be decoded
+    * when a later submit observes it. */
+   struct util_dynarray faulttrace_cmdbuf;
+   uint64_t faulttrace_seqid;
+
    /* We may enqueue both CDM and VDM work, possibly to the same batch for
     * geometry/tessellation.
     */
    struct agx_encoder vdm;
    struct agx_encoder cdm;
+
+   /* The native M5 compute profile covers one dispatch per command: its
+    * captured control stream is a single launch, its grid, a barrier and the
+    * terminator, and the descriptor carries one dispatch identity, one
+    * submission index and one pair of dispatch stamps. A geometry-shader or
+    * transform-feedback prepass issues several launches, so on AGX3c each one
+    * is terminated where it ends and submitted as its own command, in order.
+    * Byte offsets into cdm.bo; empty on every other part, where the whole
+    * stream is submitted once. */
+   struct {
+      uint32_t start, end;
+   } cdm_dispatch[AGX_MAX_CDM_DISPATCHES];
+   unsigned cdm_dispatch_count;
 
    /* Scissor and depth-bias descriptors, uploaded at GPU time */
    struct util_dynarray scissor, depth_bias;
@@ -571,6 +642,18 @@ struct asahi_vs_shader_key {
     */
    bool hw;
    bool custom_borders;
+
+   /* G17G has no UVS store with a register index, so its vertex shaders
+    * take the UVS layout linked against the bound fragment shader's
+    * interpolation as constants rather than as uniforms (separable
+    * programs do not know it at compile time). */
+   bool g17g_link_uvs;
+   uint64_t flat_varyings;
+   uint64_t linear_varyings;
+
+   /* Nonzero: export only these generic varyings (VARYING_SLOT_VAR0 and
+    * up), the ones a split MRT pass's fragment program reads. */
+   uint64_t g17g_fs_inputs;
 };
 
 struct agx_vertex_elements {
@@ -580,13 +663,19 @@ struct agx_vertex_elements {
    /* These parts do not affect the generated code so are not in the key */
    uint16_t src_offsets[PIPE_MAX_ATTRIBS];
    uint16_t buffers[PIPE_MAX_ATTRIBS];
+
+   /* The elements as bound, for the draw module (agx_xfb_cpu.c). */
+   struct pipe_vertex_element pipe[PIPE_MAX_ATTRIBS];
 };
 
 struct asahi_fs_shader_key {
    enum pipe_format rt_formats[PIPE_MAX_COLOR_BUFS];
    uint8_t nr_samples;
    bool custom_borders;
-   bool padding[6];
+   /* G17G: keep colour output g17g_mrt_output - 1 alone, at location 0
+    * (agx_g17g_split_mrt). Zero keeps every output. */
+   uint8_t g17g_mrt_output;
+   bool padding[5];
 };
 static_assert(sizeof(struct asahi_fs_shader_key) == 40, "no holes");
 
@@ -594,10 +683,24 @@ struct asahi_cs_shader_key {
    bool custom_borders;
 };
 
+/* The geometry copy program is a hardware vertex shader compiled before the
+ * fragment shader is known, so it normally reads its UVS indices from
+ * uniforms. AGX3's UVSW takes only an immediate index (every native G17P and
+ * G17G vertex program), so on those chips the copy program is compiled per
+ * fragment interpolation layout: the same flat/linear masks the draw-time
+ * link uses, so both sides derive one UVS layout. */
+struct asahi_gs_shader_key {
+   uint64_t flat_varyings;
+   uint64_t linear_varyings;
+   uint64_t link_uvs;
+};
+static_assert(sizeof(struct asahi_gs_shader_key) == 24, "no holes");
+
 union asahi_shader_key {
    struct asahi_vs_shader_key vs;
    struct asahi_fs_shader_key fs;
    struct asahi_cs_shader_key cs;
+   struct asahi_gs_shader_key gs;
 };
 
 enum agx_dirty {
@@ -742,6 +845,35 @@ struct agx_context {
 
    struct pipe_vertex_buffer vertex_buffers[PIPE_MAX_ATTRIBS];
    uint32_t vb_mask;
+
+   /* G17G: transform feedback on the CPU (agx_xfb_cpu.c). */
+   struct draw_context *xfb_draw;
+   struct vbuf_render *xfb_render;
+
+   /* G17G renders one colour attachment at a time: while an application draw
+    * is split, the bound framebuffer holds attachment g17g_mrt_rt alone at
+    * slot 0, and g17g_mrt_pass counts the passes of the draw. */
+   bool g17g_mrt_split;
+   uint8_t g17g_mrt_rt, g17g_mrt_pass;
+
+   /* G17G: an application draw runs once over every colour attachment,
+    * attachment 0 in the tilebuffer and the others spilled
+    * (agx_g17g_mrt_one_pass). */
+   bool g17g_mrt_spill;
+
+   /* G17G renders one layer at a time (agx_g17g_bind_layer): while a draw
+    * or clear of a layered framebuffer is split, the bound framebuffer holds
+    * one layer's views. g17g_layered_fb is the application's framebuffer
+    * while agx_swtnl.c sorts a CPU geometry stage's primitives by layer. */
+   bool g17g_layer_split;
+   uint16_t g17g_layer;
+   const struct pipe_framebuffer_state *g17g_layered_fb;
+
+   /* G17G: the stages before rasterization on the CPU (agx_swtnl.c). */
+   struct draw_context *swtnl_draw;
+   struct vbuf_render *swtnl_render;
+   struct hash_table_u64 *swtnl_vs;
+   bool swtnl_inner;
 
    unsigned patch_vertices;
    float default_outer_level[4];
@@ -914,6 +1046,41 @@ uint64_t agx_batch_get_so_address(struct agx_batch *batch, unsigned buffer,
                                   uint32_t *size);
 
 void agx_init_streamout_functions(struct pipe_context *ctx);
+
+void agx_xfb_cpu_create_vs(struct agx_context *ctx,
+                           struct agx_uncompiled_shader *so,
+                           const struct pipe_shader_state *cso,
+                           const nir_shader *nir);
+void agx_xfb_cpu_delete_vs(struct agx_context *ctx,
+                           struct agx_uncompiled_shader *so);
+bool agx_xfb_cpu_applies(struct agx_context *ctx,
+                         const struct pipe_draw_indirect_info *indirect);
+void agx_xfb_cpu_draw(struct agx_context *ctx,
+                      const struct pipe_draw_info *info,
+                      const struct pipe_draw_start_count_bias *draw);
+void agx_xfb_cpu_destroy(struct agx_context *ctx);
+
+bool agx_swtnl_lower_for_draw(nir_shader *nir);
+bool agx_swtnl_applies(struct agx_context *ctx);
+void agx_swtnl_draw(struct agx_context *ctx, const struct pipe_draw_info *info,
+                    const struct pipe_draw_start_count_bias *draw);
+void agx_swtnl_delete_shader(struct agx_context *ctx,
+                             struct agx_uncompiled_shader *so);
+void agx_swtnl_destroy(struct agx_context *ctx);
+
+void agx_g17g_bind_layer(struct agx_context *ctx,
+                         const struct pipe_framebuffer_state *layered,
+                         unsigned layer);
+void agx_g17g_layered_clear(struct agx_context *ctx, unsigned buffers,
+                            uint32_t color_clear_mask,
+                            uint8_t stencil_clear_mask,
+                            const union pipe_color_union *color,
+                            double depth, unsigned stencil);
+void agx_g17g_split_mrt_clear(struct agx_context *ctx, unsigned buffers,
+                              uint32_t color_clear_mask,
+                              uint8_t stencil_clear_mask,
+                              const union pipe_color_union *color,
+                              double depth, unsigned stencil);
 
 static inline void
 agx_dirty_all(struct agx_context *ctx)
@@ -1151,15 +1318,22 @@ struct agx_lower_bindings_options {
    bool g17p_shadow_gather;
    bool g17p_bindless_storage;
    unsigned image_records;
+   /* Keep a crawled texture bindful when its index fits the state table:
+    * the handle serves the descriptor read, the operation names the entry. */
+   bool table_index_crawls;
    unsigned bindful_sampler_count;
 };
 
 bool agx_nir_lower_bindings(nir_shader *shader,
                        struct agx_lower_bindings_options *options);
-bool agx_nir_lower_custom_border_g17p(nir_shader *shader, bool shadow_gather);
+/* shadow_gathers: also depth-compare gathers (G17G, whose sampler record
+ * leaves the comparison to the instruction). */
+bool agx_nir_lower_custom_border_g17p(nir_shader *shader, bool shadow_gathers);
+bool agx_nir_lower_custom_border_g17g(nir_shader *shader);
 bool agx_nir_rebind_g17p_texture_crawls(nir_shader *shader);
 bool agx_nir_lower_g17p_storage_records(nir_shader *shader,
                                         unsigned record_size_B);
+bool agx_nir_rebind_g17g_image_loads(nir_shader *shader);
 
 bool agx_batch_is_active(struct agx_batch *batch);
 bool agx_batch_is_submitted(struct agx_batch *batch);
@@ -1285,6 +1459,12 @@ bool agx_g17p_direct_resolve_blit_shape(const struct pipe_blit_info *info,
 bool agx_g17p_staged_resolve_blit_shape(const struct pipe_blit_info *info);
 
 bool agx_g17p_stencil_plane_blit_shape(const struct pipe_blit_info *info);
+
+bool agx_generate_mipmap_g17g(struct pipe_context *pctx,
+                              struct pipe_resource *prsc,
+                              enum pipe_format format, unsigned base_level,
+                              unsigned last_level, unsigned first_layer,
+                              unsigned last_layer);
 
 void agx_resource_copy_region(struct pipe_context *pctx,
                               struct pipe_resource *dst, unsigned dst_level,

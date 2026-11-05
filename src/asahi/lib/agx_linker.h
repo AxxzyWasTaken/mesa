@@ -346,6 +346,12 @@ struct agx_fs_epilog_key {
    uint16_t max_samples_per_tile;
    bool force_small_tile;
    bool preserve_zero_mask;
+   /* The layout keeps attachment 0 alone in the tilebuffer and spills the
+    * others (agx_build_tilebuffer_layout_rt0_resident). */
+   bool rt0_resident;
+   /* Pixel classes the main part already holds (agx_shader_info::
+    * agx3_pixel_held); the epilog does not wait for them again. */
+   uint8_t main_pixel_held;
    /* M5: the epilog's coverage update is the single native testing form
     * (agx_nir_lower_sample_mask_m5). */
    bool m5_coverage;

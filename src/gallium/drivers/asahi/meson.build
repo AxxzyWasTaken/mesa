@@ -16,6 +16,8 @@ files_asahi = files(
   'agx_state.c',
   'agx_streamout.c',
   'agx_uniforms.c',
+  'agx_xfb_cpu.c',
+  'agx_swtnl.c',
 )
 
 if with_tests
