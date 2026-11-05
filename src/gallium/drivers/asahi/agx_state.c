@@ -3816,13 +3816,13 @@ agx_update_fs(struct agx_batch *batch)
    /* HAL200 texture/sampler table pointers consume fragment uniform halves
     * 0..7, overlapping the legacy dynamic blend constants at halves4..11.
     * Link the epilog against a range after the main shader's complete uniform
-    * footprint. agx_build_g17p_graphics_program() publishes that exact range.
+    * footprint. The graphics program builder publishes that exact range.
     */
-   if (agx_native_graphics(dev) &&
+   if ((agx_native_graphics(dev) || dev->chip == AGX_CHIP_G17G) &&
        agx_nr_tex_descriptors(batch, ctx->fs) != 0 &&
        !agx_g17p_fragment_blend_constant_base(
           dev->chip, ctx->fs, &link_key.epilog.fs.blend_constant_base)) {
-      mesa_loge("asahi: G17P fragment blend constants exceed the native "
+      mesa_loge("asahi: fragment blend constants exceed the native "
                 "uniform file");
       ctx->linked.fs = NULL;
       return true;
