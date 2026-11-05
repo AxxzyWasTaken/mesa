@@ -7,6 +7,7 @@
 
 #include <stdbool.h>
 #include "asahi/compiler/agx_compile.h"
+#include "agx_zls_pixels.h"
 #include "asahi/layout/layout.h"
 #include "agx_abi.h"
 #include "agx_pack.h"

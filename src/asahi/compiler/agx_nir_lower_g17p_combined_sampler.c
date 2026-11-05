@@ -605,6 +605,37 @@ agx_nir_lower_g17p_combined_sampler(
    return true;
 }
 
+bool
+agx_nir_lower_g17g_combined_sampler(
+   nir_shader *shader, struct agx_g17p_combined_sampler_binding *binding)
+{
+   if (!shader || !binding || shader->info.stage != MESA_SHADER_FRAGMENT)
+      return false;
+
+   nir_foreach_function_impl(impl, shader) {
+      nir_foreach_block(block, impl) {
+         nir_foreach_instr(instr, block) {
+            if (instr->type != nir_instr_type_tex)
+               continue;
+            const nir_tex_instr *tex = nir_instr_as_tex(instr);
+            const int lod = nir_tex_instr_src_index(tex, nir_tex_src_lod);
+            if (tex->op != nir_texop_txl ||
+                tex->sampler_dim != GLSL_SAMPLER_DIM_2D || tex->is_array ||
+                tex->is_shadow || tex->dest_type != nir_type_float32 ||
+                lod < 0 || !nir_src_is_const(tex->src[lod].src) ||
+                nir_src_as_float(tex->src[lod].src) != 0.0)
+               return false;
+         }
+      }
+   }
+
+   /* Both generations place the sampler word at +32 and its heap index at
+    * +40. The common pass validates a single static set-0 resource and
+    * rewrites only that resource's descriptor crawls. No API LOD bias is
+    * removed here: the bounded M5 shape has an explicit zero level. */
+   return agx_nir_lower_g17p_combined_sampler(shader, binding);
+}
+
 /* Ordinary native integer-coordinate read. The descriptor selects float,
  * signed, or unsigned texel interpretation; the result is a 32-bit register
  * value in each case. Input attachments arrive as 2D-array reads. */
@@ -1003,6 +1034,39 @@ lower_indexed_samplers(nir_shader *shader, int native32_set, bool m5)
    }
    NIR_PASS(_, shader, nir_opt_dce);
    return true;
+}
+
+bool
+agx_nir_lower_g17g_indexed_samplers(nir_shader *shader)
+{
+   if (!shader || shader->info.stage != MESA_SHADER_FRAGMENT)
+      return false;
+   nir_foreach_function_impl(impl, shader) {
+      nir_foreach_block(block, impl) {
+         nir_foreach_instr(instr, block) {
+            /* The shared lowering also supports storage-image fetches on
+             * G17P. M5 currently only has the array-sample operand ABI. */
+            if (instr->type == nir_instr_type_intrinsic &&
+                nir_instr_as_intrinsic(instr)->intrinsic ==
+                   nir_intrinsic_bindless_image_load)
+               return false;
+            if (instr->type != nir_instr_type_tex)
+               continue;
+            const nir_tex_instr *tex = nir_instr_as_tex(instr);
+            const int lod = nir_tex_instr_src_index(tex, nir_tex_src_lod);
+            if (tex->op != nir_texop_txl ||
+                tex->sampler_dim != GLSL_SAMPLER_DIM_2D || !tex->is_array ||
+                tex->is_shadow || tex->dest_type != nir_type_float32 ||
+                lod < 0 || !nir_src_is_const(tex->src[lod].src) ||
+                nir_src_as_float(tex->src[lod].src) != 0.0)
+               return false;
+         }
+      }
+   }
+   /* Gen10 publishes the same software heap-index tail and reserved sampler
+    * prefix as Gen9. The native opcode/staging differences stay in the M5
+    * encoder; this shared lowering only translates API handles to indices. */
+   return agx_nir_lower_g17p_indexed_samplers(shader);
 }
 
 bool
@@ -1619,6 +1683,85 @@ agx_nir_lower_g17p_storage_image(
       .pbe_offset_B = pbe_offset_B,
       .write_only = load == NULL && atomics == 0,
    };
+   return true;
+}
+
+bool
+agx_nir_lower_g17p_gallium_storage_write(nir_shader *shader,
+                                          unsigned pbe_state)
+{
+   if (!shader || shader->info.stage != MESA_SHADER_COMPUTE ||
+       BITSET_LAST_BIT(shader->info.textures_used) != 0 ||
+       BITSET_LAST_BIT(shader->info.images_used) != 1)
+      return false;
+
+   nir_intrinsic_instr *store = NULL;
+   unsigned impl_count = 0;
+   nir_foreach_function_impl(impl, shader) {
+      impl_count++;
+      nir_foreach_block(block, impl) {
+         nir_foreach_instr(instr, block) {
+            if (instr->type == nir_instr_type_tex)
+               return false;
+            if (instr->type != nir_instr_type_intrinsic)
+               continue;
+
+            nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+            switch (intr->intrinsic) {
+            case nir_intrinsic_image_store: {
+               const enum pipe_format format = nir_intrinsic_format(intr);
+               const unsigned data_components =
+                  nir_src_num_components(intr->src[3]);
+               if (store ||
+                   (format != PIPE_FORMAT_R32_UINT &&
+                    format != PIPE_FORMAT_R32_SINT) ||
+                   nir_intrinsic_image_dim(intr) != GLSL_SAMPLER_DIM_2D ||
+                   nir_intrinsic_image_array(intr) ||
+                   !nir_src_is_const(intr->src[0]) ||
+                   nir_src_as_uint(intr->src[0]) != pbe_state ||
+                   nir_src_num_components(intr->src[1]) != 4 ||
+                   nir_src_bit_size(intr->src[1]) != 32 ||
+                   (data_components != 1 && data_components != 4) ||
+                   nir_src_bit_size(intr->src[3]) != 32 ||
+                   !nir_src_is_const(intr->src[2]) ||
+                   nir_src_as_uint(intr->src[2]) != 0 ||
+                   !nir_src_is_const(intr->src[4]) ||
+                   nir_src_as_uint(intr->src[4]) != 0 ||
+                   (nir_intrinsic_access(intr) &
+                    (ACCESS_COHERENT | ACCESS_VOLATILE)))
+                  return false;
+               store = intr;
+               break;
+            }
+            case nir_intrinsic_image_load:
+            case nir_intrinsic_image_sparse_load:
+            case nir_intrinsic_image_atomic:
+            case nir_intrinsic_image_atomic_swap:
+            case nir_intrinsic_image_size:
+            case nir_intrinsic_image_samples:
+            case nir_intrinsic_bindless_image_load:
+            case nir_intrinsic_bindless_image_sparse_load:
+            case nir_intrinsic_bindless_image_store:
+            case nir_intrinsic_bindless_image_atomic:
+            case nir_intrinsic_bindless_image_atomic_swap:
+            case nir_intrinsic_bindless_image_size:
+            case nir_intrinsic_bindless_image_samples:
+               return false;
+            default:
+               break;
+            }
+         }
+      }
+   }
+
+   if (impl_count != 1 || !store)
+      return false;
+
+   nir_builder b = nir_builder_at(nir_before_instr(&store->instr));
+   nir_src_rewrite(&store->src[0], nir_imm_intN_t(&b, 0, 16));
+   nir_progress(true, nir_shader_get_entrypoint(shader),
+                nir_metadata_control_flow);
+   NIR_PASS(_, shader, nir_opt_dce);
    return true;
 }
 

@@ -8,6 +8,7 @@
  */
 
 #include <stdint.h>
+#include "asahi/compiler/agx_debug.h"
 #include "asahi/compiler/agx_nir_texture.h"
 #include "asahi/layout/layout.h"
 #include "compiler/nir/nir_builder.h"
@@ -743,12 +744,35 @@ agx_blit(struct pipe_context *pipe, const struct pipe_blit_info *info)
          /* Resolve stencil by selecting sample zero, but preserve every
           * sample when copying between multisample images. G17P sample
           * shading handles the latter through the shared static lowering.
+          * Equal-sample-count G18 copies must preserve each source sample;
+          * its render blitter supports the per-sample shading path.
           */
-         stencil.sample0_only = info->src.resource->nr_samples > 1 &&
-                                info->dst.resource->nr_samples <= 1;
+         if (agx_device(pipe->screen)->chip == AGX_CHIP_G18G) {
+            const bool preserve_samples =
+               util_res_sample_count(stencil.src.resource) ==
+                  util_res_sample_count(stencil.dst.resource);
+            stencil.sample0_only =
+               info->src.resource->nr_samples > 1 && !preserve_samples;
+         } else {
+            stencil.sample0_only = info->src.resource->nr_samples > 1 &&
+                                   info->dst.resource->nr_samples <= 1;
+         }
          agx_blit(pipe, &stencil);
          return;
       }
+   }
+
+   if (agx_device(pipe->screen)->chip == AGX_CHIP_G18G &&
+       (agx_device(pipe->screen)->debug & AGX_DBG_FAULTTRACE)) {
+      fprintf(stderr,
+              "M5_BLIT %s %ux%u L%u -> %s %ux%u L%u mask=%#x filter=%u "
+              "scissor=%u samples=%u->%u\n",
+              util_format_name(info->src.format), info->src.box.width,
+              info->src.box.height, info->src.level,
+              util_format_name(info->dst.format), info->dst.box.width,
+              info->dst.box.height, info->dst.level, info->mask, info->filter,
+              info->scissor_enable, info->src.resource->nr_samples,
+              info->dst.resource->nr_samples);
    }
 
    if (info->render_condition_enable && !agx_render_condition_check(ctx))
@@ -763,6 +787,14 @@ agx_blit(struct pipe_context *pipe, const struct pipe_blit_info *info)
    agx_legalize_compression(ctx, agx_resource(info->src.resource),
                             info->src.format);
 
+   /* The current G18 fused EOT resolve replaces the multisample store. GL
+    * requires the source samples to survive a resolve, including subsequent
+    * texture fetches and resolves. Store them first and use the render blitter
+    * to fetch and average every sample until EOT can preserve both outputs. */
+   const bool g18_msaa4 =
+      agx_device(ctx->base.screen)->chip == AGX_CHIP_G18G &&
+      agx_g18_msaa4_enabled();
+
    if (agx_native_graphics(agx_device(ctx->base.screen)) &&
        agx_g17p_direct_resolve_blit_shape(info, true) &&
        agx_g17p_attach_direct_resolve(ctx, info->src.resource,
@@ -773,6 +805,28 @@ agx_blit(struct pipe_context *pipe, const struct pipe_blit_info *info)
        agx_g17p_staged_resolve_blit_shape(info) &&
        agx_g17p_staged_resolve_blit(ctx, info))
       return;
+
+   /* The render blitter fetches every stored sample and performs the format's
+    * resolve in the shader. A non-layered framebuffer can select any valid
+    * layer of the supported array storage; u_blitter carries that layer into
+    * the source coordinates. Keep the single-layer extent and storage checks.
+    */
+   if (g18_msaa4 && util_res_sample_count(info->src.resource) > 1 &&
+       (!agx_g18_msaa4_storage(agx_device(ctx->base.screen),
+                                agx_resource(info->src.resource),
+                                info->src.format) ||
+        info->src.level != 0 || info->src.box.z < 0 ||
+        (unsigned)info->src.box.z >= info->src.resource->array_size ||
+        info->src.box.depth != 1)) {
+      mesa_loge("asahi: G18G multisample blit source %s %ux%u has "
+                "unsupported sample count, format or storage layout "
+                "(level=%u layer=%d depth=%d samples=%u target=%u)",
+                util_format_name(info->src.format), info->src.box.width,
+                info->src.box.height, info->src.level, info->src.box.z,
+                info->src.box.depth, util_res_sample_count(info->src.resource),
+                info->src.resource->target);
+      return;
+   }
 
    if (asahi_compute_blit_supported(agx_device(ctx->base.screen)->chip,
                                     info)) {
@@ -794,6 +848,9 @@ agx_blit(struct pipe_context *pipe, const struct pipe_blit_info *info)
       ctx, ctx->blitter,
       ASAHI_BLIT |
          (info->render_condition_enable ? 0 : ASAHI_DISABLE_RENDER_COND));
+   if (agx_device(pipe->screen)->chip == AGX_CHIP_G18G &&
+       (agx_device(pipe->screen)->debug & AGX_DBG_FAULTTRACE))
+      fprintf(stderr, "M5_BLIT entering u_blitter\n");
    util_blitter_blit(ctx->blitter, info, NULL);
 
    /* The first DRI drawable validation seeds its private MSAA colourbuffer

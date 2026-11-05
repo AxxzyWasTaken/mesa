@@ -58,8 +58,12 @@ struct ail_tile ail_get_max_tile_size(unsigned blocksize_B);
 uint64_t ail_m5_layer_stride_B(uint64_t unaligned_size_B, unsigned layers,
                               bool has_compression_metadata);
 
-/* Compression metadata uses 16x16 tiles through 8 B/px and 16x8 at 16 B/px. */
-struct ail_tile ail_m5_compression_tile_size(unsigned blocksize_B);
+/* Compression metadata uses 16x16 tiles through 8 B/px and 16x8 at 16 B/px.
+ * Tile dimensions are in sample elements. On G18G the 16 B/px geometry
+ * rotates to 8x16 for 2x/8x MSAA; other chips pass sample_count_sa = 1
+ * (ail_metadata_tile in layout.h), which keeps the G17G-family rule. */
+struct ail_tile ail_m5_compression_tile_size(unsigned blocksize_B,
+                                            unsigned sample_count_sa);
 
 #ifdef __cplusplus
 }

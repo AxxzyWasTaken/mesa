@@ -45,6 +45,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include "util/log.h"
+#include "util/u_debug.h"
 #include "util/hash_table.h"
 #include "util/set.h"
 #include "util/u_debug.h"
@@ -736,7 +737,49 @@ hk_cmd_buffer_emit_cs_jump(struct hk_cmd_buffer *cmd, void *current,
    return current;
 }
 
-static void *
+int hk_g17p_launch_trace_state = -1;
+
+int
+hk_g17p_launch_trace_init(void)
+{
+   const int enabled = debug_get_bool_option("HK_G17P_LAUNCH_TRACE", false) ? 1 : 0;
+   hk_g17p_launch_trace_state = enabled;
+   return enabled;
+}
+
+/* Single line, distinct tag. The multi-line dump below has twice been reported
+ * as "only the header printed", so anything that must not be lost in a log
+ * filter goes through this instead. */
+void
+hk_g17p_trace_line(const char *label, uint64_t base, const void *data,
+                   size_t len)
+{
+   const uint8_t *bytes = data;
+   fprintf(stderr, "G17P %s: base=%" PRIx64 " len=%zu bytes=", label, base,
+           len);
+   for (size_t i = 0; i < len; ++i)
+      fprintf(stderr, "%02x", bytes[i]);
+   fprintf(stderr, "\n");
+   fflush(stderr);
+}
+
+void
+hk_g17p_trace_hexdump(const char *label, uint64_t base, const void *data,
+                      size_t len)
+{
+   const uint8_t *bytes = data;
+   fprintf(stderr, "G17P dump: %s base=%" PRIx64 " len=%zu\n", label, base,
+           len);
+   for (size_t off = 0; off < len; off += 16) {
+      fprintf(stderr, "G17P dump:   +%04zx ", off);
+      for (size_t i = 0; i < 16 && off + i < len; ++i)
+         fprintf(stderr, "%02x ", bytes[off + i]);
+      fprintf(stderr, "\n");
+   }
+   fflush(stderr);
+}
+
+void *
 hk_cmd_buffer_emit_cdm_terminate(struct hk_cmd_buffer *cmd, void *current)
 {
    struct hk_device *dev = hk_cmd_buffer_device(cmd);
@@ -3689,6 +3732,9 @@ hk_dispatch_precomp(struct hk_cmd_buffer *cmd, struct agx_grid grid,
 
    struct agx_precompiled_shader *prog = agx_get_precompiled(&dev->bg_eot, idx);
    if (!prog) {
+      if (dev->dev.chip == AGX_CHIP_G18G)
+         mesa_loge("missing precompiled helper %u on %s (barrier=%u)",
+                   idx, agx_chip_name(dev->dev.chip), barrier);
       vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
       return;
    }
@@ -3837,8 +3883,10 @@ hk_cs_init_graphics(struct hk_cmd_buffer *cmd, struct hk_cs *cs)
 
    hk_drm_attachment_set_init(&cs->fragment_attachments);
 
-   /* Only the native AGX3 path submits the spans (hk_queue.c). */
-   if (agx_native_graphics(&dev->dev))
+   /* Only the native AGX3 path submits the spans (hk_queue.c). G18G
+    * submits them too, as it did before the paths were split. */
+   const bool g18g = dev->dev.chip == AGX_CHIP_G18G;
+   if (agx_native_graphics(&dev->dev) || g18g)
       hk_cs_capture_fragment_attachments(dev, render, cs);
 
    if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) {

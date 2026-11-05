@@ -22,13 +22,13 @@ b_only(enum agx_isa_encoding enc)
 static bool
 enc_ok(enum agx_isa_encoding enc)
 {
-   return enc == AGX_ISA_ENCODING_AGX3B || enc == AGX_ISA_ENCODING_AGX3C;
+   return enc == AGX_ISA_ENCODING_AGX3B || agx_encoding_is_g17_class(enc);
 }
 
 static unsigned
 nslots(enum agx_isa_encoding enc)
 {
-   return enc == AGX_ISA_ENCODING_AGX3C ? 8 : 6;
+   return agx_encoding_is_g17_class(enc) ? 8 : 6;
 }
 
 static uint16_t
@@ -131,8 +131,22 @@ agx3_fltnorm_encode(enum agx_isa_encoding enc,
    memset(out, 0, AGX3_FLTNORM_MAX_LENGTH);
    *len = 0;
 
-   if (!enc_ok(enc) || d->dest >= 256 ||
-       (d->first_instruction && enc != AGX_ISA_ENCODING_AGX3B))
+   /* M5's native flat-colour program also marks its leading FLTNORM with
+    * f68. Its second immediate pack leaves the bit clear. */
+   if (!enc_ok(enc) || d->dest >= 256)
+      return false;
+   /* G18G (agx3d) keeps fltnorm's agx3c encoding: 147 of the 152 aligned
+    * applegpu_g17g/applegpu_g18g fltnorm words of the m5 reference corpus are
+    * byte-identical and the rest differ only in register and wait choices,
+    * and the wait field stays a mask. No G18G program carries the f68 start
+    * marker, so it is refused there. */
+   if (enc == AGX_ISA_ENCODING_AGX3D && d->first_instruction)
+      return false;
+   if (enc == AGX_ISA_ENCODING_AGX3C && d->first_instruction &&
+       (!d->two_lanes || d->snorm || d->is_16bit ||
+        d->srgb != AGX3_FLTNORM_SRGB_NONE ||
+        d->src[0].kind != AGX3_FLTNORM_SRC_IMMEDIATE ||
+        d->src[1].kind != AGX3_FLTNORM_SRC_IMMEDIATE))
       return false;
    if ((d->wait_mask & ~wait_limit(enc)) != 0)
       return false;
@@ -140,6 +154,8 @@ agx3_fltnorm_encode(enum agx_isa_encoding enc,
       return false;
    if (d->two_lanes != (d->src[1].kind != AGX3_FLTNORM_SRC_NONE))
       return false;
+   /* G18G normalized16 output witnesses carry modes 2/3 in the same operand
+    * map; G18G compiles to agx3c before its agx3d re-encode. */
 
    static const struct src_fields s0 = {
       .f_kind = 23, .f_imm = 15, .f_reg = 16, .f_uniform = 17,
@@ -155,7 +171,7 @@ agx3_fltnorm_encode(enum agx_isa_encoding enc,
    unsigned nbase = 0;
    base[nbase++] = (struct agx3_field_kv)KV(9, 2);
    base[nbase++] = (struct agx3_field_kv)KV(10, 1);
-   if (enc == AGX_ISA_ENCODING_AGX3C) {
+   if (agx_encoding_is_g17_class(enc)) {
       base[nbase++] = (struct agx3_field_kv)KV(48, 3);
       base[nbase++] = (struct agx3_field_kv)KV(49, 72);
    }
@@ -189,7 +205,8 @@ agx3_fltnorm_encode(enum agx_isa_encoding enc,
       if (d->wait_mask & (1u << i))
          ov[n++] = (struct agx3_field_kv)KV(50 + i, 1);
 
-   if (agx3_bind_compose(enc, "fltnorm", 0, base, nbase, ov, n, out, len))
+   if (agx3_bind_compose(enc, "fltnorm", agx3_bind_ep(enc, 0), base, nbase,
+                         ov, n, out, len))
       return true;
 
    memset(out, 0, AGX3_FLTNORM_MAX_LENGTH);
@@ -324,14 +341,15 @@ agx3_persp_rcp_encode(enum agx_isa_encoding enc,
       KV(27, d->rhw_cache), KV(39, d->coef_index),
    };
    unsigned n = 5;
-   if (enc == AGX_ISA_ENCODING_AGX3C) {
+   if (agx_encoding_is_g17_class(enc)) {
       ov[n++] = (struct agx3_field_kv)KV(47, 3);
       ov[n++] = (struct agx3_field_kv)KV(48, 64);
    }
    for (unsigned i = 0; i < nslots(enc); ++i)
       if (d->wait_mask & (1u << i))
          ov[n++] = (struct agx3_field_kv)KV(49 + i, 1);
-   return agx3_bind_compose(enc, "f32rcp", 0, base, 7, ov, n, out, len);
+   return agx3_bind_compose(enc, "f32rcp", agx3_bind_ep(enc, 0),
+                            base, 7, ov, n, out, len);
 }
 
 bool
@@ -355,6 +373,9 @@ agx3_persp_mul_encode(enum agx_isa_encoding enc,
    if (d->vary_index > 0x7f)
       return false;
    if (d->stage_dest ? (d->slot < 1 || d->slot > 6) : (d->slot != 0))
+      return false;
+   /* The G18G (agx3d) witnesses here use a general-register destination. */
+   if (enc == AGX_ISA_ENCODING_AGX3D && d->stage_dest)
       return false;
 
    /* The form's root predicates -- the composer refuses ep4 outright without
@@ -389,7 +410,7 @@ agx3_persp_mul_encode(enum agx_isa_encoding enc,
    }
    ov[n++] = (struct agx3_field_kv)KV(70, d->vary_index);
 
-   if (enc == AGX_ISA_ENCODING_AGX3C) {
+   if (agx_encoding_is_g17_class(enc)) {
       ov[n++] = (struct agx3_field_kv)KV(78, 3);
       ov[n++] = (struct agx3_field_kv)KV(79, 62);
    }
@@ -402,7 +423,8 @@ agx3_persp_mul_encode(enum agx_isa_encoding enc,
     * the extended ep5 form.  Try the canonical compact form first so all
     * existing GPR and slot1 witnesses remain byte-identical. */
    for (unsigned ep = 4; ep <= 5; ++ep) {
-      if (agx3_bind_compose(enc, "f32mul", ep, base, 10, ov, n, out, len))
+      if (agx3_bind_compose(enc, "f32mul", agx3_bind_ep(enc, ep),
+                            base, 10, ov, n, out, len))
          return true;
    }
 
@@ -430,7 +452,10 @@ agx3_normflt_encode(enum agx_isa_encoding enc,
     * width: one 16-bit register for packed 8-bit lanes and a single 16-bit
     * lane, and two for a pair of 16-bit lanes (applegpu_g17p RG16Unorm,
     * RGBA16Unorm and RGBA16Snorm blending reads `1c` where R16 and RGBA8
-    * read `14`). AGX3c adds this form's sub-opcode pair. */
+    * read `14`). Fresh G17G/G18G R16/RG16 UNORM/SNORM tile reads and
+    * unpack_unorm2x16_to_float/unpack_snorm2x16_to_float programs establish
+    * the same scalar/pair widths and normalized modes 2/3. AGX3c adds this
+    * form's sub-opcode pair. */
    struct agx3_field_kv base[7];
    unsigned nbase = 0;
    base[nbase++] = (struct agx3_field_kv)KV(9, 2);
@@ -439,7 +464,11 @@ agx3_normflt_encode(enum agx_isa_encoding enc,
    base[nbase++] =
       (struct agx3_field_kv)KV(26, d->is_16bit && d->two_lanes ? 2 : 1);
    base[nbase++] = (struct agx3_field_kv)KV(29, 1);
-   if (enc == AGX_ISA_ENCODING_AGX3C) {
+   /* G18G (agx3d) keeps normflt's agx3c encoding: 8 of the 14 aligned
+    * applegpu_g17g/applegpu_g18g normflt words of the m5 reference corpus are
+    * byte-identical and the rest differ only in wait choice (f32..f39, still
+    * a mask on agx3d). */
+   if (agx_encoding_is_g17_class(enc)) {
       base[nbase++] = (struct agx3_field_kv)KV(30, 3);
       base[nbase++] = (struct agx3_field_kv)KV(31, 115);
    }
@@ -459,7 +488,8 @@ agx3_normflt_encode(enum agx_isa_encoding enc,
       if (d->wait_mask & (1u << i))
          ov[n++] = (struct agx3_field_kv)KV(32 + i, 1);
 
-   if (agx3_bind_compose(enc, "normflt", 0, base, nbase, ov, n, out, len))
+   if (agx3_bind_compose(enc, "normflt", agx3_bind_ep(enc, 0), base, nbase,
+                         ov, n, out, len))
       return true;
 
    memset(out, 0, AGX3_FLTNORM_MAX_LENGTH);
@@ -478,6 +508,11 @@ agx3_rgb10a2_encode_for_encoding(enum agx_isa_encoding enc,
 {
    if (!enc_ok(enc) || !d || !out || !length || d->dest >= 256 || (d->dest & 1) ||
        (d->wait_mask & ~wait_limit(enc)) || d->layout > AGX3_PACKED_RG11B10)
+      return false;
+   /* Packed floats and part-start markers stay outside the G18G (agx3d)
+    * contract until their shader-linking paths are qualified. */
+   if (enc == AGX_ISA_ENCODING_AGX3D &&
+       (d->layout != AGX3_PACKED_RGB10A2 || d->first_instruction))
       return false;
    const struct agx3_field_kv base[] = {KV(9, 2), KV(10, 2)};
    struct agx3_field_kv fields[48];
@@ -510,7 +545,9 @@ agx3_rgb10a2_encode_for_encoding(enum agx_isa_encoding enc,
       }
    }
    /* Fresh texture-to-RGB10 native main waits for smp slot1 at field84. */
-   if (enc == AGX_ISA_ENCODING_AGX3C) {
+   /* Fresh G17G/G18G render pipelines establish the same register/immediate,
+    * modifier and lifetime fields as G17P. Their pack sub-opcode is 3/116. */
+   if (agx_encoding_is_g17_class(enc)) {
       fields[n++] = (struct agx3_field_kv)KV(82, 3);
       fields[n++] = (struct agx3_field_kv)KV(83, 116);
    }
@@ -521,7 +558,7 @@ agx3_rgb10a2_encode_for_encoding(enum agx_isa_encoding enc,
    fields[n++] = (struct agx3_field_kv)KV(94, 0);
    fields[n++] = (struct agx3_field_kv)KV(95, 0);
    fields[n++] = (struct agx3_field_kv)KV(96, 0);
-   return agx3_bind_compose(enc, "pack", 0,
+   return agx3_bind_compose(enc, "pack", agx3_bind_ep(enc, 0),
                            base, 2, fields, n, out, length);
 }
 
@@ -535,6 +572,19 @@ agx3_rgb10a2_encode(const struct agx3_rgb10a2_desc *d,
       return false;
    memcpy(out, bytes, *length);
    return true;
+}
+
+bool
+agx3_rgb10a2_encode_g18g(enum agx_isa_encoding enc,
+                         const struct agx3_rgb10a2_desc *d,
+                         uint8_t out[16], uint8_t *length)
+{
+   /* G18G compiles as agx3c: packed floats and part-start markers remain
+    * G17P-only there until their shader-linking paths are qualified. */
+   if (d && agx_encoding_is_g17_class(enc) &&
+       (d->layout != AGX3_PACKED_RGB10A2 || d->first_instruction))
+      return false;
+   return agx3_rgb10a2_encode_for_encoding(enc, d, out, length);
 }
 
 /* Fresh single- and two-attachment fetch programs identify the source register
@@ -569,4 +619,42 @@ agx3_rgb10a2_unpack_encode(
          fields[n++] = (struct agx3_field_kv)KV(32 + i, 1);
    return agx3_bind_compose(enc, "unpack", 0,
                            base, nbase, fields, n, out, length);
+}
+
+bool
+agx3_rgb10a2_unpack_encode_g18g(
+   enum agx_isa_encoding enc, const struct agx3_rgb10a2_unpack_desc *d,
+   uint8_t out[16], uint8_t *length)
+{
+   if (enc == AGX_ISA_ENCODING_AGX3B)
+      return agx3_rgb10a2_unpack_encode(enc, d, out, length);
+
+   if (!out || !length)
+      return false;
+   memset(out, 0, 10);
+   *length = 0;
+   if (!d || !agx_encoding_is_g17_class(enc) || d->dest > 248 ||
+       d->source > 254 || ((d->dest | d->source) & 1) ||
+       (d->wait_mask & ~0xff) || d->layout != AGX3_PACKED_RGB10A2)
+      return false;
+
+   /* Native G17G/G18G RGB10A2 framebuffer reads and
+    * unpack_unorm10a2_to_float use a ten-byte instruction, with f30/f31
+    * selecting the unpack sub-opcode. A retained raw source uses f27;
+    * a discarded one uses f29. Both forms are witnessed with compute
+    * consumers, and framebuffer reads also establish the destination hint.
+    * Packed-float layouts remain outside this G17/G18 contract. */
+   const struct agx3_field_kv base[] = {
+      KV(9, 2), KV(10, 2), KV(25, 2), KV(26, 2), KV(30, 3), KV(31, 191),
+   };
+   struct agx3_field_kv fields[13] = {
+      KV(2, d->dest), KV(11, d->dest_hint), KV(18, d->source),
+      KV(27, !d->discard), KV(29, d->discard),
+   };
+   unsigned n = 5;
+   for (unsigned i = 0; i < 8; ++i)
+      if (d->wait_mask & (1u << i))
+         fields[n++] = (struct agx3_field_kv)KV(32 + i, 1);
+   return agx3_bind_compose(enc, "unpack", agx3_bind_ep(enc, 0),
+                           base, 6, fields, n, out, length);
 }

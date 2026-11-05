@@ -105,11 +105,11 @@ agx3_subgroup_encode_quad_ballot_imm(uint16_t dest, bool dest_cache,
                             fields, count, out, length);
 }
 
-bool
-agx3_subgroup_encode_shuffle(enum agx_isa_encoding enc,
-                             const struct agx3_subgroup_shuffle_desc *d,
-                             uint8_t out[AGX3_SUBGROUP_MAX_LENGTH],
-                             uint8_t *length)
+/* `g18g` selects the G18G layer's forms; see agx3_subgroup_encode_*_g18g(). */
+static bool
+encode_shuffle(enum agx_isa_encoding enc,
+               const struct agx3_subgroup_shuffle_desc *d, bool g18g,
+               uint8_t out[AGX3_SUBGROUP_MAX_LENGTH], uint8_t *length)
 {
    if (d == NULL || out == NULL || length == NULL)
       return false;
@@ -165,7 +165,8 @@ agx3_subgroup_encode_shuffle(enum agx_isa_encoding enc,
     * pinned: a pinned f41 claimed the lane was dead even when the vote and
     * shuffle lowerings read it again for the next component.
     */
-   if ((enc == AGX_ISA_ENCODING_AGX3B || is_c(enc)) && !d->quad &&
+   if ((enc == AGX_ISA_ENCODING_AGX3B || is_c(enc)) &&
+       (!d->quad || (g18g && is_c(enc))) &&
        d->lane_kind == AGX3_SUBGROUP_LANE_REGISTER) {
       const unsigned slots = is_c(enc) ? 8 : 6;
       if (d->lane >= (is_c(enc) ? 256 : 192) || (d->wait_mask >> slots) != 0 ||
@@ -184,9 +185,15 @@ agx3_subgroup_encode_shuffle(enum agx_isa_encoding enc,
       hbase[hnb++] = (struct agx3_field_kv){38, 1};
 
       if (is_c(enc)) {
-         const uint8_t ids[] = {154,155,161,160};
-         hbase[hnb++] = (struct agx3_field_kv){42,3};
-         hbase[hnb++] = (struct agx3_field_kv){43,ids[d->op]};
+         /* Native886 G17G/G18G dynamic scalar/vector shuffles use the same
+          * lifetime fields, half-register lane address and wait bank. G18
+          * additionally carries its operation selector in f42/f43; the G18G
+          * layer also takes its quad shuffles from a register lane here. */
+         static const uint8_t ids[2][AGX3_SUBGROUP_SHUFFLE_NUM] = {
+            {154, 155, 161, 160}, {140, 137, 142, 141},
+         };
+         hbase[hnb++] = (struct agx3_field_kv){42, 3};
+         hbase[hnb++] = (struct agx3_field_kv){43, ids[d->quad][d->op]};
       }
       struct agx3_field_kv hov[16];
       unsigned hnv = 0;
@@ -356,10 +363,30 @@ agx3_subgroup_encode_shuffle(enum agx_isa_encoding enc,
 }
 
 bool
-agx3_subgroup_encode_ballot(enum agx_isa_encoding enc,
-                            const struct agx3_subgroup_ballot_desc *d,
-                            uint8_t out[AGX3_SUBGROUP_MAX_LENGTH],
-                            uint8_t *length)
+agx3_subgroup_encode_shuffle(enum agx_isa_encoding enc,
+                             const struct agx3_subgroup_shuffle_desc *d,
+                             uint8_t out[AGX3_SUBGROUP_MAX_LENGTH],
+                             uint8_t *length)
+{
+   return encode_shuffle(enc, d, false, out, length);
+}
+
+/* G18G only (AGX_ISA_ENCODING_AGX3C, re-encoded as agx3d afterwards): AGX3c
+ * quad shuffles from a register lane take the register-lane form with the
+ * quad selectors. */
+bool
+agx3_subgroup_encode_shuffle_g18g(enum agx_isa_encoding enc,
+                                  const struct agx3_subgroup_shuffle_desc *d,
+                                  uint8_t out[AGX3_SUBGROUP_MAX_LENGTH],
+                                  uint8_t *length)
+{
+   return encode_shuffle(enc, d, true, out, length);
+}
+
+static bool
+encode_ballot(enum agx_isa_encoding enc,
+              const struct agx3_subgroup_ballot_desc *d, bool g18g,
+              uint8_t out[AGX3_SUBGROUP_MAX_LENGTH], uint8_t *length)
 {
    if (d == NULL || out == NULL || length == NULL)
       return false;
@@ -509,6 +536,11 @@ agx3_subgroup_encode_ballot(enum agx_isa_encoding enc,
       d->type == AGX3_SUBGROUP_BALLOT_INTEGER && d->src_live;
    if ((!d->compare_immediate && !live_integer_ballot) || !d->src_live)
       ADD_FIELD(27, 1);
+   /* G18G: AGX3c's immediate form marks a source that stays live with f25:
+    * simd_ballot(x != 0) + x is f25 where the dead-x form has f27
+    * (m6-libagx-forms2 lk_ballot_ne16_live / ne32_live). */
+   if (g18g && is_c(enc) && d->compare_immediate && d->src_live)
+      ADD_FIELD(25, 1);
 
    const char *mnemonic;
    uint16_t cond_field, invert_field;
@@ -546,7 +578,9 @@ agx3_subgroup_encode_ballot(enum agx_isa_encoding enc,
    }
 
    if (is_c(enc)) {
-      if (d->quad || d->type != AGX3_SUBGROUP_BALLOT_INTEGER)
+      /* G18G keeps its quad and float ballots, which carry no wait. */
+      if ((d->quad || d->type != AGX3_SUBGROUP_BALLOT_INTEGER) &&
+          (!g18g || d->wait_mask))
          return false;
       for (unsigned i = 0; i < 8; ++i)
          if (d->wait_mask & (1u << i))
@@ -563,6 +597,103 @@ agx3_subgroup_encode_ballot(enum agx_isa_encoding enc,
    if (d->compare_immediate)
       ov[no++] = (struct agx3_field_kv){30, d->compare_value};
    return agx3_bind_compose(enc, mnemonic, 0, base, nb, ov, no, out, length);
+}
+
+bool
+agx3_subgroup_encode_ballot(enum agx_isa_encoding enc,
+                            const struct agx3_subgroup_ballot_desc *d,
+                            uint8_t out[AGX3_SUBGROUP_MAX_LENGTH],
+                            uint8_t *length)
+{
+   return encode_ballot(enc, d, false, out, length);
+}
+
+/* G18G only (AGX_ISA_ENCODING_AGX3C, re-encoded as agx3d afterwards): the
+ * AGX3c immediate ballot of a source that stays live carries f25 as the
+ * G18G layer emits it. */
+bool
+agx3_subgroup_encode_ballot_g18g(enum agx_isa_encoding enc,
+                                 const struct agx3_subgroup_ballot_desc *d,
+                                 uint8_t out[AGX3_SUBGROUP_MAX_LENGTH],
+                                 uint8_t *length)
+{
+   return encode_ballot(enc, d, true, out, length);
+}
+
+/*
+ * simd_ballot(true). agx_lower_pseudo() spells a ballot of a boolean as
+ * `icmp_ballot b, #0, ueq, invert`, and a constant-true predicate leaves
+ * `icmp_ballot #1, #0, ueq, invert` -- both operands immediate, which the
+ * register forms above cannot take. Apple compiles simd_ballot(true) to one
+ * instruction whose bytes are identical for applegpu_g17g and applegpu_g18g
+ * (g18ref-out/probe/m6-alu-misc, ballot_true):
+ *
+ *   simdiballot r0 = ballot(!(#1 ?0 #0))   27 01 20 1a 25 00 ae 02 30 00 08 40
+ *
+ * slot A the immediate 1 (f15, kind f23 = 1, width f24 = 1), slot B the
+ * immediate 0 (f38/f39 = 1), f54 = 0 and the invert bit f55 set. That is the
+ * very instruction Mesa's operands name, so it is emitted as witnessed, with
+ * only the destination (and its f11 cache hint, the same field as on the
+ * other simdiballot forms) varying. The witness carries no wait, and the
+ * caller retires any before.
+ */
+bool
+agx3_subgroup_encode_ballot_true_gpu1(uint16_t dest, bool dest_cache,
+                                      uint8_t out[AGX3_SUBGROUP_MAX_LENGTH],
+                                      uint8_t *length)
+{
+   if (out == NULL || length == NULL ||
+       !valid_reg(AGX_ISA_ENCODING_AGX3C, dest))
+      return false;
+   const struct agx3_field_kv base[] = {
+      {9, 2}, {10, 2}, {15, 1}, {23, 1}, {24, 1}, {38, 1}, {39, 1},
+      {44, 3}, {45, 157}, {55, 1},
+   };
+   const struct agx3_field_kv ov[] = {
+      {2, dest},
+      {11, dest_cache ? 1u : 0u},
+   };
+   return agx3_bind_compose(AGX_ISA_ENCODING_AGX3C, "simdiballot", 0, base,
+                            sizeof(base) / sizeof(base[0]), ov,
+                            sizeof(ov) / sizeof(ov[0]), out, length);
+}
+
+/*
+ * simd_ballot(a < b) of two 32-bit registers, unsigned: slot B is a register
+ * (f31, kind f38 = 2, width f39 = 2) and f54 is the condition, 1 = ult as in
+ * enum agx_icond. applegpu_g18g (g18ref-out/probe/m6-alu-misc ballot_ult and
+ * m6-alu-hints h_ballot_ult_live), both operands read for the last time:
+ *
+ *   simdiballot r0 = ^r0 < ^r2          f16 0, f27, f31 4, f42, f54 = 1
+ *   simdiballot r2 = ^r2 < ^r3          f16 4, f27, f31 6, f42, f54 = 1
+ *
+ * Only that lifetime shape is witnessed (Apple multiplies first when the
+ * operands stay live), so live operands are refused, as is every other
+ * condition.
+ */
+bool
+agx3_subgroup_encode_ballot_ult_reg_gpu1(
+   uint16_t dest, bool dest_cache, uint16_t src0, uint16_t src1,
+   uint8_t out[AGX3_SUBGROUP_MAX_LENGTH], uint8_t *length)
+{
+   if (out == NULL || length == NULL ||
+       !valid_reg(AGX_ISA_ENCODING_AGX3C, dest) ||
+       !valid_reg(AGX_ISA_ENCODING_AGX3C, src0) ||
+       !valid_reg(AGX_ISA_ENCODING_AGX3C, src1))
+      return false;
+   const struct agx3_field_kv base[] = {
+      {9, 2}, {10, 2}, {23, 2}, {24, 2}, {27, 1}, {38, 2}, {39, 2},
+      {42, 1}, {44, 3}, {45, 157}, {54, 1},
+   };
+   const struct agx3_field_kv ov[] = {
+      {2, dest},
+      {11, dest_cache ? 1u : 0u},
+      {16, src0},
+      {31, src1},
+   };
+   return agx3_bind_compose(AGX_ISA_ENCODING_AGX3C, "simdiballot", 0, base,
+                            sizeof(base) / sizeof(base[0]), ov,
+                            sizeof(ov) / sizeof(ov[0]), out, length);
 }
 
 struct reduce_form {
@@ -591,11 +722,10 @@ static const struct reduce_form reduce_forms[AGX3_SUBGROUP_REDUCE_NUM] = {
    [AGX3_SUBGROUP_REDUCE_UMAX] = {"sRedumax", "qRedumax", 180, 134, false, 2},
 };
 
-bool
-agx3_subgroup_encode_reduce(enum agx_isa_encoding enc,
-                            const struct agx3_subgroup_reduce_desc *d,
-                            uint8_t out[AGX3_SUBGROUP_MAX_LENGTH],
-                            uint8_t *length)
+static bool
+encode_reduce(enum agx_isa_encoding enc,
+              const struct agx3_subgroup_reduce_desc *d, bool g18g,
+              uint8_t out[AGX3_SUBGROUP_MAX_LENGTH], uint8_t *length)
 {
    if (d == NULL || out == NULL || length == NULL ||
        (unsigned)d->op >= AGX3_SUBGROUP_REDUCE_NUM)
@@ -689,7 +819,30 @@ agx3_subgroup_encode_reduce(enum agx_isa_encoding enc,
        * read, for SIMD and quad forms alike: simd_prefix_inclusive_sum(),
        * which adds the source back afterwards, is bf01560403001609 (f25)
        * next to the exclusive bf0156020204100b (f27). */
-      ADD_FIELD(d->src_live ? 25 : 27, 1);
+      if (g18g && is_c(enc)) {
+         /* AGX3c's SIMD integer add does the same: metal-nt
+          * applegpu_g17g/g18g give the inclusive sum f25 and the exclusive
+          * one f27 (m6-libagx-forms lk_prefix_incl_load /
+          * lk_prefix_excl_load). */
+         const bool c_simd_iadd = !d->quad && !d->half &&
+                                  d->op == AGX3_SUBGROUP_REDUCE_IADD;
+         /* Native999's live/dead pairs on both G17G and G18G use no
+          * source hint for a live full-width min/max/bitwise operand. In
+          * particular, f27 is a final-read hint, not the generic AGX3c
+          * reduction default. Preserve the existing IADD/quad/half paths. */
+         const bool c_keep_source = !d->quad && !d->half && d->src_live &&
+            (d->op == AGX3_SUBGROUP_REDUCE_SMIN ||
+             d->op == AGX3_SUBGROUP_REDUCE_SMAX ||
+             d->op == AGX3_SUBGROUP_REDUCE_AND ||
+             d->op == AGX3_SUBGROUP_REDUCE_OR ||
+             d->op == AGX3_SUBGROUP_REDUCE_XOR ||
+             d->op == AGX3_SUBGROUP_REDUCE_UMIN ||
+             d->op == AGX3_SUBGROUP_REDUCE_UMAX);
+         if (!c_keep_source)
+            ADD_FIELD(c_simd_iadd && d->src_live ? 25 : 27, 1);
+      } else {
+         ADD_FIELD(d->src_live ? 25 : 27, 1);
+      }
       if (f->integer_class == 1)
          ADD_FIELD(28, 1);
       if (is_c(enc)) {
@@ -730,6 +883,10 @@ agx3_subgroup_encode_reduce(enum agx_isa_encoding enc,
     * Own-shader A18 Pro captures pin slot-6 signed min/max to this family:
     *   sRedimin 3f02560002001407, sRedimax bf02560002001407.
     */
+   /* AGX3c: the SIMD integer add waits at f45 + (slot - 1) on all eight
+    * slots, as on AGX3b. metal-nt applegpu_g17g puts a load on slot 8 and
+    * waits with f52; applegpu_g18g puts it on slot 1 and waits with f45
+    * (m6-libagx-waits2 lw2_prefix_*, m6-libagx-forms lk_local_atomic_*). */
    const unsigned slots = is_c(enc) ? 8 : 6;
    if (d->wait_mask != 0) {
       if ((d->wait_mask >> slots) != 0)
@@ -747,6 +904,27 @@ agx3_subgroup_encode_reduce(enum agx_isa_encoding enc,
    if (f->is_float && !f16_arith && d->src_live)
       ov[n++] = (struct agx3_field_kv){27, 1};
    return agx3_bind_compose(enc, mnemonic, 0, base, nb, ov, n, out, length);
+}
+
+bool
+agx3_subgroup_encode_reduce(enum agx_isa_encoding enc,
+                            const struct agx3_subgroup_reduce_desc *d,
+                            uint8_t out[AGX3_SUBGROUP_MAX_LENGTH],
+                            uint8_t *length)
+{
+   return encode_reduce(enc, d, false, out, length);
+}
+
+/* G18G only (AGX_ISA_ENCODING_AGX3C, re-encoded as agx3d afterwards): the
+ * source-lifetime hints of the AGX3c SIMD integer reductions as the G18G
+ * layer emits them (native999). */
+bool
+agx3_subgroup_encode_reduce_g18g(enum agx_isa_encoding enc,
+                                 const struct agx3_subgroup_reduce_desc *d,
+                                 uint8_t out[AGX3_SUBGROUP_MAX_LENGTH],
+                                 uint8_t *length)
+{
+   return encode_reduce(enc, d, true, out, length);
 }
 
 #undef ADD_FIELD

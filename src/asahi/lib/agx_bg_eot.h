@@ -6,6 +6,7 @@
 #pragma once
 
 #include "agx_bg_eot_key.h"
+#include "layout.h"
 #include "util/simple_mtx.h"
 #include "agx_tilebuffer.h"
 #include "libagx_dgc.h"
@@ -112,6 +113,47 @@ struct agx_bg_eot_shader {
    struct agx_bo *bo;
    uint64_t ptr;
 };
+
+/*
+ * Imageblock (physical) formats for which the G17G end-of-tile store has a
+ * native text. AGX3C block stores are not encoded generically: the compiler
+ * recognizes the complete RT0 store graph and substitutes Apple's witnessed
+ * applegpu_g17g program (agx3_rt0_eot_kind in agx3_pack_binary.c). Apple's
+ * builtin factory sorts every attachment key into one of five imageblock
+ * format classes, and all five have been generated for applegpu_g17g from the
+ * same architecture-independent request that produced the G17P tables, so the
+ * admitted set is the physical formats whose store shape those classes cover.
+ *
+ * SRGBA8 is admitted because the end-of-tile builder stores sRGB tiles through
+ * the same U8NORM text: the fragment shader already applied the transfer and
+ * the PBE descriptor, not the shader, carries the memory format. RG11B10F is
+ * not, because G17G keeps the packed-float tile in its own physical format
+ * rather than the raw 32-bit word G17P rewrites it to, and that shape has no
+ * witness. RGB9E5 is left out for the same reason.
+ *
+ * A format admitted here can still be refused later: the compiler matches the
+ * whole post-register-allocation graph, and anything it does not recognize
+ * fails the shader rather than emitting a partially grounded store.
+ */
+static inline bool
+agx_g17g_rt0_eot_physical_format_supported(enum pipe_format physical)
+{
+   switch ((enum ail_isa_format)physical) {
+   case AIL_ISA_FORMAT_U8NORM:
+   case AIL_ISA_FORMAT_SRGBA8:
+   case AIL_ISA_FORMAT_S8NORM:
+   case AIL_ISA_FORMAT_RGB10A2:
+   case AIL_ISA_FORMAT_I8:
+   case AIL_ISA_FORMAT_I16:
+   case AIL_ISA_FORMAT_I32:
+   case AIL_ISA_FORMAT_F16:
+   case AIL_ISA_FORMAT_U16NORM:
+   case AIL_ISA_FORMAT_S16NORM:
+      return true;
+   default:
+      return false;
+   }
+}
 
 struct agx_bg_eot_shader *agx_get_bg_eot_shader(struct agx_bg_eot_cache *cache,
                                                 struct agx_bg_eot_key *key);

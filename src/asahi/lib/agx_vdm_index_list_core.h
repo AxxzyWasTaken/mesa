@@ -300,6 +300,116 @@ agx_vdm_index_list_indirect_pack_words(
    return true;
 }
 
+/*
+ * G18G (M6) Index Lists. G18G writes the HAL300 records
+ * (agx_chip_hal300_records): its Index List words are G17G's above, byte for
+ * byte, except the HAL300 Unk 2 word, which G18G takes from the pipeline
+ * (agx_vdm_index_list_hal300_unk2) instead of the constant 7. The helpers
+ * above stay as they are for every other chip; G18G callers use these.
+ */
+
+/* HAL300's extra Index List word ("Unk 2", gated by header bit 27). Apple's
+ * setRenderPipelineStateCommon derives it per pipeline from word 4 of the
+ * UVS record {0x0c280000, ...}: n = byte 0 + byte 2, the vertex output count
+ * (AGXMetalG18G 0x219643220..0x2196432b4; G17G 0x216106df8..0x216106e8c).
+ * Every J873 capture has n <= 9 and 7. Only G18G takes the derived value;
+ * the other HAL300 chips keep the constant their captures show. */
+static inline uint32_t
+agx_vdm_index_list_hal300_unk2(enum agx_chip chip, uint32_t uvs_word4)
+{
+   const uint32_t n = (uvs_word4 & 0xffu) + ((uvs_word4 >> 16) & 0xffu);
+
+   if (chip != AGX_CHIP_G18G)
+      return 7u;
+
+   return n <= 9    ? 7u
+          : n <= 11 ? 6u
+          : n == 12 ? 5u
+          : n <= 15 ? 4u
+          : n <= 19 ? 3u
+          : n <= 23 ? 2u
+                    : 0u;
+}
+
+/* The chip whose Index List words a chip writes: G18G writes G17G's. */
+static inline enum agx_chip
+agx_vdm_index_list_record_chip(enum agx_chip chip)
+{
+   return chip == AGX_CHIP_G18G ? AGX_CHIP_G17G : chip;
+}
+
+/* Direct, indexed and indirect Index Lists, G18G included.
+ *
+ * Sessions 20260925-a and -b of the J873 native captures (26A428) contain
+ * only direct non-indexed draws; sessions -g1 and -g2 add direct indexed ones
+ * (indexed-u16, indexed-strip, quad-strip, gears). Those are Mesa's HAL300
+ * direct indexed words byte for byte, e.g. 69f20600 00018300 3 1 0 7 0000000f
+ * 1 for three u16 triangles and 69f30900 ... for a restarted u16 strip.
+ *
+ * No indirect draw is captured, but AGXMetalG18G 26A428 emits the indirect
+ * forms below word for word: non-indexed at 0x219662e7c..0x219662eb0 and
+ * indexed, with its State Update, at 0x219663130..0x2196631fc. The G17G
+ * copies are instruction-identical, with the same header tables. */
+static inline bool
+agx_vdm_index_list_indexed_or_indirect_supported_inline(enum agx_chip chip)
+{
+   return agx_vdm_index_list_direct_target_supported_inline(
+      agx_vdm_index_list_record_chip(chip));
+}
+
+static inline bool
+agx_vdm_index_list_nonindexed_has_tail(enum agx_chip chip)
+{
+   /* HAL300 non-indexed draws carry the fifth (Unk 2) word, the G17G family
+    * included.
+    *
+    * G18G is witnessed with the fifth word: every J873 native render draws
+    * with 0x69c40000 | primitive << 8, count, instances, start and 7, e.g.
+    * 69c40600 3 1 0 7 for the colour triangle and 69c40100 6 1 6 7 for
+    * lines. */
+   return agx_vdm_index_list_direct_is_hal300_inline(
+      agx_vdm_index_list_record_chip(chip));
+}
+
+/* agx_vdm_index_list_direct_pack_words, with the HAL300 Unk 2 word given. */
+static inline bool
+agx_vdm_index_list_direct_pack_words_unk2(
+   enum agx_chip chip, uint8_t primitive, bool indexed, bool restart_enable,
+   uint8_t index_size, uint64_t index_buffer, uint32_t count,
+   uint32_t instances, uint32_t start, uint32_t index_buffer_size_word,
+   uint32_t unk2, struct agx_vdm_index_list_direct_words *out)
+{
+   const enum agx_chip record_chip = agx_vdm_index_list_record_chip(chip);
+   if (!agx_vdm_index_list_direct_pack_words(
+          record_chip, primitive, indexed, restart_enable, index_size,
+          index_buffer, count, instances, start, index_buffer_size_word, out))
+      return false;
+
+   if (agx_vdm_index_list_direct_is_hal300_inline(record_chip))
+      out->words[indexed ? 5 : 4] = unk2;
+   return true;
+}
+
+/* agx_vdm_index_list_indirect_pack_words, with the HAL300 Unk 2 word given. */
+static inline bool
+agx_vdm_index_list_indirect_pack_words_unk2(
+   enum agx_chip chip, uint8_t primitive, bool indexed, bool restart_enable,
+   uint8_t index_size, uint64_t index_buffer, uint64_t indirect_buffer,
+   uint32_t restart_index, uint32_t index_buffer_size_word, uint32_t unk2,
+   struct agx_vdm_index_list_indirect_words *out)
+{
+   const enum agx_chip record_chip = agx_vdm_index_list_record_chip(chip);
+   if (!agx_vdm_index_list_indirect_pack_words(
+          record_chip, primitive, indexed, restart_enable, index_size,
+          index_buffer, indirect_buffer, restart_index,
+          index_buffer_size_word, out))
+      return false;
+
+   if (agx_vdm_index_list_direct_is_hal300_inline(record_chip))
+      out->words[indexed ? 6 : 3] = unk2;
+   return true;
+}
+
 bool agx_vdm_index_list_direct_nonindexed_pack(
    enum agx_chip chip,
    const struct agx_vdm_index_list_direct_nonindexed_info *info,

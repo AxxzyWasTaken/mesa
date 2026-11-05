@@ -1223,7 +1223,9 @@ get_image_copy_pipeline(struct vk_device *device, struct vk_meta_device *meta,
       .nir = build_image_copy_shader(key,
          !agx_native_graphics(&container_of(device, struct hk_device, vk)->dev) &&
          !agx_chip_g17_m5(container_of(device, struct hk_device, vk)->dev.chip) &&
-         container_of(device, struct hk_device, vk)->dev.chip != AGX_CHIP_G16G),
+         container_of(device, struct hk_device, vk)->dev.chip != AGX_CHIP_G16G &&
+         /* G18G (AGX3) stores raw packed bytes too. */
+         container_of(device, struct hk_device, vk)->dev.chip != AGX_CHIP_G18G),
    };
    const VkPipelineShaderStageCreateInfo cs_info = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,

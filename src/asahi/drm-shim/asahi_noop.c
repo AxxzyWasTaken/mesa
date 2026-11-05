@@ -343,6 +343,84 @@ static const struct drm_asahi_params_global params_g17s_task = {
    .usc_generation = 3, .gpu_hal_generation = DRM_ASAHI_GPU_HAL_300,
 };
 
+/* Compiler diagnostics only: J813's observed G17G C0/HAL 300 topology.
+ * This profile rejects every submission; it cannot validate GPU execution or
+ * produce a conformance result. Keep its explicit name distinct from hardware.
+ */
+static const struct drm_asahi_params_global params_g17g_compile_only = {
+   .gpu_generation = 17,
+   .gpu_variant = 'G',
+   .gpu_revision = 0x20,
+   .chip_id = 0x8142,
+   .num_dies = 1,
+   .num_clusters_total = 1,
+   .num_cores_per_cluster = 10,
+   .core_masks = {0x3ff},
+   .vm_start = 0x4000,
+   .vm_end = (1ull << 42) - 0x8000ull,
+   .vm_kernel_min_size = 0x20000000,
+   .max_commands_per_submission = 1,
+   .max_attachments = 16,
+   .command_timestamp_frequency_hz = 1000000000,
+   .usc_generation = 3,
+   .gpu_hal_generation = DRM_ASAHI_GPU_HAL_300,
+};
+
+/*
+ * T8152 / M6 (J873), selected with ASAHI_SHIM_CHIP=g18g. There is no G18G
+ * kernel driver yet, so like the G17G profile above this one rejects every
+ * submission: it exists to drive the G18G identity, record packers and
+ * compiler gates offline, not to validate execution.
+ *
+ * Grounded fields: generation 18, variant 'G' and chip 0x8152 (the J873 is
+ * Mac18,5 / T8152, its ADT GPU node is gpu,t8152 and its kext
+ * com.apple.AGXG18G); USC generation 3 (the applegpu_g18g Mach-O
+ * cpusubtype 0x1c3); a 42-bit user VA two pages below the top, as on M5 (the
+ * UAT is 43 bits wide with root selection at bit 42, per the SPTM GET_INFO
+ * replies). Revision and topology are measured
+ * on the J873: the Linux driver's SGX ID probe decodes revision B1 and two
+ * clusters of six cores (mask 0xfff), and the native ioreg reports
+ * num_cores=12, num_mgpus=2, core_mask_list=(63,63). (The kext's class
+ * name, AGX::PI_400::G::A0, ends in A0; the ID register reads B1.)
+ *
+ * gpu_hal_generation stays DRM_ASAHI_GPU_HAL_300 until the kernel settles on a
+ * value: Apple's G18G kext is PI_400, but no Linux G18G driver publishes one
+ * and the uAPI defines no DRM_ASAHI_GPU_HAL_400. Mesa selects the G18G record
+ * layouts from agx_chip_command_stream_generation, never from this number.
+ */
+static const struct drm_asahi_params_global params_g18g = {
+   .gpu_generation = 18,
+   .gpu_variant = 'G',
+   .gpu_revision = 0x11,
+   .chip_id = 0x8152,
+   .num_dies = 1,
+   .num_clusters_total = 2,
+   .num_cores_per_cluster = 6,
+   .core_masks = {0x3f, 0x3f},
+   .vm_start = 0x4000,
+   .vm_end = (1ull << 42) - 0x8000ull,
+   .vm_kernel_min_size = 0x20000000,
+   .max_commands_per_submission = 1,
+   .max_attachments = 16,
+   .command_timestamp_frequency_hz = 1000000000,
+   .usc_generation = 3,
+   .gpu_hal_generation = DRM_ASAHI_GPU_HAL_300,
+};
+
+static bool
+g17g_compile_only(void)
+{
+   const char *chip = getenv("ASAHI_SHIM_CHIP");
+   return chip && !strcmp(chip, "g17g-compile-only");
+}
+
+static bool
+g18g_profile(void)
+{
+   const char *chip = getenv("ASAHI_SHIM_CHIP");
+   return chip && !strcmp(chip, "g18g");
+}
+
 static const struct drm_asahi_params_global *
 shim_params(void)
 {
@@ -361,6 +439,12 @@ shim_params(void)
       return &params_g16s_rt;
    if (chip && !strcmp(chip, "g16s"))
       return &params_g16s;
+   if (g17g_compile_only())
+      return &params_g17g_compile_only;
+
+   if (g18g_profile())
+      return &params_g18g;
+
    if (chip && !strcmp(chip, "g17p"))
       return &params_g17p;
    if (chip && !strcmp(chip, "g15s"))
@@ -1275,6 +1359,17 @@ shim_features(void)
       features |= DRM_ASAHI_FEATURE_VM_STATUS;
    if (shim_env_on("ASAHI_SHIM_VM_STATUS_MIRROR"))
       features |= DRM_ASAHI_FEATURE_VM_STATUS_MIRROR;
+   /* The M6 (G18G) features (bits 31 and 32); only the G18G identity
+    * reports them. */
+   if (g18g_profile()) {
+      /* Replays both the refusing and the suffix-emitting G18 graphics
+       * scratch paths; the shim executes nothing either way. */
+      if (shim_env_on("ASAHI_SHIM_G18_GRAPHICS_SCRATCH"))
+         features |= DRM_ASAHI_FEATURE_G18_GRAPHICS_SCRATCH;
+      /* Replays a kernel that admits the native 40/56/72-byte 32x32 tiles. */
+      if (shim_env_on("ASAHI_SHIM_G18_NATIVE_TILE_SAMPLES"))
+         features |= DRM_ASAHI_FEATURE_G18_NATIVE_TILE_SAMPLES;
+   }
    return features;
 }
 
@@ -1725,6 +1820,22 @@ g15s_submit_gate(int fd, const struct drm_asahi_submit *submit)
 static int
 asahi_ioctl_submit_unlocked(int fd, unsigned long request, void *arg)
 {
+   if (g17g_compile_only()) {
+      fprintf(stderr, "shim: G17G compiler-only profile rejects GPU submission\n");
+      errno = EOPNOTSUPP;
+      return -1;
+   }
+
+   /* Offline triage only: accept (and drop) G18G submissions so one
+    * rejected submit does not poison the context and hide every later
+    * refusal in the same test. */
+   if (g18g_profile() && !getenv("ASAHI_SHIM_G18G_ACCEPT_SUBMIT")) {
+      fprintf(stderr, "shim: G18G profile has no kernel contract and rejects "
+                      "GPU submission\n");
+      errno = EOPNOTSUPP;
+      return -1;
+   }
+
    const struct drm_asahi_submit *submit = arg;
    submit_calls++;
    asahi_log_submit(submit);
@@ -1948,6 +2059,9 @@ drm_shim_driver_init(void)
    const bool g15s = chip && !strcmp(chip, "g15s");
    const bool g15c = chip && !strcmp(chip, "g15c");
    const bool g16g = chip && !strcmp(chip, "g16g");
+   /* ASAHI_SHIM_CHIP=g17g-compile-only and g18g. */
+   const bool g17g = g17g_compile_only();
+   const bool g18g = g18g_profile();
 
    drm_shim_override_file(g13x   ? "DRIVER=asahi\n"
                                    "OF_FULLNAME=/soc/agx\n"
@@ -1960,6 +2074,14 @@ drm_shim_driver_init(void)
                           : g16s ? "DRIVER=asahi\n"
                                    "OF_FULLNAME=/soc/agx\n"
                                    "OF_COMPATIBLE_0=apple,gpu-g16s\n"
+                                   "OF_COMPATIBLE_N=1\n"
+                          : g17g ? "DRIVER=asahi\n"
+                                   "OF_FULLNAME=/soc/agx\n"
+                                   "OF_COMPATIBLE_0=apple,gpu-g17g\n"
+                                   "OF_COMPATIBLE_N=1\n"
+                          : g18g ? "DRIVER=asahi\n"
+                                   "OF_FULLNAME=/soc/agx\n"
+                                   "OF_COMPATIBLE_0=apple,gpu-g18g\n"
                                    "OF_COMPATIBLE_N=1\n"
                           : g17p ? "DRIVER=asahi\n"
                                    "OF_FULLNAME=/soc/agx\n"

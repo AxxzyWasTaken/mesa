@@ -153,6 +153,8 @@ agx_resource_setup(struct agx_device *dev, struct agx_resource *nresource)
       .sample_count_sa = MAX2(templ->nr_samples, 1),
       .levels = templ->last_level + 1,
       .writeable_image = templ->bind & PIPE_BIND_SHADER_IMAGE,
+      /* G18G keeps sample-dependent metadata tiles and compact Z/S layers. */
+      .g18g = dev->chip == AGX_CHIP_G18G,
 
       /* Ostensibly this should be based on the bind, but Gallium bind flags are
        * notoriously unreliable. The only cost of setting this excessively is a
@@ -1015,6 +1017,31 @@ agx_transfer_map(struct pipe_context *pctx, struct pipe_resource *resource,
 
    agx_prepare_for_map(ctx, rsrc, level, usage, box, staging_blit);
 
+   struct agx_device *dev = agx_device(pctx->screen);
+   const bool trace_read = dev->chip == AGX_CHIP_G18G &&
+                          (dev->debug & AGX_DBG_FAULTTRACE) &&
+                          (usage & PIPE_MAP_READ);
+   if (trace_read) {
+      fprintf(stderr, "M5_READBACK va=%#llx size=%llu format=%s modifier=%#llx valid=%u staging=%u box=%d,%d,%d,%d stride=%u\n",
+              (unsigned long long)rsrc->bo->va->addr,
+              (unsigned long long)rsrc->bo->size,
+              util_format_name(rsrc->layout.format),
+              (unsigned long long)rsrc->modifier,
+              agx_resource_valid(rsrc, level), staging_blit,
+              box->x, box->y, box->width, box->height,
+              util_format_get_stride(rsrc->layout.format, box->width));
+      const uint8_t *raw = agx_bo_map(rsrc->bo);
+      if (raw) {
+         size_t nonzero = 0;
+         for (size_t i = 0; i < rsrc->bo->size; ++i)
+            nonzero += raw[i] != 0;
+         fprintf(stderr, "M5_READBACK_RAW nonzero=%zu head=", nonzero);
+         for (unsigned i = 0; i < MIN2(rsrc->bo->size, 32); ++i)
+            fprintf(stderr, "%02x", raw[i]);
+         fputc('\n', stderr);
+      }
+   }
+
    /* Track the written buffer range */
    if (resource->target == PIPE_BUFFER) {
       /* Note the ordering: DISCARD|WRITE is valid, so clear before adding. */
@@ -1084,6 +1111,16 @@ agx_transfer_map(struct pipe_context *pctx, struct pipe_resource *resource,
 
             ail_detile(map, dst, &rsrc->layout, level, transfer->base.stride,
                        box->x, box->y, box->width, box->height);
+            if (trace_read) {
+               size_t nonzero = 0;
+               for (size_t i = 0; i < transfer->base.layer_stride; ++i)
+                  nonzero += dst[i] != 0;
+               fprintf(stderr, "M5_READBACK_DETILED layer=%u nonzero=%zu head=",
+                       z, nonzero);
+               for (unsigned i = 0; i < MIN2(transfer->base.layer_stride, 32); ++i)
+                  fprintf(stderr, "%02x", dst[i]);
+               fputc('\n', stderr);
+            }
          }
       }
 
@@ -1361,6 +1398,33 @@ build_timestamp_offset(struct agx_batch *batch, unsigned offset)
 #define timestamp_offset(batch, offs)                                          \
    build_timestamp_offset(batch, offsetof(struct agx_timestamps, offs))
 
+/* Native G18 ZLS arrays use either 16-KiB pages (bit 0) or 128-byte
+ * cachelines. The upper field stores units minus one. In particular, a
+ * 128-byte layer is encoded as zero; it is not a missing array stride.
+ * Witness: layered-zls native682, including sub-page Z32 and S8 arrays. */
+static uint32_t
+agx_zls_layer_stride(struct agx_device *dev, const struct ail_layout *layout,
+                     bool single_layer)
+{
+   if (dev->chip == AGX_CHIP_G18G && layout->policy == AIL_LAYOUT_POLICY_M5) {
+      if (single_layer)
+         return 0;
+
+      uint64_t stride = layout->layer_stride_B;
+      bool pages = util_is_aligned(stride, AIL_PAGESIZE);
+      unsigned unit = pages ? AIL_PAGESIZE : AIL_CACHELINE;
+      assert(stride && util_is_aligned(stride, unit));
+      assert((stride / unit - 1) <= (UINT32_MAX >> 14));
+      return ((stride / unit - 1) << 14) | pages;
+   }
+
+   assert((layout->depth_px == 1 ||
+           util_is_aligned(layout->layer_stride_B, AIL_PAGESIZE)) &&
+          "Page aligned Z/S layers");
+   unsigned pages = layout->layer_stride_B / AIL_PAGESIZE;
+   return ((pages - 1) << 14) | 1;
+}
+
 static void
 agx_cmdbuf(struct agx_device *dev, struct drm_asahi_cmd_render *c,
            struct agx_pool *pool, struct agx_batch *batch,
@@ -1416,18 +1480,14 @@ agx_cmdbuf(struct agx_device *dev, struct drm_asahi_cmd_render *c,
 
       unsigned level = zsbuf->level;
       unsigned first_layer = zsbuf->first_layer;
+      const bool single_layer =
+         MAX2(util_framebuffer_get_num_layers(framebuffer), 1) == 1;
 
       if (zres) {
          c->depth.base = agx_map_texture_gpu(zres, first_layer) +
                          ail_get_level_offset_B(&zres->layout, level);
 
-         /* Main stride in pages */
-         assert((zres->layout.depth_px == 1 ||
-                 util_is_aligned(zres->layout.layer_stride_B, AIL_PAGESIZE)) &&
-                "Page aligned Z layers");
-
-         unsigned stride_pages = zres->layout.layer_stride_B / AIL_PAGESIZE;
-         c->depth.stride = ((stride_pages - 1) << 14) | 1;
+         c->depth.stride = agx_zls_layer_stride(dev, &zres->layout, single_layer);
 
          if (zres->layout.compressed) {
             c->depth.comp_base =
@@ -1459,12 +1519,7 @@ agx_cmdbuf(struct agx_device *dev, struct drm_asahi_cmd_render *c,
          c->stencil.base = agx_map_texture_gpu(sres, first_layer) +
                            ail_get_level_offset_B(&sres->layout, level);
 
-         /* Main stride in pages */
-         assert((sres->layout.depth_px == 1 ||
-                 util_is_aligned(sres->layout.layer_stride_B, AIL_PAGESIZE)) &&
-                "Page aligned S layers");
-         unsigned stride_pages = sres->layout.layer_stride_B / AIL_PAGESIZE;
-         c->stencil.stride = ((stride_pages - 1) << 14) | 1;
+         c->stencil.stride = agx_zls_layer_stride(dev, &sres->layout, single_layer);
 
          if (sres->layout.compressed) {
             c->stencil.comp_base =
@@ -1501,8 +1556,22 @@ agx_cmdbuf(struct agx_device *dev, struct drm_asahi_cmd_render *c,
    /* G17P treats an absent ZLS allocation as an inactive depth surface.  Its
     * native render command keeps the clear register at 1.0 in that state;
     * zero is only a real clear value when depth or stencil storage exists. */
-   if (agx_native_graphics(dev) && !zres && !sres)
+   if ((agx_native_graphics(dev) || dev->chip == AGX_CHIP_G18G) && !zres &&
+       !sres)
       c->isp_bgobjdepth = fui(1.0f);
+
+   /* Neither AGX3 generation publishes the ISP's depth/stencil dimensions the
+    * way AGX2 does, and the two do not agree with each other either, so take
+    * the packing from the shared witness rather than the AGX2 struct. The
+    * Gallium path had been publishing G17P's 15-bit pair on G17G, which the
+    * kernel's M5 depth admission refused as soon as a render actually carried
+    * a depth attachment. */
+   if (dev->chip == AGX_CHIP_G18G) {
+      c->isp_zls_pixels =
+         agx_zls_pixels(dev->chip, c->width_px, c->height_px, c->depth.base,
+                        c->depth.comp_base, c->stencil.base,
+                        c->stencil.comp_base);
+   }
 
    if ((dev->debug & AGX_DBG_NOCLUSTER) && dev->chip != AGX_CHIP_G17P)
       c->flags |= DRM_ASAHI_RENDER_NO_VERTEX_CLUSTERING;
@@ -1527,6 +1596,23 @@ agx_cmdbuf(struct agx_device *dev, struct drm_asahi_cmd_render *c,
    c->partial_eot.usc = pipeline_store.usc | 4;
 
    agx_tilebuffer_set_drm_cmd(c, tib);
+
+   /* The depth/stencil half of the render command is the part the M5 kernel
+    * validates and the part no CTS failure can otherwise be read from. */
+   if (dev->chip == AGX_CHIP_G18G && (dev->debug & AGX_DBG_FAULTTRACE)) {
+      fprintf(stderr,
+              "M5_RENDER %ux%u cbufs=%u zs=%s zls=%#llx pixels=%#x "
+              "clear=%#x depth=%#llx/%#llx stencil=%#llx/%#llx "
+              "load=%#x clear_mask=%#x resolve=%#x\n",
+              c->width_px, c->height_px, framebuffer->nr_cbufs,
+              util_format_name(framebuffer->zsbuf.format),
+              (unsigned long long)c->zls_ctrl, c->isp_zls_pixels,
+              c->isp_bgobjdepth, (unsigned long long)c->depth.base,
+              (unsigned long long)c->depth.comp_base,
+              (unsigned long long)c->stencil.base,
+              (unsigned long long)c->stencil.comp_base, batch->load,
+              batch->clear, batch->resolve);
+   }
 
    c->samples = tib->nr_samples;
    c->layers = MAX2(util_framebuffer_get_num_layers(framebuffer), 1);
@@ -1859,8 +1945,10 @@ agx_destroy_context(struct pipe_context *pctx)
          drmSyncobjDestroy(dev->fd, ctx->batches.slots[i].syncobj);
    }
 
-   dev->ops.bo_unbind_object(dev, ctx->timestamp_handle);
-   agx_bo_unreference(dev, ctx->timestamps);
+   if (ctx->timestamps) {
+      dev->ops.bo_unbind_object(dev, ctx->timestamp_handle);
+      agx_bo_unreference(dev, ctx->timestamps);
+   }
 
    u_rwlock_wrunlock(&screen->destroy_lock);
 
@@ -2038,16 +2126,18 @@ agx_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
    ctx->compute_blitter.blit_cs = asahi_blit_key_table_create(ctx);
 
    struct agx_device *dev = agx_device(screen);
-   size_t timestamps_size = sizeof(struct agx_timestamps) * AGX_MAX_BATCHES;
+   if (screen->caps.query_timestamp || screen->caps.query_time_elapsed) {
+      size_t timestamps_size = sizeof(struct agx_timestamps) * AGX_MAX_BATCHES;
 
-   /* The kernel requires that timestamp buffers are SHARED */
-   ctx->timestamps =
-      agx_bo_create(dev, timestamps_size, 0, AGX_BO_WRITEBACK | AGX_BO_SHARED,
-                    "Timestamp buffer");
-   assert(ctx->timestamps);
+      /* The kernel requires that timestamp buffers are SHARED. */
+      ctx->timestamps =
+         agx_bo_create(dev, timestamps_size, 0, AGX_BO_WRITEBACK | AGX_BO_SHARED,
+                       "Timestamp buffer");
+      assert(ctx->timestamps);
 
-   ret = agx_bind_timestamps(dev, ctx->timestamps, &ctx->timestamp_handle);
-   assert(!ret);
+      ret = agx_bind_timestamps(dev, ctx->timestamps, &ctx->timestamp_handle);
+      assert(!ret);
+   }
 
    /* Sync object/FD used for NATIVE_FENCE_FD. */
    ctx->in_sync_fd = -1;
@@ -2224,6 +2314,29 @@ agx_init_compute_caps(struct pipe_screen *pscreen)
    caps->max_subgroups = caps->max_variable_threads_per_block / 32;
 }
 
+/*
+ * Whether the kernel binds a timestamp object: timer queries and the
+ * per-context timestamp buffer need DRM_ASAHI_GEM_BIND_OBJECT with
+ * DRM_ASAHI_BIND_OBJECT_USAGE_TIMESTAMPS. Asked of the kernel with a
+ * throwaway binding rather than assumed.
+ */
+static bool
+agx_kernel_binds_timestamps(struct agx_device *dev)
+{
+   struct agx_bo *bo =
+      agx_bo_create(dev, sizeof(struct agx_timestamps) * AGX_MAX_BATCHES, 0,
+                    AGX_BO_WRITEBACK | AGX_BO_SHARED, "Timestamp probe");
+   if (!bo)
+      return false;
+
+   uint32_t handle = 0;
+   const bool bound = agx_bind_timestamps(dev, bo, &handle) == 0;
+   if (bound)
+      dev->ops.bo_unbind_object(dev, handle);
+   agx_bo_unreference(dev, bo);
+   return bound;
+}
+
 static void
 agx_init_screen_caps(struct pipe_screen *pscreen)
 {
@@ -2248,14 +2361,32 @@ agx_init_screen_caps(struct pipe_screen *pscreen)
    caps->glsl_tess_levels_as_inputs = true;
    caps->doubles = true;
 
+   /* Every G18G stage, compute included, publishes its own native texture
+    * and sampler tables (agx_upload_textures/agx_upload_samplers), so GL's
+    * combined unit count is their sum, as GLES already reports. No stage
+    * binds more than max_texture_samplers.
+    */
+   caps->combined_texture_units_all_stages =
+      agx_device(pscreen)->chip == AGX_CHIP_G18G;
+
    caps->max_render_targets = caps->fbfetch = 8;
    caps->fbfetch_coherent = true;
 
    caps->max_dual_source_render_targets = 1;
 
    caps->occlusion_query = true;
-   caps->query_timestamp = true;
-   caps->query_time_elapsed = true;
+   /* Timer queries are not optional for GL 3.3 (ARB_timer_query), which
+    * gates every later desktop GL version, so on M6 (G18G), whose kernel
+    * contract is still being written, follow whether the kernel binds a
+    * timestamp object rather than assuming or refusing it.
+    */
+   struct agx_device *dev = agx_device(pscreen);
+   const bool timestamps =
+      agx_params_g18g_bringup_supported(&dev->params)
+         ? agx_kernel_binds_timestamps(dev)
+         : true;
+   caps->query_timestamp = timestamps;
+   caps->query_time_elapsed = timestamps;
    caps->query_so_overflow = true;
    caps->query_memory_info = true;
    caps->primitive_restart = true;

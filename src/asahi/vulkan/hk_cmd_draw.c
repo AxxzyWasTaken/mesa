@@ -22,6 +22,7 @@
 #include "agx_vdm_state_core.h"
 #include "agx_ppp_hal200_raster_core.h"
 #include "agx_ppp_hal300_depth_bias_scissor_core.h"
+#include "agx_ppp_hal300_graphics_core.h"
 #include "agx_ppp_viewport_payload_core.h"
 #include "agx_ppp_w_clamp_cull2_core.h"
 #include "agx_tilebuffer.h"
@@ -7877,6 +7878,21 @@ hk_flush_vp_state(struct hk_cmd_buffer *cmd, struct hk_cs *cs, uint8_t **out)
    for (uint32_t i = 0; i < api_viewports; i++) {
       const VkViewport *vp = &dyn->vp.viewports[i];
 
+      if (dev->dev.chip == AGX_CHIP_G18G) {
+         /* Clamp before converting to unsigned. During a Zink window shrink,
+          * the old inverted viewport can extend above the new attachment. A
+          * negative minimum must clip to zero, not wrap to a huge coordinate. */
+         minx[i] = CLAMP(MIN2(vp->x, vp->x + vp->width), 0.0f,
+                         (float)cmd->state.gfx.render.cr.width);
+         miny[i] = CLAMP(MIN2(vp->y, vp->y + vp->height), 0.0f,
+                         (float)cmd->state.gfx.render.cr.height);
+         maxx[i] = CLAMP(MAX2(vp->x, vp->x + vp->width), 0.0f,
+                         (float)cmd->state.gfx.render.cr.width);
+         maxy[i] = CLAMP(MAX2(vp->y, vp->y + vp->height), 0.0f,
+                         (float)cmd->state.gfx.render.cr.height);
+         continue;
+      }
+
       minx[i] = MIN2(vp->x, vp->x + vp->width);
       miny[i] = MIN2(vp->y, vp->y + vp->height);
       maxx[i] = MAX2(vp->x, vp->x + vp->width);
@@ -12085,6 +12101,15 @@ struct hk_robust_index_batch {
    uint32_t restart_index;
 };
 
+/* The chip whose VDM records libagx writes for this device: the record family,
+ * with G18G writing G17G's records. */
+static enum agx_chip
+hk_libagx_record_chip(const struct hk_device *dev)
+{
+   return agx_vdm_index_list_record_chip(
+      agx_chip_record_family(dev->dev.chip));
+}
+
 static void
 hk_flush_robust_index_batch(struct hk_cmd_buffer *cmd,
                             struct hk_robust_index_batch *batch)
@@ -12101,7 +12126,7 @@ hk_flush_robust_index_batch(struct hk_cmd_buffer *cmd,
                                   draw->index_buffer,
                                   draw->index_buffer_range_B, draw->restart,
                                   batch->restart_index,
-                                  agx_chip_record_family(dev->dev.chip),
+                                  hk_libagx_record_chip(dev),
                                   cmd->state.gfx.topology, draw->index_size);
    batch->cs->stats.robust_index_dispatches++;
    batch->cs->stats.robust_index_batches++;
@@ -12129,7 +12154,7 @@ hk_emit_robust_index(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
    }
 
    size_t size_B = libagx_draw_robust_index_vdm_size(
-      agx_chip_record_family(dev->dev.chip), tail_emitted);
+      hk_libagx_record_chip(dev), tail_emitted);
    uint64_t target = hk_cs_alloc_for_indirect(cs, size_B);
 
    uint64_t empty_draw_jump = 0;
@@ -12168,7 +12193,7 @@ hk_emit_robust_index(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
          cmd, agx_1d(32), AGX_BARRIER_ALL | AGX_PREGFX, target, hk_heap(cmd),
          dev->dev.printf_buffer_address, draw.b.ptr, draw.index_buffer,
          draw.index_buffer_range_B, draw.restart, restart_index,
-         agx_chip_record_family(dev->dev.chip), topology, draw_state_offset,
+         hk_libagx_record_chip(dev), topology, draw_state_offset,
          tail_emitted, empty_draw_jump, draw.index_size);
       cs->stats.robust_index_dispatches++;
    }
@@ -12586,9 +12611,9 @@ hk_draw_impl(struct hk_cmd_buffer *cmd, uint16_t draw_id, struct agx_draw draw_,
                   cs->restart_index = index;
                }
             }
-            cs->current = (void *)agx_vdm_draw((uint32_t *)out,
-                                               dev->dev.chip, draw, topology,
-                                               hk_draw_restart_index(cmd, draw));
+            cs->current = (void *)agx_vdm_draw(
+               (uint32_t *)out, agx_vdm_index_list_record_chip(dev->dev.chip),
+               draw, topology, hk_draw_restart_index(cmd, draw));
          }
       }
 
@@ -13098,10 +13123,10 @@ hk_g17p_emit_indirect_record(struct hk_cmd_buffer *cmd, uint16_t draw_id,
    } else {
       /* As hk_draw_impl() emits an indirect HAL300 draw: the packet carries
        * its own restart state. */
-      cs->current = (void *)agx_vdm_draw((uint32_t *)cs->current,
-                                         hk_cmd_buffer_device(cmd)->dev.chip,
-                                         draw, gfx->topology,
-                                         hk_draw_restart_index(cmd, draw));
+      cs->current = (void *)agx_vdm_draw(
+         (uint32_t *)cs->current,
+         agx_vdm_index_list_record_chip(hk_cmd_buffer_device(cmd)->dev.chip),
+         draw, gfx->topology, hk_draw_restart_index(cmd, draw));
    }
    hk_g17p_note_layer_zero_draw(cmd, cs);
    hk_note_pre_raster_images(cmd, cs);

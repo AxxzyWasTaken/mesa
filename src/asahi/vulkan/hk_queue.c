@@ -402,8 +402,9 @@ asahi_append_compute_attachments(struct hk_device *dev,
                                  const struct hk_cs *cs)
 {
    /* Attachment spans are hints for the native AGX3 firmware interface.
-    * AGX2 has never sent them, so G13 and G14 keep that submission. */
-   if (!agx_native_graphics(&dev->dev))
+    * AGX2 has never sent them, so G13 and G14 keep that submission. G18G
+    * (M6) sends them as well. */
+   if (!agx_native_graphics(&dev->dev) && dev->dev.chip != AGX_CHIP_G18G)
       return;
 
    const struct hk_drm_attachment_set *set = &cs->compute_attachments;
@@ -427,7 +428,7 @@ asahi_append_fragment_attachments(struct hk_device *dev,
                                   const struct hk_cs *cs)
 {
    /* See asahi_append_compute_attachments(). */
-   if (!agx_native_graphics(&dev->dev))
+   if (!agx_native_graphics(&dev->dev) && dev->dev.chip != AGX_CHIP_G18G)
       return;
 
    const struct hk_drm_attachment_set *set = &cs->fragment_attachments;

@@ -15,10 +15,11 @@
 /*
  * Per-mnemonic canonical baselines, taken verbatim from the decoded bare
  * witnesses (transcendental-int-re analysis.json `baselines`, corpus_frag for
- * the gradients). f9/f10/f25/f26/f29 are the operand-shape selectors; f11,
- * f27, f29 and f40(b)/f42(c) retain the canonical witness values here. G17P's
- * rounding/log/exp source-discard field is overridden from the actual source
- * lifetime below. On AGX3c the class discriminator f33=3 plus the f34
+ * the gradients). f9/f10/f25/f26 select the operand shape. The legacy replay
+ * entry point preserves the witnesses' f11/f27/f29 lifetime fields and
+ * f40(b)/f42(c) waits. G17G runtime encoding overrides them with the actual
+ * post-RA lifetimes and scheduler dependencies. On AGX3c the class
+ * discriminator f33=3 plus the f34
  * op-select join the baseline (f32sinc uses a distinct word0 without f42).
  */
 struct funop_form {
@@ -57,6 +58,12 @@ static const struct agx3_field_kv c_exp2[] = {
    KV(9, 2),  KV(10, 2), KV(25, 2), KV(26, 2), KV(29, 1),
    KV(33, 3), KV(34, 52), KV(42, 1),
 };
+static const struct agx3_field_kv c_rsqrt[] = {
+   KV(9, 2), KV(10, 2), KV(25, 2), KV(26, 2), KV(33, 3), KV(34, 66),
+};
+static const struct agx3_field_kv c_sqrt_step[] = {
+   KV(9, 2), KV(10, 2), KV(25, 2), KV(26, 2), KV(33, 3), KV(34, 68),
+};
 static const struct agx3_field_kv c_sinc[] = {
    KV(9, 2),  KV(10, 2), KV(11, 1), KV(25, 2), KV(26, 2), KV(27, 1),
    KV(33, 3), KV(34, 67),
@@ -91,6 +98,10 @@ static const struct funop_form forms[AGX3_FUNOP_COUNT] = {
                         c_dfdx, NELEM(c_dfdx)},
    [AGX3_FUNOP_DFDY] = {"f32dfdy", -1, false, b_dfdy, NELEM(b_dfdy),
                         c_dfdy, NELEM(c_dfdy)},
+   [AGX3_FUNOP_RSQRT] = {"f32rsqrt", -1, true, NULL, 0,
+                         c_rsqrt, NELEM(c_rsqrt)},
+   [AGX3_FUNOP_SQRT_STEP] = {"f32sqrtstep", -1, true, NULL, 0,
+                             c_sqrt_step, NELEM(c_sqrt_step)},
 };
 
 static bool
@@ -106,23 +117,50 @@ agx3_funop_carries_wait(enum agx_isa_encoding enc, enum agx3_funop op)
           op < AGX3_FUNOP_COUNT && forms[op].wait_ok;
 }
 
-bool
-agx3_funop_encode_source_lifetime(
-   enum agx_isa_encoding enc, enum agx3_funop op, uint16_t dest, uint16_t src,
-   bool src_abs, bool src_neg, bool saturate, uint16_t wait_mask, bool src_live,
-   uint8_t out[AGX3_FUNOP_MAX_LENGTH], uint8_t *len)
+static bool
+agx3_funop_encode_impl(enum agx_isa_encoding enc, enum agx3_funop op, uint16_t dest,
+                  uint16_t src, bool src_abs, bool src_neg, bool saturate,
+                  uint16_t wait_mask, bool src_live, const struct agx3_funop_runtime *runtime,
+                  uint8_t out[AGX3_FUNOP_MAX_LENGTH],
+                  uint8_t *len)
 {
    if (out == NULL || len == NULL)
       return false;
    memset(out, 0, AGX3_FUNOP_MAX_LENGTH);
    *len = 0;
 
-   if ((enc != AGX_ISA_ENCODING_AGX3B && enc != AGX_ISA_ENCODING_AGX3C) ||
-       op >= AGX3_FUNOP_COUNT)
+   /*
+    * G18G (agx3d) takes the G17G runtime field vectors unchanged: the
+    * f32rsqrt, f32rint, f32log2, f32exp2 and f32sqrtstep words of the aligned
+    * applegpu_g17g/applegpu_g18g pairs of the j813-linux gpu/m5-*-reference
+    * corpus (16 to 24 of each) differ only in their wait slot, and 12 of 16
+    * are byte-identical; the glxgears normalize() is one of them
+    * (27 00 04 58 2a 20 a3 12 30 00). Only that runtime entry point, whose
+    * lifetimes and waits are the caller's, is admitted for agx3d.
+    */
+   if ((enc != AGX_ISA_ENCODING_AGX3B && !agx_encoding_is_g17_class(enc)) ||
+        op >= AGX3_FUNOP_COUNT || (enc == AGX_ISA_ENCODING_AGX3D && !runtime))
       return false;
 
-   /* Witnessed operand domain: even 32-bit half-register pairs below 128. */
-   if (dest >= 128 || src >= 128 || (dest & 1) || (src & 1))
+   const bool root = op == AGX3_FUNOP_RSQRT || op == AGX3_FUNOP_SQRT_STEP;
+   if (root && !runtime)
+      return false;
+   if (runtime && (!agx_encoding_is_g17_class(enc) ||
+                   (op > AGX3_FUNOP_EXP2 && !root) ||
+                   (runtime->src_cache && runtime->src_discard)))
+      return false;
+
+   const bool dest_16 = runtime && runtime->dest_16;
+   const bool src_16 = runtime && runtime->src_16;
+   if (runtime &&
+       ((op <= AGX3_FUNOP_RINT && (dest_16 || src_16)) ||
+        (op == AGX3_FUNOP_RSQRT && (dest_16 != src_16)) ||
+        (op == AGX3_FUNOP_SQRT_STEP && (dest_16 || src_neg || saturate))))
+      return false;
+
+   /* Native scalar half registers may be odd; float registers are pairs. */
+   if (dest >= 128 || src >= 128 || (!dest_16 && (dest & 1)) ||
+       (!src_16 && (src & 1)))
       return false;
 
    const struct funop_form *F = &forms[op];
@@ -138,7 +176,7 @@ agx3_funop_encode_source_lifetime(
    if (wait_mask && !F->wait_ok)
       return false;
 
-   struct agx3_field_kv ov[16];
+   struct agx3_field_kv ov[22];
    unsigned n = 0;
    ov[n++] = (struct agx3_field_kv)KV(2, dest);
    ov[n++] = (struct agx3_field_kv)KV(18, src);
@@ -158,20 +196,78 @@ agx3_funop_encode_source_lifetime(
       ov[n++] = (struct agx3_field_kv)KV(14, 1);
    if (F->rint_mode >= 0)
       ov[n++] = (struct agx3_field_kv)KV(43, F->rint_mode);
+
+   /* Apple applegpu_g17g witnesses log2(x)*x and exp2(x)*x retain the
+    * source (f27=1, f29=0), while their last-use counterparts set f29.
+    * The same fields are independently witnessed for all four rint modes.
+    * Copying the canonical last-use template here discards live inputs. */
+   if (runtime) {
+      ov[n++] = (struct agx3_field_kv)KV(10, dest_16 ? 1 : 2);
+      ov[n++] = (struct agx3_field_kv)KV(26, src_16 ? 1 : 2);
+      ov[n++] = (struct agx3_field_kv)KV(11, runtime->dest_cache);
+      ov[n++] = (struct agx3_field_kv)KV(27, runtime->src_cache);
+      ov[n++] = (struct agx3_field_kv)KV(29, runtime->src_discard);
+   }
    /* Wait bits f35..f40 (b) / f35..f42 (c), one per scoreboard slot; on the
     * canonical AGX3b baseline the slot-6 field doubles as the f40 hint. */
    for (unsigned i = 0; i < nslots; ++i) {
-      if (wait_mask & (1u << i))
-         ov[n++] = (struct agx3_field_kv)KV(35 + i, 1);
+      if (runtime || (wait_mask & (1u << i)))
+         ov[n++] = (struct agx3_field_kv)KV(35 + i, !!(wait_mask & (1u << i)));
    }
 
    const struct agx3_field_kv *base = is_b(enc) ? F->base_b : F->base_c;
    const unsigned nbase = is_b(enc) ? F->nbase_b : F->nbase_c;
 
-   if (!agx3_bind_compose(enc, F->mnemonic, 0, base, nbase, ov, n, out, len)) {
+   if (!agx3_bind_compose(enc, F->mnemonic, agx3_bind_ep(enc, 0), base, nbase,
+                          ov, n, out, len)) {
       memset(out, 0, AGX3_FUNOP_MAX_LENGTH);
       *len = 0;
       return false;
    }
    return true;
+}
+
+bool
+agx3_funop_encode(enum agx_isa_encoding enc, enum agx3_funop op, uint16_t dest,
+                  uint16_t src, bool src_abs, bool src_neg, bool saturate,
+                  uint16_t wait_mask, uint8_t out[AGX3_FUNOP_MAX_LENGTH],
+                  uint8_t *len)
+{
+   return agx3_funop_encode_impl(enc, op, dest, src, src_abs, src_neg, saturate,
+                                 wait_mask, false, NULL, out, len);
+}
+
+bool
+agx3_funop_encode_g17g(enum agx3_funop op, uint16_t dest, uint16_t src,
+                       bool src_abs, bool src_neg, bool saturate,
+                       uint16_t wait_mask,
+                       const struct agx3_funop_runtime *runtime,
+                       uint8_t out[AGX3_FUNOP_MAX_LENGTH], uint8_t *len)
+{
+   return agx3_funop_encode_runtime(AGX_ISA_ENCODING_AGX3C, op, dest, src,
+                                    src_abs, src_neg, saturate, wait_mask,
+                                    runtime, out, len);
+}
+
+bool
+agx3_funop_encode_runtime(enum agx_isa_encoding enc, enum agx3_funop op,
+                          uint16_t dest, uint16_t src, bool src_abs,
+                          bool src_neg, bool saturate, uint16_t wait_mask,
+                          const struct agx3_funop_runtime *runtime,
+                          uint8_t out[AGX3_FUNOP_MAX_LENGTH], uint8_t *len)
+{
+   return runtime && agx_encoding_is_g17_class(enc) &&
+          agx3_funop_encode_impl(enc, op, dest, src, src_abs, src_neg,
+                                 saturate, wait_mask, false, runtime, out,
+                                 len);
+}
+
+bool
+agx3_funop_encode_source_lifetime(
+   enum agx_isa_encoding enc, enum agx3_funop op, uint16_t dest, uint16_t src,
+   bool src_abs, bool src_neg, bool saturate, uint16_t wait_mask, bool src_live,
+   uint8_t out[AGX3_FUNOP_MAX_LENGTH], uint8_t *len)
+{
+   return agx3_funop_encode_impl(enc, op, dest, src, src_abs, src_neg, saturate,
+                                wait_mask, src_live, NULL, out, len);
 }

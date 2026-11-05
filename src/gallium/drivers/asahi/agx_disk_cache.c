@@ -221,7 +221,11 @@ void
 agx_disk_cache_init(struct agx_screen *screen)
 {
 #ifdef ENABLE_SHADER_CACHE
-   if (agx_get_compiler_debug() || (screen->dev.debug & ~ALLOWED_FLAGS))
+   /* G18G keeps j873's persistent cache off: its compiler A/B gates
+    * (agx_get_fs_structure_flags(), AGX_G18_MSAA4) select code paths that
+    * must never share persistent shader entries. */
+   if (agx_get_compiler_debug() || (screen->dev.debug & ~ALLOWED_FLAGS) ||
+       screen->dev.chip == AGX_CHIP_G18G)
       return;
 
    const char *renderer = screen->pscreen.get_name(&screen->pscreen);

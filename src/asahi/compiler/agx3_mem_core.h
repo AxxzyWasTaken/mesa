@@ -62,6 +62,12 @@ struct agx3_mem_desc {
    uint8_t slot;       /* load only: 1..6 (agx3b) / 1..8 (agx3c) */
    uint16_t wait_mask; /* bit i sets wait slot i */
 
+   /* Apple marks the final LDDEV of a program, and only that one: AGX3b with
+    * f79=2 (vertex corpus), AGX3c with f82=2, which only the 14-byte ep2/ep5
+    * forms carry (every metal-nt G17G kernel, vertex, fragment and preamble
+    * in gpu/m5-*-reference; a two-load kernel emits the 8-byte form then the
+    * marked one). No store witness carries either. */
+   bool last_load;
    /* Atomic/coherent access qualifier. Apple's AGX3 encoders expose this as
     * f77 on loads and f75 on stores. */
    bool coherent;

@@ -23,6 +23,7 @@ agx_vdm_ppp_state_core_supported(enum agx_chip chip)
    case AGX_CHIP_G17G:
    case AGX_CHIP_G17S:
    case AGX_CHIP_G17C:
+   case AGX_CHIP_G18G:
       return true;
 
    case AGX_CHIP_G13G:

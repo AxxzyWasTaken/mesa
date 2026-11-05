@@ -90,6 +90,9 @@ agx_gallium_descriptor_generation(enum agx_chip chip)
    case AGX_CHIP_G17G:
    case AGX_CHIP_G17S:
    case AGX_CHIP_G17C:
+   /* The J873 native captures carry Gen10 texture and PBE descriptors that
+    * Mesa's G17G packers reproduce byte for byte. */
+   case AGX_CHIP_G18G:
       return AGX_DESCRIPTOR_GENERATION_10;
    case AGX_CHIP_G15P:
    case AGX_CHIP_UNKNOWN:
@@ -296,6 +299,10 @@ bool agx_gallium_pack_native_pbe(
    enum agx_descriptor_generation generation,
    struct agx_gallium_pbe_descriptor *out,
    const struct AGX_PBE *semantic);
+
+/* G18-only mip-chain extension; retains all semantic sideband checks. */
+bool agx_gallium_pack_g18_native_pbe(
+   struct agx_gallium_pbe_descriptor *out, const struct AGX_PBE *semantic);
 
 bool agx_gallium_set_null_native_pbe(
    enum agx_descriptor_generation generation,

@@ -27,6 +27,9 @@ extern "C" {
 /* G17G/S native allocation ends at r125; r126/r127 are not GPRs. */
 #define AGX3C_NUM_REGS (252)
 
+/* G18G's ordinary register file ends at r125 (half 251). */
+#define AGX3D_NUM_REGS (252)
+
 /* u0-u255 inclusive, as pairs of 16-bits */
 #define AGX_NUM_UNIFORMS (512)
 
@@ -717,6 +720,10 @@ typedef struct {
    bool agx3_staging_known;
    bool agx3_fltnorm_start;
    bool agx3_mrt_tile_ops_ordered;
+   /* The packer emitted this fragment's tile accesses through the native1130
+    * mixed-format protocol, inside its 0x200 entry and final release (run
+    * 1139); its reads then take the long LLDCol form. */
+   bool agx3_g18_mixed_protocol;
    struct agx3_colour_link_info agx3_colour_link;
 
    /* Promoted constants. These will be appended to the binary at the end. */
@@ -1226,6 +1233,9 @@ bool agx3_lower_scalar_cube_coordinates(agx_context *ctx);
 bool agx3_split_texture_coordinates(agx_context *ctx);
 bool agx3_reserve_cube_scratch(agx_context *ctx);
 void agx_lower_uniform_sources(agx_context *ctx);
+void agx_lower_agx3_fma_sources(agx_context *ctx);
+void agx_lower_agx3_immediates(agx_context *ctx);
+void agx_materialize_agx3_cf_constants(agx_context *ctx);
 void agx_opt_cse(agx_context *ctx);
 bool agx_opt_collect_split(agx_context *ctx);
 void agx_opt_cse_pressure(agx_context *ctx);
@@ -1460,6 +1470,14 @@ struct agx_cycle_estimate agx_estimate_cycles(agx_context *ctx);
 bool agx_is_alu(const agx_instr *I);
 
 extern int agx_compiler_debug;
+
+bool agx_instrs_equal_for_cse(const agx_instr *i1, const agx_instr *i2);
+
+bool agx3_sink_vertex_outputs(agx_context *ctx);
+
+bool agx3_coalesce_uniform_half_stores(agx_context *ctx);
+
+bool agx_lower_agx3_device_atomic_sources(agx_context *ctx);
 
 #ifdef __cplusplus
 } /* extern C */

@@ -74,6 +74,7 @@ enum agx_dbg {
    AGX_DBG_FEEDBACK = BITFIELD_BIT(20),
    AGX_DBG_1QUEUE = BITFIELD_BIT(21),
    AGX_DBG_NOMERGE = BITFIELD_BIT(22),
+   AGX_DBG_FAULTTRACE = BITFIELD_BIT(23),
    /* Track BOs without serializing submissions, then decode only a failed
     * submit while its command stream and referenced allocations are live. */
    /* Decode every command stream at submit time without waiting for the GPU. */

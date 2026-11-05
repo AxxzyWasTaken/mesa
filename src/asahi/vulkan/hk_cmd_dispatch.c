@@ -2678,6 +2678,143 @@ hk_dispatch_g17p_native(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
    cs->stats.cmds++;
 }
 
+void
+hk_dispatch_g17g_native(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
+                        struct hk_shader *s, struct agx_grid grid,
+                        struct agx_workgroup local_size)
+{
+   struct hk_device *dev = hk_cmd_buffer_device(cmd);
+   struct hk_linked_shader *linked = s ? s->only_linked : NULL;
+   if (dev->dev.chip != AGX_CHIP_G17G || cs->type != HK_CS_CDM ||
+       !hk_g17p_compute_shader_supported(dev->dev.chip, s, linked,
+                                         AGX3_G17P_MAX_SPILL_B) ||
+       s->info.stage != MESA_SHADER_COMPUTE || agx_is_indirect(grid) ||
+       s->b.info.local_size || s->b.info.uses_ray_traversal ||
+       s->info.agx3_txf_texture_valid || s->info.agx3_storage_image_valid ||
+       s->info.agx3_sampled_storage_valid || s->info.agx3_indexed_storage_valid ||
+       !local_size.x || !local_size.y || !local_size.z ||
+       (uint64_t)local_size.x * local_size.y * local_size.z > 1024) {
+      mesa_loge("M5 native compute: unsupported shader or indirect/shared-memory launch");
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+      return;
+   }
+   if (!grid.count[0] || !grid.count[1] || !grid.count[2])
+      return;
+
+   struct hk_descriptor_state *descriptors = &cmd->state.cs.descriptors;
+   descriptors->root.cs.constant_data_addr = s->data_size
+      ? hk_pool_upload(cmd, s->data_ptr, s->data_size, HK_MIN_UBO_ALIGNMENT) : 0;
+   if (s->data_size && !descriptors->root.cs.constant_data_addr) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+      return;
+   }
+   const uint64_t root = hk_cmd_buffer_upload_root(cmd, VK_PIPELINE_BIND_POINT_COMPUTE);
+   uint64_t texture_pointers = 0;
+   if (s->info.agx3_indexed_sampler_valid) {
+      if (!dev->sampled_images.bo || !dev->sampled_images.bo->va ||
+          !dev->samplers.table.bo || !dev->samplers.table.bo->va) {
+         vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+         return;
+      }
+      const uint64_t pointers[] = {
+         dev->sampled_images.bo->va->addr, dev->samplers.table.bo->va->addr,
+      };
+      texture_pointers = hk_pool_upload(cmd, pointers, sizeof(pointers), 8);
+      hk_cmd_buffer_retain_bo(cmd, dev->sampled_images.bo);
+      hk_cmd_buffer_retain_bo(cmd, dev->samplers.table.bo);
+   }
+   if (!root || (s->info.agx3_indexed_sampler_valid && !texture_pointers)) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+      return;
+   }
+   struct agx3_ioto_uniform_range ranges[HK_G17P_COMPUTE_MAX_RANGES];
+   size_t range_count;
+   if (!hk_g17p_compute_uniform_ranges(dev->dev.chip, cmd, s, root,
+                                       texture_pointers, ranges, &range_count)) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+      return;
+   }
+   struct agx_bo *program_bo = agx_bo_create(
+      &dev->dev, AGX3_G17P_GRAPHICS_PROGRAM_MAX_SIZE, AGX_IOTO_PROGRAM_ALIGNMENT,
+      AGX_BO_EXEC | AGX_BO_LOW_VA, "M5 compute Ioto program");
+   if (!program_bo) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+      return;
+   }
+   util_dynarray_append(&cmd->large_bos, program_bo);
+   void *map = agx_bo_map(program_bo);
+   const uint64_t shader_va = linked->b.bo->va->addr + linked->b.entry_offset;
+   if (!map || !agx_va_in_usc_window(&dev->dev, program_bo->va->addr) ||
+       !agx_va_in_usc_window(&dev->dev, shader_va) ||
+       linked->b.size > AGX_USC_WINDOW_SIZE - (shader_va - dev->dev.shader_base)) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+      return;
+   }
+   if (hk_g17p_launch_trace_enabled()) {
+      for (size_t i = 0; i < range_count; ++i)
+         fprintf(stderr, "M5_COMPUTE_UNIFORMS program=%" PRIx64
+                 " start=%u count=%u address=%" PRIx64 "\n",
+                 program_bo->va->addr, ranges[i].start_halfs,
+                 ranges[i].size_halfs, ranges[i].address);
+   }
+
+   const struct agx3_g17p_graphics_program_desc desc = {
+      .program_va = program_bo->va->addr, .shader_va = shader_va,
+      .uniform_ranges = ranges, .uniform_range_count = range_count,
+      .shader_binary_size = linked->b.size, .nr_gprs = linked->b.nr_gprs,
+      .compiler_d_valid = s->b.info.agx3_staging_known,
+      .compiler_d = (uint32_t)s->b.info.agx3_staging_halfs * 2,
+   };
+   struct agx3_g17p_graphics_program program;
+   /* The launch record is G17G's (agx3_g17g_native_compute_program_bind
+    * binds it as G17G); name that chip for the shared native bind. */
+   struct agx3_g17p_native_compute_program_desc launch_desc = {
+      .chip = AGX_CHIP_G17G,
+      .program_va = program_bo->va->addr, .shader_va = shader_va,
+   };
+   struct agx3_compute_program launch;
+   if (!agx3_g17g_compute_program_generate(dev->dev.chip, &desc, &program) ||
+       !agx3_cdm_direct_template_sources_compute(s->b.info.uses_resource_info_query,
+                                                 false, false, &launch_desc.launch_sources) ||
+       !agx3_g17g_native_compute_program_bind(&launch_desc, &launch)) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+      return;
+   }
+   memcpy(map, program.bytes, program.length);
+   hk_cmd_buffer_retain_bo(cmd, linked->b.bo);
+   if (s->b.info.rodata.size_16)
+      hk_cmd_buffer_retain_bo(cmd, s->bo);
+
+   hk_ensure_cs_has_space(cmd, cs, 0x2000);
+   struct agx3_compute_dispatch_sink sink = {
+      .data = (uint8_t *)cs->current,
+      .capacity = (uint8_t *)cs->end - (uint8_t *)cs->current,
+   };
+   const struct agx3_compute_direct_grid direct = {
+      .source = AGX3_CDM_DIRECT_GRID_GLOBAL_THREADS,
+      .size = {grid.count[0], grid.count[1], grid.count[2]},
+      .local_size = {local_size.x, local_size.y, local_size.z},
+      .dimensions = grid.count[2] != 1 || local_size.z != 1 ? 3
+                  : grid.count[1] != 1 || local_size.y != 1 ? 2 : 1,
+   };
+   if (!agx3_g17g_native_compute_dispatch_append(&launch, &direct, 5, &sink)) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+      return;
+   }
+   if (hk_g17p_launch_trace_enabled()) {
+      fprintf(stderr, "M5 native compute recorded: program=%" PRIx64
+              " bytes=%u shader=%" PRIx64 " size=%u ranges=%zu grid=%ux%ux%u local=%ux%ux%u\n",
+              program_bo->va->addr, program.length, shader_va, (unsigned)linked->b.size,
+              range_count, grid.count[0], grid.count[1], grid.count[2],
+              local_size.x, local_size.y, local_size.z);
+      hk_g17p_trace_hexdump("M5-compute-ioto", program_bo->va->addr,
+                            program.bytes, program.length);
+      hk_g17p_trace_hexdump("M5-compute-stream", cs->addr, sink.data, sink.length);
+   }
+   cs->current = (uint32_t *)((uint8_t *)cs->current + sink.length);
+   cs->stats.cmds++;
+}
+
 static void
 dispatch_grid(struct hk_cmd_buffer *cmd, struct agx_grid grid, bool in_threads)
 {
