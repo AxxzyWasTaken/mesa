@@ -8184,10 +8184,15 @@ agx_encode_g17g_state(struct agx_batch *batch, uint8_t *out)
     * mode below or, for layouts mixing modes, the linker's varying counts.
     * G17G's linear counts live at bits 16..23 and its position-only reads
     * carry no varying components, so those shapes name their counts
-    * explicitly rather than falling into the single-mode shift. */
+    * explicitly rather than falling into the single-mode shift. The
+    * single-mode shape also stops at eight varying components and three
+    * coefficient bindings (agx_ppp_hal300_graphics_core_pack); a colour
+    * layout past either limit takes the linker's counts instead. */
    const bool general_varyings =
       position_only ||
-      (color_varying && (mixed_cf || (!color->perspective && color->smooth)));
+      (color_varying &&
+       (mixed_cf || (!color->perspective && color->smooth) ||
+        vs->uvs.user_size > 8 || cf->nr_bindings > 3));
    const uint32_t counts_32 = batch->linked_varyings.counts_32.opaque[0];
 
    const struct agx_ppp_hal300_graphics_fields graphics_fields = {
