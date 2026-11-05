@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <xf86drm.h>
 #include "asahi/compiler/agx_compile.h"
+#include "asahi/compiler/agx_debug.h"
 #include "asahi/layout/layout.h"
 #include "asahi/genxml/agx3_cmdstream.h"
 #include "asahi/lib/agx_g17p_compression.h"
@@ -2586,7 +2587,8 @@ agx_is_format_supported(struct pipe_screen *pscreen, enum pipe_format format,
       return false;
 
    if (sample_count > 1 &&
-       (agx_device(pscreen)->chip == AGX_CHIP_G18G ||
+       ((agx_device(pscreen)->chip == AGX_CHIP_G18G &&
+         !agx_g18_msaa4_enabled()) ||
         (agx_device(pscreen)->debug & AGX_DBG_NOMSAA)))
       return false;
 
