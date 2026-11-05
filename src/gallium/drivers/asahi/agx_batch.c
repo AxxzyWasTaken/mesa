@@ -851,12 +851,20 @@ agx_retire_failed_submit(struct agx_context *ctx, struct agx_batch *batch,
    free(extres);
    util_dynarray_fini(cmdbuf);
 
+   /* The kernel refuses a submission outside its admitted profile with
+    * ENOTSUPP (524, a value libc does not name). Nothing was queued and no
+    * fence will signal, so there is no completion to await and no fault to
+    * record: drop the batch and keep the context usable.
+    */
+   const bool refused = (error == 524);
+
    /* An ioctl error does not cancel accepted commands. Wait for both the
     * failed ioctl's aggregate (if published) and any earlier split compute.
     * Keep both handles alive until completion is established.
     */
-   bool complete = agx_wait_failed_submit(dev, error_syncobj, false);
-   complete &= agx_wait_failed_submit(dev, accepted_syncobj, true);
+   bool complete = refused || agx_wait_failed_submit(dev, error_syncobj, false);
+   if (!refused)
+      complete &= agx_wait_failed_submit(dev, accepted_syncobj, true);
 
    /* Never put resources in the BO cache on an inconclusive wait. Keep the
     * entire batch, its fences, context and screen until process exit. This
@@ -881,10 +889,12 @@ agx_retire_failed_submit(struct agx_context *ctx, struct agx_batch *batch,
       agx_msg("submit completion unknown; quarantining context resources\n");
    }
 
-   const bool first_fault = !ctx->any_faults;
-   ctx->any_faults = true;
-   if (first_fault && ctx->reset.reset)
-      ctx->reset.reset(ctx->reset.data, PIPE_GUILTY_CONTEXT_RESET);
+   if (!refused) {
+      const bool first_fault = !ctx->any_faults;
+      ctx->any_faults = true;
+      if (first_fault && ctx->reset.reset)
+         ctx->reset.reset(ctx->reset.data, PIPE_GUILTY_CONTEXT_RESET);
+   }
 
    errno = error;
 }
