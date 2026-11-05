@@ -2826,7 +2826,8 @@ agx_shader_initialize(struct agx_device *dev, struct agx_uncompiled_shader *so,
 
    struct agx_lower_bindings_options binding_options = {
       .uses_bindless_samplers = &so->uses_bindless_samplers,
-      .g17p_plain_txf_crawl = agx_native_graphics(dev),
+      .g17p_plain_txf_crawl =
+         agx_native_graphics(dev) || dev->chip == AGX_CHIP_G17G,
       .table_index_crawls = dev->chip == AGX_CHIP_G17G,
       .g17p_native_sampler_handles =
          agx_native_graphics(dev) || dev->chip == AGX_CHIP_G17G,
