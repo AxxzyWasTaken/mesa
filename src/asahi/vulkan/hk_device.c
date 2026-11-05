@@ -942,6 +942,20 @@ hk_CreateDevice(VkPhysicalDevice physicalDevice,
       }
    }
 
+   if (dev->vk.enabled_features.sparseBinding) {
+      dev->sparse_fill = agx_bo_create(&dev->dev, AIL_PAGESIZE, 0, 0,
+                                       "Sparse fill page");
+      if (!dev->sparse_fill || !agx_bo_map(dev->sparse_fill)) {
+         result = vk_error(dev, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+         HK_INIT_FAIL(fail_dev, "sparse-fill", 0);
+      }
+      memset(agx_bo_map(dev->sparse_fill), 0, AIL_PAGESIZE);
+      if (agx_bo_sync_for_device(dev->sparse_fill, 0, AIL_PAGESIZE)) {
+         result = vk_error(dev, VK_ERROR_DEVICE_LOST);
+         HK_INIT_FAIL(fail_dev, "sparse-fill-sync", 0);
+      }
+   }
+
    result = hk_init_sampler_heap(dev, &dev->samplers);
    if (result != VK_SUCCESS)
       HK_INIT_FAIL(fail_dev, "sampler-heap", 0);
@@ -1106,6 +1120,7 @@ fail_samplers:
 fail_dev:
    hk_finish_vm_status_mirror(dev);
    agx_bo_unreference(&dev->dev, dev->physical_sparse_map);
+   agx_bo_unreference(&dev->dev, dev->sparse_fill);
    agx_bo_unreference(&dev->dev, dev->code_heap.chunk);
    agx_close_device(&dev->dev);
    /* agx_close_device owns the DRM fd after agx_open_device succeeds. */
@@ -1191,6 +1206,7 @@ hk_DestroyDevice(VkDevice _device, const VkAllocationCallbacks *pAllocator)
    agx_bg_eot_cleanup(&dev->bg_eot);
    hk_finish_vm_status_mirror(dev);
    agx_bo_unreference(&dev->dev, dev->physical_sparse_map);
+   agx_bo_unreference(&dev->dev, dev->sparse_fill);
    agx_bo_unreference(&dev->dev, dev->code_heap.chunk);
    simple_mtx_destroy(&dev->code_heap.lock);
    agx_close_device(&dev->dev);

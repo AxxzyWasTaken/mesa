@@ -1339,15 +1339,12 @@ agx_open_device(void *memctx, struct agx_device *dev)
 
       /* The contents of the scratch page are undefined, but making them nonzero
        * helps fuzz for bugs where we incorrectly read from the write section.
-       *
-       * G17P advertises strict residency and reads an unbound page through
-       * this mapping, so it needs zero. A shader lookup per load would tax
-       * every D3D12 shader to cover reading back a write to an unbound page.
+       * Unbound sparse pages map hk's own zeroed fill page instead.
        */
       void *map = agx_bo_map(dev->scratch_bo);
       if (!map)
          goto fail;
-      memset(map, dev->chip == AGX_CHIP_G17P ? 0 : 0xCA, AIL_PAGESIZE);
+      memset(map, 0xCA, AIL_PAGESIZE);
    }
 
    if (agx_chip_has_native_render_context(dev->chip)) {

@@ -707,7 +707,7 @@ hk_flush_bind(struct hk_bind_builder *b)
    struct drm_asahi_gem_bind_op op;
    if (!b->mem) {
       op = (struct drm_asahi_gem_bind_op){
-         .handle = b->dev->dev.scratch_bo->uapi_handle,
+         .handle = b->dev->sparse_fill->uapi_handle,
          .flags = DRM_ASAHI_BIND_READ | DRM_ASAHI_BIND_WRITE |
                   agx_fill_bind_flags(&b->dev->dev),
          .addr = b->va->addr + b->resourceOffset,
@@ -758,7 +758,7 @@ hk_sparse_buffer_map_commit(struct hk_bind_builder *b)
       const uint64_t first = (op->addr - b->va->addr) / AIL_PAGESIZE;
       const uint64_t pages = DIV_ROUND_UP(op->range, AIL_PAGESIZE);
       const bool resident =
-         op->handle != b->dev->dev.scratch_bo->uapi_handle;
+         op->handle != b->dev->sparse_fill->uapi_handle;
 
       VkResult result = hk_update_physical_sparse_map(
          b->dev, op->addr, op->range, !resident);
@@ -809,7 +809,7 @@ hk_sparse_image_map_commit(struct hk_bind_builder *b)
       const uint64_t resource_offset = op->addr - b->va->addr;
       const uint64_t size_page = ail_bytes_to_pages(op->range);
       const bool enabled =
-         op->handle != b->dev->dev.scratch_bo->uapi_handle;
+         op->handle != b->dev->sparse_fill->uapi_handle;
 
       for (uint64_t offs_page = 0; offs_page < size_page; ++offs_page) {
          const uint64_t target_page =

@@ -133,6 +133,13 @@ struct hk_device {
    uint32_t va_alias_resources;
    /* One bit per main-heap page: only unbound sparse buffer pages are set. */
    struct agx_bo *physical_sparse_map;
+   /* The zeroed page every unbound sparse page maps, read-write (the
+    * read-only shadow maps the zero page). It is no write sink of the
+    * driver's, unlike the scratch page, so it stays zero for strict
+    * residency. shortcut: an application store to an unbound page lands
+    * here and later reads of unbound pages see it; guard stores with the
+    * residency map if that ever matters. */
+   struct agx_bo *sparse_fill;
    struct agxdecode_ctx *decode_ctx;
    /* Opt-in frame anatomy profiler (hk_frame_anatomy.h); NULL unless the
     * HK_FRAME_ANATOMY environment variable is set. */

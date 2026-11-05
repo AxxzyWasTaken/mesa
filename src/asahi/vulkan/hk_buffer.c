@@ -138,7 +138,7 @@ hk_bind_scratch(struct hk_device *dev, struct agx_va *va, unsigned offset_B,
    /* The kernel refuses a fill it cannot back (ENOMEM; on M5 also its
     * hypervisor page-table budget): that is device memory exhaustion. */
    /* Map read-write scratch to the primary (bottom half) VA range */
-   int ret = agx_bo_bind(&dev->dev, dev->dev.scratch_bo, addr, size_B, 0,
+   int ret = agx_bo_bind(&dev->dev, dev->sparse_fill, addr, size_B, 0,
                          flags | DRM_ASAHI_BIND_WRITE);
    if (ret)
       return errno == ENOMEM ? VK_ERROR_OUT_OF_DEVICE_MEMORY : VK_ERROR_UNKNOWN;
