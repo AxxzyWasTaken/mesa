@@ -36,6 +36,10 @@ extern "C" {
 #endif
 
 struct zink_batch_usage;
+struct pipe_screen;
+
+void zink_kopper_wl_drawable_ref(struct pipe_screen *pscreen, const struct kopper_loader_info *info);
+void zink_kopper_wl_drawable_unref(struct pipe_screen *pscreen, const struct kopper_loader_info *info);
 
 /* number of times a swapchain can be read without forcing readback mode */
 #define ZINK_READBACK_THRESHOLD 3

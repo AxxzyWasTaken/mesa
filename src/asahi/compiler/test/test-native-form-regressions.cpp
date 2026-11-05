@@ -2221,6 +2221,57 @@ TEST(NativeForms, CubeArrayShadowZeroLodUsesNativeDescriptors)
    }
 }
 
+/* A constant descriptor may be read ahead of its sample. A dynamic index is
+ * only known to be in range where the sample runs, and there are no soft
+ * faults: speculating `if (i >= 0) sample(tex[i])` would read element -1. */
+TEST(NativeForms, HeapIndexReadsSpeculateOnlyForConstantDescriptors)
+{
+   for (bool dynamic : {false, true}) {
+      SCOPED_TRACE(dynamic);
+      nir_builder b = nir_builder_init_simple_shader(
+         MESA_SHADER_COMPUTE, &agx_nir_options, "heap index access");
+      nir_def *texture = nir_bindless_image_agx(
+         &b, dynamic ? nir_load_local_invocation_index(&b) : nir_imm_int(&b, 0));
+      nir_def *sampler = nir_bindless_sampler_agx(
+         &b, nir_imm_int(&b, 32), nir_imm_intN_t(&b, 5, 16));
+      nir_tex_instr *tex = nir_tex_instr_create(b.shader, 5);
+      tex->op = nir_texop_txl;
+      tex->sampler_dim = GLSL_SAMPLER_DIM_CUBE;
+      tex->is_array = true;
+      tex->is_shadow = true;
+      tex->is_new_style_shadow = true;
+      tex->coord_components = 4;
+      tex->dest_type = nir_type_float32;
+      tex->src[0] = nir_tex_src_for_ssa(nir_tex_src_backend1,
+                                      nir_imm_vec4(&b, 1, 0, 0, 0));
+      tex->src[1] = nir_tex_src_for_ssa(nir_tex_src_comparator,
+                                      nir_imm_float(&b, 0.5));
+      tex->src[2] = nir_tex_src_for_ssa(nir_tex_src_lod, nir_imm_float(&b, 0));
+      tex->src[3] = nir_tex_src_for_ssa(nir_tex_src_texture_handle, texture);
+      tex->src[4] = nir_tex_src_for_ssa(nir_tex_src_sampler_handle, sampler);
+      nir_def_init(&tex->instr, &tex->def, 1, 32);
+      nir_builder_instr_insert(&b, &tex->instr);
+      nir_store_ssbo(&b, &tex->def, nir_imm_int(&b, 0), nir_imm_int(&b, 0));
+      ASSERT_TRUE(agx_nir_lower_g17p_indexed_samplers(b.shader));
+
+      unsigned reads = 0;
+      nir_foreach_block(block, nir_shader_get_entrypoint(b.shader)) {
+         nir_foreach_instr(instr, block) {
+            if (instr->type != nir_instr_type_intrinsic ||
+                nir_instr_as_intrinsic(instr)->intrinsic !=
+                   nir_intrinsic_load_global_constant)
+               continue;
+            reads++;
+            EXPECT_EQ(nir_intrinsic_access(nir_instr_as_intrinsic(instr)) &
+                         ACCESS_CAN_SPECULATE,
+                      dynamic ? 0u : (unsigned)ACCESS_CAN_SPECULATE);
+         }
+      }
+      EXPECT_EQ(reads, 1u);
+      ralloc_free(b.shader);
+   }
+}
+
 TEST(NativeForms, EndOfTilePreservesSamplesAndResolvesSameTile)
 {
    /* Both outputs read offset zero. Their descriptors are distinct, and

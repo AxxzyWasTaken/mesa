@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -212,6 +213,38 @@ static const struct drm_asahi_params_global params_g17p = {
    .gpu_hal_generation = DRM_ASAHI_GPU_HAL_200,
 };
 
+#define SHIM_T6041_AURORA_PARAMS(variant)                                     \
+   {                                                                          \
+      .features = DRM_ASAHI_FEATURE_VM_STATUS |                               \
+                  DRM_ASAHI_FEATURE_INDEPENDENT_QUEUES |                      \
+                  DRM_ASAHI_FEATURE_PER_COMMAND_INPUT_SYNCS |                 \
+                  DRM_ASAHI_FEATURE_VM_STATUS_MIRROR |                        \
+                  DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS |                    \
+                  DRM_ASAHI_FEATURE_FRAGMENT_BARRIERS |                       \
+                  DRM_ASAHI_FEATURE_BOUNDED_AS_BUILD |                        \
+                  DRM_ASAHI_FEATURE_CUMULATIVE_SIGNALS,                       \
+      .gpu_generation = 16, .gpu_variant = (variant), .gpu_revision = 0x11,   \
+      .chip_id = 0x6041, .num_dies = 1, .num_clusters_total = 4,              \
+      .num_cores_per_cluster = 10,                                            \
+      .core_masks = {0x3ff, 0x3ff, 0x3ff, 0x3ff},                             \
+      .vm_start = 0x4000, .vm_end = (1ull << 42) - 0x8000ull,                 \
+      .vm_kernel_min_size = 0x20000000,                                       \
+      .max_commands_per_submission = 64, .max_attachments = 16,               \
+      .max_frequency_khz = 1398000,                                           \
+      .command_timestamp_frequency_hz = 1000000000, .usc_generation = 3,      \
+      .gpu_hal_generation = DRM_ASAHI_GPU_HAL_200,                            \
+   }
+
+static const struct drm_asahi_params_global params_t6041 =
+   SHIM_T6041_AURORA_PARAMS('C');
+static const struct drm_asahi_params_global params_t6041x =
+   SHIM_T6041_AURORA_PARAMS('X');
+
+static const struct drm_asahi_queue_limits queue_limits_g17 = {
+   .max_queues = 42,
+   .max_in_flight_per_queue = 1,
+};
+
 static const struct drm_asahi_params_global params_g16g = {
    .features = DRM_ASAHI_FEATURE_VM_STATUS |
                DRM_ASAHI_FEATURE_PER_COMMAND_INPUT_SYNCS |
@@ -371,6 +404,10 @@ shim_params(void)
       return &params_g16g;
    if (chip && !strcmp(chip, "g17s"))
       return &params_g17s;
+   if (chip && !strcmp(chip, "t6041"))
+      return &params_t6041;
+   if (chip && !strcmp(chip, "t6041x"))
+      return &params_t6041x;
 
    return &params_g13g;
 }
@@ -379,6 +416,14 @@ static bool
 shim_g15s(void)
 {
    return shim_params() == &params_g15s;
+}
+
+static bool
+shim_g17_runtime(void)
+{
+   const struct drm_asahi_params_global *params = shim_params();
+   return params == &params_g17p || params == &params_t6041 ||
+          params == &params_t6041x;
 }
 
 /* Whether the selected identity is driven by the M3 (G15) kernel, whose
@@ -521,7 +566,7 @@ static unsigned t8140_render_submits_unbound;
 static bool
 t8140_registry_active(void)
 {
-   return shim_params() == &params_g17p;
+   return shim_g17_runtime();
 }
 
 static bool
@@ -1333,6 +1378,16 @@ asahi_ioctl_get_param(int fd, unsigned long request, void *arg)
          gp->size = sizeof(limits);
          return 0;
       }
+      if (shim_g17_runtime() && shim_params() != &params_g17p) {
+         if (gp->size < sizeof(queue_limits_g17)) {
+            errno = EINVAL;
+            return -1;
+         }
+         memcpy((void *)(uintptr_t)gp->pointer, &queue_limits_g17,
+                sizeof(queue_limits_g17));
+         gp->size = sizeof(queue_limits_g17);
+         return 0;
+      }
       if (!shim_g15s() || gp->size < sizeof(queue_limits_g15s)) {
          errno = EINVAL;
          return -1;
@@ -1410,7 +1465,7 @@ asahi_ioctl_vm_bind_unlocked(int fd, unsigned long request, void *arg)
        * heap. The kernel refuses a bind that lands on them; a run that gets
        * its allocator geometry wrong here produces thousands of rejected
        * binds on hardware and nothing at all under a no-op shim. */
-      if (params == &params_g17p &&
+      if (shim_g17_runtime() &&
           start < SHIM_G17P_RENDER_AUX_ALIAS_END &&
           SHIM_G17P_RENDER_AUX_ALIAS_START < end) {
          fprintf(stderr,
@@ -1763,7 +1818,7 @@ asahi_ioctl_submit_unlocked(int fd, unsigned long request, void *arg)
    }
 
    const char *validate = getenv("ASAHI_SHIM_VALIDATE_G17P_STREAM");
-   if (!validate || !strcmp(validate, "0") || shim_params() != &params_g17p)
+   if (!validate || !strcmp(validate, "0") || !shim_g17_runtime())
       return 0;
 
    const uint8_t *cmdbuf = (const void *)(uintptr_t)submit->cmdbuf;

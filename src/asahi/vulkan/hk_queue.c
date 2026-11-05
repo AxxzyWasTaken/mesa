@@ -204,6 +204,11 @@ asahi_fill_vdm_command(struct hk_device *dev, struct hk_cs *cs,
       c->height_px = MIN2(c->height_px, cs->area_y1);
    }
 
+   /* An attachmentless pass takes its size from the render area, which can be
+    * empty, and the kernel refuses a zero dimension. */
+   c->width_px = MAX2(c->width_px, 1);
+   c->height_px = MAX2(c->height_px, 1);
+
    c->isp_bgobjdepth = cs->cr.isp_bgobjdepth;
    c->isp_bgobjvals = cs->cr.isp_bgobjvals;
 

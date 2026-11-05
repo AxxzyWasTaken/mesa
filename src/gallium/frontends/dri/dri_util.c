@@ -723,6 +723,8 @@ int driUnbindContext(struct dri_context *ctx)
 void
 driDestroyDrawable(struct dri_drawable *drawable)
 {
+    if (drawable && drawable->screen->type == DRI_SCREEN_KOPPER)
+       kopper_release_drawable(drawable);
     dri_put_drawable(drawable);
 }
 
