@@ -942,7 +942,10 @@ hk_CreateDevice(VkPhysicalDevice physicalDevice,
       }
    }
 
-   if (dev->vk.enabled_features.sparseBinding) {
+   /* Capture-replay buffers reserve their VA and bind the fill page until
+    * memory is bound, like sparse buffers, so they need it too. */
+   if (dev->vk.enabled_features.sparseBinding ||
+       dev->vk.enabled_features.bufferDeviceAddressCaptureReplay) {
       dev->sparse_fill = agx_bo_create(&dev->dev, AIL_PAGESIZE, 0, 0,
                                        "Sparse fill page");
       if (!dev->sparse_fill || !agx_bo_map(dev->sparse_fill)) {
