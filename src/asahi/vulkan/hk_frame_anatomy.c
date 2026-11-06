@@ -546,12 +546,14 @@ hk_frame_anatomy_dump_nir(struct hk_device *dev, const struct hk_shader *shader,
 {
    struct hk_frame_anatomy *fa = dev->frame_anatomy;
    if (!fa || !fa->dump_dir || !shader->code_size ||
-       (stage != MESA_SHADER_FRAGMENT && stage != MESA_SHADER_COMPUTE))
+       (stage != MESA_SHADER_FRAGMENT && stage != MESA_SHADER_COMPUTE &&
+        stage != MESA_SHADER_VERTEX))
       return;
 
    char path[512];
    snprintf(path, sizeof(path), "%s/%s-%08x.nir", fa->dump_dir,
-            stage == MESA_SHADER_FRAGMENT ? "fs" : "cs",
+            stage == MESA_SHADER_FRAGMENT ? "fs"
+            : stage == MESA_SHADER_VERTEX ? "vs" : "cs",
             _mesa_hash_data(shader->code_ptr, shader->code_size));
    if (access(path, F_OK) == 0)
       return;
@@ -688,6 +690,7 @@ hk_frame_anatomy_render(struct hk_frame_anatomy_submit *s,
       const struct agx2_stats *st = &vs->b.info.stats;
       const uint32_t hash =
          vs->code_size ? _mesa_hash_data(vs->code_ptr, vs->code_size) : 0;
+      hk_fa_dump_fs(fa, hash, vs, "vs");
       HK_FA_APPEND(" vs=%08x:d%u:i%u:g%u:t%u:sp%u", hash,
                    cs->anatomy_vs[i].draws, st->instrs, st->gprs, st->threads,
                    st->spills + st->fills);
@@ -713,6 +716,19 @@ hk_frame_anatomy_render(struct hk_frame_anatomy_submit *s,
    if (cs->anatomy_api_barriers)
       HK_FA_APPEND(" apibar_n=m%u:b%u:i%u", cs->anatomy_api_mem,
                    cs->anatomy_api_buf, cs->anatomy_api_img);
+
+   /* The vertex (tiling) half's own requirement, resolved for this ioctl
+    * like bar=/prior=, the stream's sync kinds and whether they differ. */
+   HK_FA_APPEND(" tak=%x/%x", cs->sync.dep_ta[HK_SYNC_VDM].prior,
+                cs->sync.dep_ta[HK_SYNC_CDM].prior);
+   HK_FA_APPEND(" ta=%c:v%d,c%d:pv%" PRIu64 ",pc%" PRIu64 " kind=0x%x",
+                cs->sync.ta_split ? 'S' : '=',
+                cs->sync.barrier_ta[HK_SYNC_VDM] == DRM_ASAHI_BARRIER_NONE
+                   ? -1 : (int)cs->sync.barrier_ta[HK_SYNC_VDM],
+                cs->sync.barrier_ta[HK_SYNC_CDM] == DRM_ASAHI_BARRIER_NONE
+                   ? -1 : (int)cs->sync.barrier_ta[HK_SYNC_CDM],
+                cs->sync.prior_ta[HK_SYNC_VDM], cs->sync.prior_ta[HK_SYNC_CDM],
+                cs->sync.kind);
 }
 
 void

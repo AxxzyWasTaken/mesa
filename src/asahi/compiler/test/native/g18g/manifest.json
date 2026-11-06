@@ -1,0 +1,3697 @@
+{
+  "scope": "Apple compiler references only; no GPU execution",
+  "hardware_execution": false,
+  "mesa_execution": false,
+  "toolchain": {
+    "metal": "Apple metal version 32023.921 (metalfe-32023.921.6)",
+    "metal_nt": "AIR-NT 32023.921",
+    "metal_toolchain": "27.1.266.1",
+    "host_os": "macOS 27.0 (26A428)"
+  },
+  "texts": {
+    "oracle.blend-add.fragment.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/blend-add.mtlp-json",
+      "mode": "blend-add",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 288,
+      "sha256": "5e7336f8efab5aa100344635bf13e4df6fd1d12bf7f5bbe216cbed2106b03847"
+    },
+    "oracle.blend-add.fragment.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/blend-add.mtlp-json",
+      "mode": "blend-add",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 304,
+      "sha256": "5c046c10145a3e9600d77657f1a9e7ba8b611dee2f1c39d012a3b726b7a14c36",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.blend-add.vertex.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/blend-add.mtlp-json",
+      "mode": "blend-add",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 242,
+      "sha256": "d7502530e287b063f5b0980d777bd331bd699c802dcc4bcff0f6b373148a4f00"
+    },
+    "oracle.blend-add.vertex.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/blend-add.mtlp-json",
+      "mode": "blend-add",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 332,
+      "sha256": "2658b297e1bf1cc8c553c28252e8b719cfb181820a7db86e154825f92cda531e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.color.fragment.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/color.mtlp-json",
+      "mode": "color",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 216,
+      "sha256": "9c5bc42ab27d056f68eae3bb70249f5d7c9332b8ee0a89fd978cbaf3ee5f2567"
+    },
+    "oracle.color.fragment.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/color.mtlp-json",
+      "mode": "color",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 246,
+      "sha256": "a5a02f979c4a0e7b67797c30cdae491229730fa632136b283c0ce0a64d8f429e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.color.vertex.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/color.mtlp-json",
+      "mode": "color",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 242,
+      "sha256": "d7502530e287b063f5b0980d777bd331bd699c802dcc4bcff0f6b373148a4f00"
+    },
+    "oracle.color.vertex.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/color.mtlp-json",
+      "mode": "color",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 332,
+      "sha256": "2658b297e1bf1cc8c553c28252e8b719cfb181820a7db86e154825f92cda531e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.compute-add.compute.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/compute-add.mtlp-json",
+      "mode": "compute-add",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 114,
+      "sha256": "ba277baf38abcfab9c9992b76a3ddb81f1fd6a2946936598e3cfe18191dce282"
+    },
+    "oracle.compute-add.compute.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/compute-add.mtlp-json",
+      "mode": "compute-add",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 114,
+      "sha256": "5a1d4d13999ffe4dd91b86a155d7e278119dae6c90dcbce722f81cbd9ab4e4d7",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.depth-always.fragment.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/depth-always.mtlp-json",
+      "mode": "depth-always",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 216,
+      "sha256": "9c5bc42ab27d056f68eae3bb70249f5d7c9332b8ee0a89fd978cbaf3ee5f2567"
+    },
+    "oracle.depth-always.fragment.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/depth-always.mtlp-json",
+      "mode": "depth-always",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 246,
+      "sha256": "a5a02f979c4a0e7b67797c30cdae491229730fa632136b283c0ce0a64d8f429e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.depth-always.vertex.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/depth-always.mtlp-json",
+      "mode": "depth-always",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 242,
+      "sha256": "d7502530e287b063f5b0980d777bd331bd699c802dcc4bcff0f6b373148a4f00"
+    },
+    "oracle.depth-always.vertex.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/depth-always.mtlp-json",
+      "mode": "depth-always",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 332,
+      "sha256": "2658b297e1bf1cc8c553c28252e8b719cfb181820a7db86e154825f92cda531e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.depth-less.fragment.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/depth-less.mtlp-json",
+      "mode": "depth-less",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 216,
+      "sha256": "9c5bc42ab27d056f68eae3bb70249f5d7c9332b8ee0a89fd978cbaf3ee5f2567"
+    },
+    "oracle.depth-less.fragment.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/depth-less.mtlp-json",
+      "mode": "depth-less",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 246,
+      "sha256": "a5a02f979c4a0e7b67797c30cdae491229730fa632136b283c0ce0a64d8f429e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.depth-less.vertex.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/depth-less.mtlp-json",
+      "mode": "depth-less",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 242,
+      "sha256": "d7502530e287b063f5b0980d777bd331bd699c802dcc4bcff0f6b373148a4f00"
+    },
+    "oracle.depth-less.vertex.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/depth-less.mtlp-json",
+      "mode": "depth-less",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 332,
+      "sha256": "2658b297e1bf1cc8c553c28252e8b719cfb181820a7db86e154825f92cda531e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.discard.fragment.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/discard.mtlp-json",
+      "mode": "discard",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 278,
+      "sha256": "53cf0d4f2e9cd55dd94558afcf16b20722796a39c20d04599d5cc7f2b984dfe3"
+    },
+    "oracle.discard.fragment.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/discard.mtlp-json",
+      "mode": "discard",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 300,
+      "sha256": "dcdebd312fedc636733127da275f9debb6e356ed926431e42018dbbe97db5f13",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.discard.vertex.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/discard.mtlp-json",
+      "mode": "discard",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 242,
+      "sha256": "d7502530e287b063f5b0980d777bd331bd699c802dcc4bcff0f6b373148a4f00"
+    },
+    "oracle.discard.vertex.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/discard.mtlp-json",
+      "mode": "discard",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 332,
+      "sha256": "2658b297e1bf1cc8c553c28252e8b719cfb181820a7db86e154825f92cda531e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.lines.fragment.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/lines.mtlp-json",
+      "mode": "lines",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 216,
+      "sha256": "9c5bc42ab27d056f68eae3bb70249f5d7c9332b8ee0a89fd978cbaf3ee5f2567"
+    },
+    "oracle.lines.fragment.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/lines.mtlp-json",
+      "mode": "lines",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 246,
+      "sha256": "a5a02f979c4a0e7b67797c30cdae491229730fa632136b283c0ce0a64d8f429e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.lines.vertex.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/lines.mtlp-json",
+      "mode": "lines",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 242,
+      "sha256": "d7502530e287b063f5b0980d777bd331bd699c802dcc4bcff0f6b373148a4f00"
+    },
+    "oracle.lines.vertex.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/lines.mtlp-json",
+      "mode": "lines",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 332,
+      "sha256": "2658b297e1bf1cc8c553c28252e8b719cfb181820a7db86e154825f92cda531e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.msaa4.fragment.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/msaa4.mtlp-json",
+      "mode": "msaa4",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 220,
+      "sha256": "ece5bd7b0d411ac02b38707b7b9dcf9e2bfd4164021c182847e537d035a2952d"
+    },
+    "oracle.msaa4.fragment.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/msaa4.mtlp-json",
+      "mode": "msaa4",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 252,
+      "sha256": "be46ea4ca0240e9490bc6c34513549d29f38a165ea16c4efd24c983250432545",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.msaa4.vertex.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/msaa4.mtlp-json",
+      "mode": "msaa4",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 242,
+      "sha256": "d7502530e287b063f5b0980d777bd331bd699c802dcc4bcff0f6b373148a4f00"
+    },
+    "oracle.msaa4.vertex.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/msaa4.mtlp-json",
+      "mode": "msaa4",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 332,
+      "sha256": "2658b297e1bf1cc8c553c28252e8b719cfb181820a7db86e154825f92cda531e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.points.fragment.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/points.mtlp-json",
+      "mode": "points",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 216,
+      "sha256": "9c5bc42ab27d056f68eae3bb70249f5d7c9332b8ee0a89fd978cbaf3ee5f2567"
+    },
+    "oracle.points.fragment.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/points.mtlp-json",
+      "mode": "points",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 246,
+      "sha256": "a5a02f979c4a0e7b67797c30cdae491229730fa632136b283c0ce0a64d8f429e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.points.vertex.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/points.mtlp-json",
+      "mode": "points",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 260,
+      "sha256": "12a18e2bb74b6f8c79bcbd716ccb0a443c7a6c2de880b8f51d0d1aa27e618da4"
+    },
+    "oracle.points.vertex.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/points.mtlp-json",
+      "mode": "points",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 348,
+      "sha256": "8ed690c22015e699b0bfe9a1e07508dc1294e6e1c52c1d4a6b388ccf956dcd6a",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.r32f.fragment.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/r32f.mtlp-json",
+      "mode": "r32f",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 138,
+      "sha256": "02563b0082e5b69a11c952ec03ae6a52253bfa189241f5a16d541b7b791525c6"
+    },
+    "oracle.r32f.fragment.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/r32f.mtlp-json",
+      "mode": "r32f",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 144,
+      "sha256": "224ec508b9a1fbba6f52b7d926e07475688f24b382735bdfe92dafa35720c360",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.r32f.vertex.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/r32f.mtlp-json",
+      "mode": "r32f",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 242,
+      "sha256": "d7502530e287b063f5b0980d777bd331bd699c802dcc4bcff0f6b373148a4f00"
+    },
+    "oracle.r32f.vertex.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/r32f.mtlp-json",
+      "mode": "r32f",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 332,
+      "sha256": "2658b297e1bf1cc8c553c28252e8b719cfb181820a7db86e154825f92cda531e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.r8ui.fragment.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/r8ui.mtlp-json",
+      "mode": "r8ui",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 170,
+      "sha256": "57eb3c6f8c2485bc740a460e4cd6950d0049a04a9a17cabeccabbd2359e68447"
+    },
+    "oracle.r8ui.fragment.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/r8ui.mtlp-json",
+      "mode": "r8ui",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 172,
+      "sha256": "031b4f95e904e408957cb5e9ca0f2d244850111059957d7678858840a637f437",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.r8ui.vertex.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/r8ui.mtlp-json",
+      "mode": "r8ui",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 242,
+      "sha256": "d7502530e287b063f5b0980d777bd331bd699c802dcc4bcff0f6b373148a4f00"
+    },
+    "oracle.r8ui.vertex.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/r8ui.mtlp-json",
+      "mode": "r8ui",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 332,
+      "sha256": "2658b297e1bf1cc8c553c28252e8b719cfb181820a7db86e154825f92cda531e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.stencil.fragment.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/stencil.mtlp-json",
+      "mode": "stencil",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 216,
+      "sha256": "9c5bc42ab27d056f68eae3bb70249f5d7c9332b8ee0a89fd978cbaf3ee5f2567"
+    },
+    "oracle.stencil.fragment.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/stencil.mtlp-json",
+      "mode": "stencil",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 246,
+      "sha256": "a5a02f979c4a0e7b67797c30cdae491229730fa632136b283c0ce0a64d8f429e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.stencil.vertex.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/stencil.mtlp-json",
+      "mode": "stencil",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 242,
+      "sha256": "d7502530e287b063f5b0980d777bd331bd699c802dcc4bcff0f6b373148a4f00"
+    },
+    "oracle.stencil.vertex.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/stencil.mtlp-json",
+      "mode": "stencil",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 332,
+      "sha256": "2658b297e1bf1cc8c553c28252e8b719cfb181820a7db86e154825f92cda531e",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.texture-sample.fragment.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/texture-sample.mtlp-json",
+      "mode": "texture-sample",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 202,
+      "sha256": "d407dc47835e2697fb144e1abde017e316e9c2263a7013c660a0378970fba846"
+    },
+    "oracle.texture-sample.fragment.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/texture-sample.mtlp-json",
+      "mode": "texture-sample",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 218,
+      "sha256": "548deb0f38f60adae5cf28aca9ca8b963dc3abdd2d990fd0818cf816ec286341",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "oracle.texture-sample.vertex.g17g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/texture-sample.mtlp-json",
+      "mode": "texture-sample",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 198,
+      "sha256": "0d5a11309680d83556f98cf293e622cd85584f2e39a0a75e86f9018b65f8c18d"
+    },
+    "oracle.texture-sample.vertex.g18g.bin": {
+      "corpus": "oracle",
+      "source": "oracle/oracle.metal",
+      "config": "oracle/texture-sample.mtlp-json",
+      "mode": "texture-sample",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 240,
+      "sha256": "cb1c4e606f109142259031278a77011c64508c3873c8123cd479ea0d586b6f51",
+      "device_witness": [
+        "mini-26A428/sessions-20260925-a",
+        "mini-26A428/sessions-20260925-b"
+      ]
+    },
+    "probe.m5-array-sampler-reference.m5_sample_array_level_zero.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-array-sampler-reference.metal",
+      "config": "../g17g/m5-array-sampler-reference.mtlp-json",
+      "function": "m5_sample_array_level_zero",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 186,
+      "sha256": "56c8c6c600b8df62ff79ddb365d004200d3f54ddd815603b987fc787e4486cf1"
+    },
+    "probe.m5-array-sampler-reference.m5_sample_array_level_zero.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-array-sampler-reference.metal",
+      "config": "../g17g/m5-array-sampler-reference.mtlp-json",
+      "function": "m5_sample_array_level_zero",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 186,
+      "sha256": "1ebf1f7c521588e842903542c8a79903024bfa3164fc9d77439330070ce5a1a1"
+    },
+    "probe.m5-buffer-store-reference.m5_copy_indexed_buffers.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-buffer-store-reference.metal",
+      "config": "../g17g/m5-buffer-store-reference.mtlp-json",
+      "function": "m5_copy_indexed_buffers",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 134,
+      "sha256": "c8c8b0d4b4497a08fee3277e99a21fd3cd374f423fbee40e52b7bac4da974b12"
+    },
+    "probe.m5-buffer-store-reference.m5_copy_indexed_buffers.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-buffer-store-reference.metal",
+      "config": "../g17g/m5-buffer-store-reference.mtlp-json",
+      "function": "m5_copy_indexed_buffers",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 130,
+      "sha256": "cd4d6ed2f897752ce9403d3a4c8e46566cde1fb9cc6c79f813b721e4ff1ffb55"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_eq_zero.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_eq_zero",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 168,
+      "sha256": "a9acbe67a3bc3083a3f0328ab5115b5255958af47b6332dfe404bb46cb4a47cb"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_eq_zero.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_eq_zero",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 162,
+      "sha256": "9ef17a5786e19d329ffe2284ef9dd7cc8ecd1aef8566d57c984b9ac79b62103d"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_ge_zero.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_ge_zero",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 168,
+      "sha256": "0c30f7d534ddc04d59356eaa6414d1c7324a799a1259a32614ad45b4d1d54c03"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_ge_zero.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_ge_zero",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 162,
+      "sha256": "c735c33078bbab2dd5b06fa39f34e0965202f032931127b35dceaaabdba01c24"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_gt.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_gt",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 164,
+      "sha256": "c68e8c922e24f5c85f08507d0255ee0ee2d15427c7f52f088ec6360c2f9514c3"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_gt.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_gt",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 162,
+      "sha256": "ee005c3774252844bcf8751f6fa80180cdf110c4ec290a34178c91805765bea8"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_half.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_half",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 160,
+      "sha256": "f3fa4fd2df2036e3740f77b8d1418a4fbd3ad2f1866ffce0b2e573195b028f1b"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_half.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_half",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 162,
+      "sha256": "6374aebbb2af48ecebc07437bf70058d0324706d311ef0f70e6d27afab70af0d"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_le.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_le",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 168,
+      "sha256": "2700f008ef69da936651119273192ed900c59cd4e1a48001f3516062dd6df3ed"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_le.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_le",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 162,
+      "sha256": "479c966f53a5584f54ec64efbe701c5b82dd5906e836668e9c3146482f81be63"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_loaded.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_loaded",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 154,
+      "sha256": "2b14785d96bdbb8834e436943d8542502bb8f7e1cc458f4ef0ff31266e663da1"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_loaded.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_loaded",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 156,
+      "sha256": "9a22b78661cb9506a013929e9e3f35a2463e41d3bba5449aabf2cb44cd5e5539"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_lt.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_lt",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 164,
+      "sha256": "bd55837dbfbf8e5757ef74fce2d461d026739badb87335c080673d07f5dcfcdf"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_lt.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_lt",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 162,
+      "sha256": "40a9c518f94e28886713f4bf3b144003ebd30c1c33f78c18c32a508c1f99f700"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_ne.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_ne",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 168,
+      "sha256": "120ee2f7a84be61d42235230dbe3ecb8f7a7024be248ed009f23245c07899f5f"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_ne.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_ne",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 162,
+      "sha256": "05817da0e47761d83487579a2646d1ab428fb60642d76605e4bdee2ee96cdd57"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_neg.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_neg",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 164,
+      "sha256": "4c6579a732a5026c8725fd4c051c236eb123dc313a20ef71a97b73ba3b174dc5"
+    },
+    "probe.m5-compare-select-reference.cmp_fimm_neg.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_fimm_neg",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 162,
+      "sha256": "34e70298d405a4a4b517b571f0b8c9d4c8fea6f0df29388ea4ab7362d3f4ac88"
+    },
+    "probe.m5-compare-select-reference.cmp_freg16.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg16",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 164,
+      "sha256": "292071bbe4191c7e4db0bd57fd235348de53d3eb5cc4ab7d70321a4c0569554e"
+    },
+    "probe.m5-compare-select-reference.cmp_freg16.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg16",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 166,
+      "sha256": "d824591e1d814e2055ecc3385a7b6c957b2d6f011ba6d59b19bffaaae9b17e82"
+    },
+    "probe.m5-compare-select-reference.cmp_freg_abs0.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg_abs0",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 178,
+      "sha256": "5dc8e2f485b1958a701971fbd8f3e16255c6d662119e9a74a76170ed4a44c946"
+    },
+    "probe.m5-compare-select-reference.cmp_freg_abs0.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg_abs0",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 170,
+      "sha256": "c347d1f8232ddc5cdb1deea84fa8d544ca74bb23274ad503132dbd91532d7acc"
+    },
+    "probe.m5-compare-select-reference.cmp_freg_abs1.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg_abs1",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 178,
+      "sha256": "c70908988835a7e8dc10398a476c793c27a8442f966994756e868983f6adb774"
+    },
+    "probe.m5-compare-select-reference.cmp_freg_abs1.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg_abs1",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 170,
+      "sha256": "5e88ea080107391717f162cb63b0e7171988cbc3017a9bd73a4939a7080e98ac"
+    },
+    "probe.m5-compare-select-reference.cmp_freg_abs2.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg_abs2",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 182,
+      "sha256": "48081ab39448d97ac567406e4717037d289dcc46472059c53732127587fd2c17"
+    },
+    "probe.m5-compare-select-reference.cmp_freg_abs2.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg_abs2",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 170,
+      "sha256": "9920844afcc8b25b10cf3c74b935906c2df14bd34ccbf59b14a0d9939f5c6d06"
+    },
+    "probe.m5-compare-select-reference.cmp_freg_ge.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg_ge",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 172,
+      "sha256": "436c7ca3826cfee264d505603feb64556086ff230ebff2581cf8ebce48eb5e3d"
+    },
+    "probe.m5-compare-select-reference.cmp_freg_ge.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg_ge",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 166,
+      "sha256": "bed58cd55f36b01ddb6a7879bec5521be7a40f5dc911c0688cfa23319c7244c8"
+    },
+    "probe.m5-compare-select-reference.cmp_freg_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 180,
+      "sha256": "a6fd5834712e10248736e609dad3ee59c4cd4dbbf9ecf30543dffeac1e3b4585"
+    },
+    "probe.m5-compare-select-reference.cmp_freg_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 178,
+      "sha256": "7e1b5147be28124b671ea60e208b8dc45e5591ff269fbd1593d68ba5aea38880"
+    },
+    "probe.m5-compare-select-reference.cmp_freg_neg.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg_neg",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 170,
+      "sha256": "5c7d1fed5196da0487f4db90f0d07ee8d12bb0129b3064bfab93ed3e2359a37e"
+    },
+    "probe.m5-compare-select-reference.cmp_freg_neg.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "cmp_freg_neg",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 168,
+      "sha256": "f1329e690fdb66557540bf7edcd8ca1cf9710797747541c940320c7b5799f7c0"
+    },
+    "probe.m5-compare-select-reference.glm_fma_abs_add.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fma_abs_add",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 124,
+      "sha256": "45c8e2ee76ce11bd1c699aefc7bd4fc95b91a1ced001e06cd2ceb117af4e097b"
+    },
+    "probe.m5-compare-select-reference.glm_fma_abs_add.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fma_abs_add",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 122,
+      "sha256": "198583326756129a078a05526f2c3192747d80da253dba81651a8098370f4115"
+    },
+    "probe.m5-compare-select-reference.glm_fma_imm_add.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fma_imm_add",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "886755ee6aa466122261b93e809eb4e20e06957ac1b7d761842f145f89cf0836"
+    },
+    "probe.m5-compare-select-reference.glm_fma_imm_add.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fma_imm_add",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 114,
+      "sha256": "522a18407f6dba101dcd3dd33f7a642dba7e4e0770c957e5f661d3c9837ef20d"
+    },
+    "probe.m5-compare-select-reference.glm_fma_imm_mul.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fma_imm_mul",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 118,
+      "sha256": "9dabd92f8dc386b58c7410ef21825a847f727344d85812e1f8d465d463d88a28"
+    },
+    "probe.m5-compare-select-reference.glm_fma_imm_mul.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fma_imm_mul",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 116,
+      "sha256": "bb93abd4051d1a13e75348c9f86bcb9468cdad614c2041d1b2da92087b5a9f3c"
+    },
+    "probe.m5-compare-select-reference.glm_fma_neg_imm_reg.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fma_neg_imm_reg",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 118,
+      "sha256": "f58a4c84965264173bcb8f2f96c0093c416b6ddbf74b97216ecbcceb58613a17"
+    },
+    "probe.m5-compare-select-reference.glm_fma_neg_imm_reg.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fma_neg_imm_reg",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 116,
+      "sha256": "7d1bf1ea83743d51d05f09c365825b277e8d3c03e10880b3abba09a889c2c09a"
+    },
+    "probe.m5-compare-select-reference.glm_fma_negimm_abs.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fma_negimm_abs",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 128,
+      "sha256": "149593590eaa82089f6a889c844a55b7ca6d6e9e191b43c56e9d9bd4cbeefe64"
+    },
+    "probe.m5-compare-select-reference.glm_fma_negimm_abs.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fma_negimm_abs",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "80c0db31b2e8502861795689dadf33bd7f6ef81abff54cbf7a3b59a398ecd58c"
+    },
+    "probe.m5-compare-select-reference.glm_fma_negimm_absload.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fma_negimm_absload",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 116,
+      "sha256": "16e01882e7b8dc50f96cca34c022d82ab37f691857002222caede4dc3bb8e34c"
+    },
+    "probe.m5-compare-select-reference.glm_fma_negimm_absload.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fma_negimm_absload",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 114,
+      "sha256": "e47dec636160a949039127c83b1d3b6aa154862a8bec517c86082ccd679e79ab"
+    },
+    "probe.m5-compare-select-reference.glm_fsel16_eqzero_imm.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fsel16_eqzero_imm",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "a204496fbbfaf8e86dd017aeff144dd742ba1a84778bdec36ed11fa70ffba9a0"
+    },
+    "probe.m5-compare-select-reference.glm_fsel16_eqzero_imm.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fsel16_eqzero_imm",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 116,
+      "sha256": "ea20f338ba5ba11aabb22967514dc421800bfeb2d820b08d811c781af1e9addd"
+    },
+    "probe.m5-compare-select-reference.glm_fsel16_regs.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fsel16_regs",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 142,
+      "sha256": "d61b53add0e0c47fca0d8e96888d55dee0deb1f5256f35ed967c0f62ea9f99d5"
+    },
+    "probe.m5-compare-select-reference.glm_fsel16_regs.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_fsel16_regs",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 142,
+      "sha256": "deeb49d3c71b3e7a5bdfab8ea3de928d2f41b4b6660d788de6b7175bf705ba9b"
+    },
+    "probe.m5-compare-select-reference.glm_isel16_gt_imm.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_isel16_gt_imm",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "a6f7e1bcb9de00d9063bef57123d300fd19b45a6a0a4d5994aca46b6e49efa1a"
+    },
+    "probe.m5-compare-select-reference.glm_isel16_gt_imm.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_isel16_gt_imm",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 118,
+      "sha256": "b3dc9392ae942449764bd73fae05bef5d53f6aa40b082b0c207e10766dd932ff"
+    },
+    "probe.m5-compare-select-reference.glm_isel16_lt_imm.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_isel16_lt_imm",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "42f7fb4a66c85711c0956ac8c5bb450414a087b43c3320d6fe1a818c729d2004"
+    },
+    "probe.m5-compare-select-reference.glm_isel16_lt_imm.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_isel16_lt_imm",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 118,
+      "sha256": "b7df91dd54c3e81aa07bb70ff8c88c1970accc897cd8ee35bd51d1ddcfeb3806"
+    },
+    "probe.m5-compare-select-reference.glm_isel16_lt_reg.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_isel16_lt_reg",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 134,
+      "sha256": "17c7ab2c6332389158f8703eb04dd8c0b413e2fe6d4efa1fbcd5f5a1439a15af"
+    },
+    "probe.m5-compare-select-reference.glm_isel16_lt_reg.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "glm_isel16_lt_reg",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 126,
+      "sha256": "a5fef6df6b909cb051b10e92b6f87edb992c65fda3230cf38be7958bb85b0e27"
+    },
+    "probe.m5-compare-select-reference.sel_f16_imm.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "sel_f16_imm",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 124,
+      "sha256": "9185b6ec89396c487ca3caaa4b2dc5336ea4a65f730628c1d386905ad2c28e27"
+    },
+    "probe.m5-compare-select-reference.sel_f16_imm.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "sel_f16_imm",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "c571329abcd3fae1d4ecd6797fe325dd318e59b79bd262fc1fa0c8c05f28831e"
+    },
+    "probe.m5-compare-select-reference.sel_f16_imm_zero.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "sel_f16_imm_zero",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "be18bf1b9607242a020b829520a2998f2d749e8214d4d50f573cf02a5e63e28c"
+    },
+    "probe.m5-compare-select-reference.sel_f16_imm_zero.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "sel_f16_imm_zero",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 116,
+      "sha256": "4a3d481cafd3089694170c348b6bd42d86e2e9323ad3ef68ed03aae8ba07b795"
+    },
+    "probe.m5-compare-select-reference.sel_f16_reg_zero.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "sel_f16_reg_zero",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 134,
+      "sha256": "23f7a7939cf2057251c55e2651fce1f3d657cf1f52a1f33d21665470c5067ad5"
+    },
+    "probe.m5-compare-select-reference.sel_f16_reg_zero.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "sel_f16_reg_zero",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 136,
+      "sha256": "e6e8bcaf6549b1579ddc49ad83d386371ca0816d83140004dd751fd30f2e6466"
+    },
+    "probe.m5-compare-select-reference.sel_f32.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "sel_f32",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 126,
+      "sha256": "c193795d1379859839a221408457cd1b3fc352d185d5eefa539f6b00b26fe092"
+    },
+    "probe.m5-compare-select-reference.sel_f32.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "sel_f32",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 124,
+      "sha256": "e3e4a46d5cb42662eb05de25e4dbd7f6d329ed85e42df261adcb00095eafaea6"
+    },
+    "probe.m5-compare-select-reference.sel_i16_imm.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "sel_i16_imm",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 134,
+      "sha256": "834f7af89e07eb5ed7e40eed83ee7f26940c510c7cf41498c99567f0bb0e382a"
+    },
+    "probe.m5-compare-select-reference.sel_i16_imm.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-compare-select-reference.metal",
+      "config": "../g17g/m5-compare-select-reference.mtlp-json",
+      "function": "sel_i16_imm",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 126,
+      "sha256": "a2932f9e2324c22f9628a757dc0657490038b574fac2900867658fafc9b44bfb"
+    },
+    "probe.m5-control-flow-reference.cf_deep_break.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_deep_break",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 376,
+      "sha256": "559bc9bd947adf9e8d64345ad0be7a8580f94d3eea6c7a56d47e3b103c749a51"
+    },
+    "probe.m5-control-flow-reference.cf_deep_break.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_deep_break",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 316,
+      "sha256": "b3d5ab05673c7586f7580d996ad107a838c9d45058335aca1b0e3e4177367281"
+    },
+    "probe.m5-control-flow-reference.cf_fcmp_forms.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_fcmp_forms",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 430,
+      "sha256": "bf0cd8da1e90fb7e55577b13f017dc1f3742fe4b8576c9fd6116bbe02e14d450"
+    },
+    "probe.m5-control-flow-reference.cf_fcmp_forms.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_fcmp_forms",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 414,
+      "sha256": "42e8b2c633d27e5e2e3c10fcbbac5fe07c42cd802b4401ccbca8295c4ae05d65"
+    },
+    "probe.m5-control-flow-reference.cf_float_alu_if.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_float_alu_if",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 178,
+      "sha256": "85bdb6c88443e7358d339d1baf2213d71fe456b382fdb7bfd687ebf14afaa563"
+    },
+    "probe.m5-control-flow-reference.cf_float_alu_if.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_float_alu_if",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 162,
+      "sha256": "dfbfc38275db8aae48852f9451e614885762998ff45e3fef06ca9674521476ce"
+    },
+    "probe.m5-control-flow-reference.cf_float_if.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_float_if",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 116,
+      "sha256": "60c32d7cb2d592027b14dc80000afac49495df025f071f444059d4c97dacc657"
+    },
+    "probe.m5-control-flow-reference.cf_float_if.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_float_if",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 116,
+      "sha256": "12513f8db19461769d5d489da979e8f2d2b7e259fbeed5d4058ee3c7149b12da"
+    },
+    "probe.m5-control-flow-reference.cf_icmp_forms.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_icmp_forms",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 426,
+      "sha256": "9e534eeaa930bb717fb311f2e05b9dcf807c2f4ae7dcbfb69cca33c0a1b8c4f5"
+    },
+    "probe.m5-control-flow-reference.cf_icmp_forms.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_icmp_forms",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 414,
+      "sha256": "b6d4ab80a328cbd645445d844be4a2bc4c0853b2164478d648eff5d84f58b071"
+    },
+    "probe.m5-control-flow-reference.cf_if_else_store.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_if_else_store",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 160,
+      "sha256": "243a04d83d7e3067225fd8825237da48cb48a41d6396daaf54fe9c257d75ee11"
+    },
+    "probe.m5-control-flow-reference.cf_if_else_store.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_if_else_store",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 146,
+      "sha256": "d9aea17809e26ed391969c572a427d962060f8f6dea5d58dcabce184b3e9ee74"
+    },
+    "probe.m5-control-flow-reference.cf_if_store.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_if_store",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 136,
+      "sha256": "34221adef0c919bf994ed321344f73a1d0b26015303fcd5ffb75f36923ab715a"
+    },
+    "probe.m5-control-flow-reference.cf_if_store.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_if_store",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 124,
+      "sha256": "b48f027b70186411c3fa5ac2b2a33d95f2c0ea2aeac97cb11d95e60bdcbd2d50"
+    },
+    "probe.m5-control-flow-reference.cf_loop_break.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_loop_break",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 204,
+      "sha256": "f9ba830d4bb1a6c47407b8719f144e42b5b0882020ea2178161336d797a16ccf"
+    },
+    "probe.m5-control-flow-reference.cf_loop_break.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_loop_break",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 186,
+      "sha256": "a27b227b4ad6b3b434ae710fc1a590d9ff5acc4bb96c7e5efe3888feb4d8e3ee"
+    },
+    "probe.m5-control-flow-reference.cf_loop_continue_nested.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_loop_continue_nested",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 350,
+      "sha256": "ea96fe48c8fc2c8de732a138725bd0d16c18adfc15675d16ae4d28b68fe032f1"
+    },
+    "probe.m5-control-flow-reference.cf_loop_continue_nested.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_loop_continue_nested",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 284,
+      "sha256": "8d5e8077310fe33f43d21afdba03a1d89573f19a0e8294007377e2c3b966d2da"
+    },
+    "probe.m5-control-flow-reference.cf_loop_divergent.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_loop_divergent",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 198,
+      "sha256": "741c30f1c3448e5216fbb60e6adbc9ac6bd2ef6fa54a37be11cd72d521768491"
+    },
+    "probe.m5-control-flow-reference.cf_loop_divergent.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_loop_divergent",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 176,
+      "sha256": "fa6948731f32b77e2e655013d86ef17c89c7b36e508d79dd4a89cf520d44f8f6"
+    },
+    "probe.m5-control-flow-reference.cf_loop_uniform.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_loop_uniform",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 196,
+      "sha256": "4d46d5c055de94b65692c08a3317ef2d1d4178ba16aedb53d1d1ad96ce290a53"
+    },
+    "probe.m5-control-flow-reference.cf_loop_uniform.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_loop_uniform",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 150,
+      "sha256": "8ae0c36139c7670ab153305dcd775c491d0aaf0da1d6b7bc13b145065bb66fd7"
+    },
+    "probe.m5-control-flow-reference.cf_loops_breaks.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_loops_breaks",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 678,
+      "sha256": "f121fbc61b34d868244c845212469dfc1d7485ab013fced4268043a710d36635"
+    },
+    "probe.m5-control-flow-reference.cf_loops_breaks.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_loops_breaks",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 554,
+      "sha256": "ad58d9fe05d9ae4ec49cb97c59a993b6fa6d4c56f958cc4f9dd415111f05707f"
+    },
+    "probe.m5-control-flow-reference.cf_nested_break.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_nested_break",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 246,
+      "sha256": "d88f5c77061e176a4327788bc81ccac13acd6ee2fa3b09512efcb8702d4ea7e6"
+    },
+    "probe.m5-control-flow-reference.cf_nested_break.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_nested_break",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 222,
+      "sha256": "654d94a06d318b836d6090d01c29185d2eda46ddf5634a522bf39bae2077089a"
+    },
+    "probe.m5-control-flow-reference.cf_nested_loops_break.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_nested_loops_break",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 284,
+      "sha256": "1728107637ae6c8c795e0d662efcdb996b4b0ada3fade4023e923dfb162a6bfe"
+    },
+    "probe.m5-control-flow-reference.cf_nested_loops_break.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_nested_loops_break",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 264,
+      "sha256": "969abf8518385bc45ff1577f736eb35bd6767632e4cdfeb4a028d3f1c1458815"
+    },
+    "probe.m5-control-flow-reference.cf_switch.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_switch",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 214,
+      "sha256": "4f10ef4fe1313cd4809327422e7128157d5ea232c9f70382f3f6c747f43a863e"
+    },
+    "probe.m5-control-flow-reference.cf_switch.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_switch",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 202,
+      "sha256": "a31972d6e352963f3027976297eaab84bb57e84e2950dbc64d0b826e9373deb7"
+    },
+    "probe.m5-control-flow-reference.cf_two_flags.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_two_flags",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 370,
+      "sha256": "a874e9f44a04d6b0bd0d1ae51c678f703d1f40ab82e717936149d3338ecb8aac"
+    },
+    "probe.m5-control-flow-reference.cf_two_flags.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-control-flow-reference.metal",
+      "config": "../g17g/m5-control-flow-reference.mtlp-json",
+      "function": "cf_two_flags",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 352,
+      "sha256": "197b551953ee3ae7f02781cce27c9abdb98b5beaad2d8bb6efce7d36e390dbd4"
+    },
+    "probe.m5-float-runtime-reference.m5_fma_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-float-runtime-reference.metal",
+      "config": "../g17g/m5-float-runtime-reference.mtlp-json",
+      "function": "m5_fma_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 110,
+      "sha256": "b8972f9750483a0e24a14685d54ec2603ff3e8524a17efc806714280f2cfbb13"
+    },
+    "probe.m5-float-runtime-reference.m5_fma_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-float-runtime-reference.metal",
+      "config": "../g17g/m5-float-runtime-reference.mtlp-json",
+      "function": "m5_fma_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 106,
+      "sha256": "d4df32771254d5bc41bc08d4d2c30e965c12cfec34de6ef66d36cdb9a5f2c44a"
+    },
+    "probe.m5-float-runtime-reference.m5_mul_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-float-runtime-reference.metal",
+      "config": "../g17g/m5-float-runtime-reference.mtlp-json",
+      "function": "m5_mul_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 108,
+      "sha256": "fb4baa4f66bb2bb6a013fb90b0da2154dd2da89b62f009c4eed5df6d140364e8"
+    },
+    "probe.m5-float-runtime-reference.m5_mul_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-float-runtime-reference.metal",
+      "config": "../g17g/m5-float-runtime-reference.mtlp-json",
+      "function": "m5_mul_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 104,
+      "sha256": "e3a77bc802ea8956f4b1f6a8cff7e8e9626c1733901693b882a8633f6f747b95"
+    },
+    "probe.m5-float-runtime-reference.m5_sub_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-float-runtime-reference.metal",
+      "config": "../g17g/m5-float-runtime-reference.mtlp-json",
+      "function": "m5_sub_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 106,
+      "sha256": "e48de577c1bbf90c1f581147cac7dae764e7764b0529efdf0ee6f63dfb1545f7"
+    },
+    "probe.m5-float-runtime-reference.m5_sub_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-float-runtime-reference.metal",
+      "config": "../g17g/m5-float-runtime-reference.mtlp-json",
+      "function": "m5_sub_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 104,
+      "sha256": "737f145447eb00273c013b035cce541ff8a8b76156f43419df0f37b7f6c8be21"
+    },
+    "probe.m5-front-facing-reference.ffFragment.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-front-facing-reference.metal",
+      "config": "../g17g/m5-front-facing-reference.mtlp-json",
+      "function": "ffFragment",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 240,
+      "sha256": "32c7e72a18d5fcdd1dd65f106ad815e6cc44a5f63b4d5279ed54ac5cb19f65b8"
+    },
+    "probe.m5-front-facing-reference.ffFragment.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-front-facing-reference.metal",
+      "config": "../g17g/m5-front-facing-reference.mtlp-json",
+      "function": "ffFragment",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 276,
+      "sha256": "d204dcc90234529e023606f5acfbf2817de761835f00a843b29d879ed8769491"
+    },
+    "probe.m5-front-facing-reference.ffVertex.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-front-facing-reference.metal",
+      "config": "../g17g/m5-front-facing-reference.mtlp-json",
+      "function": "ffVertex",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 242,
+      "sha256": "d7502530e287b063f5b0980d777bd331bd699c802dcc4bcff0f6b373148a4f00"
+    },
+    "probe.m5-front-facing-reference.ffVertex.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-front-facing-reference.metal",
+      "config": "../g17g/m5-front-facing-reference.mtlp-json",
+      "function": "ffVertex",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 332,
+      "sha256": "2658b297e1bf1cc8c553c28252e8b719cfb181820a7db86e154825f92cda531e"
+    },
+    "probe.m5-gl4-reference.rbit32_dead.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "rbit32_dead",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 118,
+      "sha256": "633f72c5872d66683339198db48bcf44d160ff4dec3a2fc4c523df4f2259f9a2"
+    },
+    "probe.m5-gl4-reference.rbit32_dead.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "rbit32_dead",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 112,
+      "sha256": "c11fa5055cc659966f63609b7918a115f329a29057f54bc887ccbdbd697ec952"
+    },
+    "probe.m5-gl4-reference.rbit32_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "rbit32_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 122,
+      "sha256": "c8aa6ce5bb46dd18ac5b81e26c1d68dcd2157c3956d37fc3b2e902529be03d64"
+    },
+    "probe.m5-gl4-reference.rbit32_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "rbit32_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "9924eea8b3f504a3f8beddca5d3777111280f77111cc6080858540aa0b7cd321"
+    },
+    "probe.m5-gl4-reference.rbit32_loaded.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "rbit32_loaded",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 104,
+      "sha256": "6f215b83065bad7c5d8ab7fa68387aa31b89e7e93cd1534752e9d1b6e1cfc326"
+    },
+    "probe.m5-gl4-reference.rbit32_loaded.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "rbit32_loaded",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 102,
+      "sha256": "44f16a5f99e1550229478e948a05076f5f42d57c10a36d4cf86aef01baa9352b"
+    },
+    "probe.m5-gl4-reference.sxAtomic.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "sxAtomic",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 424,
+      "sha256": "f73b8b463ad17b9260225a2d356df72a2ecfb9f8e714c15caedc6f861c4a4ad6"
+    },
+    "probe.m5-gl4-reference.sxAtomic.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "sxAtomic",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 442,
+      "sha256": "8df2e9b81a7549f11429e696742cb349963c9b168139dc89def80263bdadfa4b"
+    },
+    "probe.m5-gl4-reference.sxAtomicVertex.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "sxAtomicVertex",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 258,
+      "sha256": "bad269c055baae9af5e9963e885ba3d7366f3c3f1fb182a482f9e25a26c71c5c"
+    },
+    "probe.m5-gl4-reference.sxAtomicVertex.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "sxAtomicVertex",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 344,
+      "sha256": "91e2f1f7cdc09643edcf7914f9f756a2495b19f5ee9dd093c2438a09db3745b6"
+    },
+    "probe.m5-gl4-reference.sxHelper.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "sxHelper",
+      "stage": "fragment",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 458,
+      "sha256": "737fab3cc64fa0305c37df207db05bd27a25176e9b96f632cea603ef28dc6fbd"
+    },
+    "probe.m5-gl4-reference.sxHelper.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "sxHelper",
+      "stage": "fragment",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 474,
+      "sha256": "be64caa54bf3d2b8ab8ad8bc76967e4278326fda7d5418fc6e48a3959ade62e2"
+    },
+    "probe.m5-gl4-reference.sxHelperVertex.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "sxHelperVertex",
+      "stage": "vertex",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 258,
+      "sha256": "bad269c055baae9af5e9963e885ba3d7366f3c3f1fb182a482f9e25a26c71c5c"
+    },
+    "probe.m5-gl4-reference.sxHelperVertex.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gl4-reference.metal",
+      "config": "../g17g/m5-gl4-reference.mtlp-json",
+      "function": "sxHelperVertex",
+      "stage": "vertex",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 344,
+      "sha256": "91e2f1f7cdc09643edcf7914f9f756a2495b19f5ee9dd093c2438a09db3745b6"
+    },
+    "probe.m5-gles3-half-widen-reference.m5_half_full_add.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gles3-half-widen-reference.metal",
+      "config": "../g17g/m5-gles3-half-widen-reference.mtlp-json",
+      "function": "m5_half_full_add",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 130,
+      "sha256": "344a80c6a3c373a469f481fe63a5e946055f1ccd6772a4497ff440eb77b5790d"
+    },
+    "probe.m5-gles3-half-widen-reference.m5_half_full_add.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gles3-half-widen-reference.metal",
+      "config": "../g17g/m5-gles3-half-widen-reference.mtlp-json",
+      "function": "m5_half_full_add",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 130,
+      "sha256": "ad43eece46f0694440e367a82f312fe9b1ed251a3dc68287547c14c34da4318e"
+    },
+    "probe.m5-gles3-half-widen-reference.m5_half_widen.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gles3-half-widen-reference.metal",
+      "config": "../g17g/m5-gles3-half-widen-reference.mtlp-json",
+      "function": "m5_half_widen",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 124,
+      "sha256": "cfb9e75dbe59e8c4c4808460e556f790155fb426dfb63c061b62d2420dcd5780"
+    },
+    "probe.m5-gles3-half-widen-reference.m5_half_widen.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gles3-half-widen-reference.metal",
+      "config": "../g17g/m5-gles3-half-widen-reference.mtlp-json",
+      "function": "m5_half_widen",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 122,
+      "sha256": "752ad2557cf5894a8d659dc9c125ebf4c82a3c41419796eefe8c843573940644"
+    },
+    "probe.m5-gles3-half-widen-reference.m5_half_widen_modifiers.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gles3-half-widen-reference.metal",
+      "config": "../g17g/m5-gles3-half-widen-reference.mtlp-json",
+      "function": "m5_half_widen_modifiers",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 138,
+      "sha256": "1f0d5ebebb11045c4898a90b40e7258dc48d8fc17639c50cec5397a1c9a7bc4f"
+    },
+    "probe.m5-gles3-half-widen-reference.m5_half_widen_modifiers.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-gles3-half-widen-reference.metal",
+      "config": "../g17g/m5-gles3-half-widen-reference.mtlp-json",
+      "function": "m5_half_widen_modifiers",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 128,
+      "sha256": "c73eacac3d912d31963459a832943b308e469d0a2247a9b3c51fd16c53247429"
+    },
+    "probe.m5-half-select-reference.m5_half_select.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-half-select-reference.metal",
+      "config": "../g17g/m5-half-select-reference.mtlp-json",
+      "function": "m5_half_select",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 138,
+      "sha256": "85e3e67ccd71ad778ec2bd679658412910f052badc8b2f3f1cd2d4a4edb0f81a"
+    },
+    "probe.m5-half-select-reference.m5_half_select.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-half-select-reference.metal",
+      "config": "../g17g/m5-half-select-reference.mtlp-json",
+      "function": "m5_half_select",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 136,
+      "sha256": "b15c6dc83a913b52aec94c0ee28d3a8d775b7a9f1000ebc1fee326b0018a3944"
+    },
+    "probe.m5-half-select-reference.m5_half_select_nested.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-half-select-reference.metal",
+      "config": "../g17g/m5-half-select-reference.mtlp-json",
+      "function": "m5_half_select_nested",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 148,
+      "sha256": "e3fb0490ec5599f4688eefbb4126f25332040c52caf7e059225cb37f40fdfd46"
+    },
+    "probe.m5-half-select-reference.m5_half_select_nested.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-half-select-reference.metal",
+      "config": "../g17g/m5-half-select-reference.mtlp-json",
+      "function": "m5_half_select_nested",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 146,
+      "sha256": "fbd5cacad9e7d01f39d787f969acce6b54607abfb39238399edf543c370707de"
+    },
+    "probe.m5-imad-reference.m5_imad_const_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-imad-reference.metal",
+      "config": "../g17g/m5-imad-reference.mtlp-json",
+      "function": "m5_imad_const_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 108,
+      "sha256": "a47969c8743b2fe983a0ef008148caa0de370e58df840e8e2eabe89aa098bd8c"
+    },
+    "probe.m5-imad-reference.m5_imad_const_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-imad-reference.metal",
+      "config": "../g17g/m5-imad-reference.mtlp-json",
+      "function": "m5_imad_const_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 106,
+      "sha256": "88317e76df1294a2edf3c635b0d51c7ce8303580a0a54efee8e0a29d412d38ca"
+    },
+    "probe.m5-imad-reference.m5_imad_imm_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-imad-reference.metal",
+      "config": "../g17g/m5-imad-reference.mtlp-json",
+      "function": "m5_imad_imm_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 108,
+      "sha256": "1b88582951d6fcdf6343d63768571904c989a4ebe0c655b6a7b1400577d1e2b4"
+    },
+    "probe.m5-imad-reference.m5_imad_imm_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-imad-reference.metal",
+      "config": "../g17g/m5-imad-reference.mtlp-json",
+      "function": "m5_imad_imm_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 106,
+      "sha256": "9289c92e96ff432195477f12c6bc09f0ae4f40df5ef01da59e2a5f38c6dc50a3"
+    },
+    "probe.m5-imad-reference.m5_imad_reg_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-imad-reference.metal",
+      "config": "../g17g/m5-imad-reference.mtlp-json",
+      "function": "m5_imad_reg_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 108,
+      "sha256": "5a867c8d904df08fbb5b484f3cfd68df8ea5e98d0a1505cf965e9784973e2a81"
+    },
+    "probe.m5-imad-reference.m5_imad_reg_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-imad-reference.metal",
+      "config": "../g17g/m5-imad-reference.mtlp-json",
+      "function": "m5_imad_reg_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 106,
+      "sha256": "871c444fef424d9cd703ce23142c6e04a83696e645616ec00ceda1e19b3773ce"
+    },
+    "probe.m5-indexed-array-sampler-reference.m5_sample_indexed_array_level_zero.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-indexed-array-sampler-reference.metal",
+      "config": "../g17g/m5-indexed-array-sampler-reference.mtlp-json",
+      "function": "m5_sample_indexed_array_level_zero",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 222,
+      "sha256": "0f160280d39974e69dbd3d82e920e49ebd6ea4609cadd7479b5169ccdd58ded9"
+    },
+    "probe.m5-indexed-array-sampler-reference.m5_sample_indexed_array_level_zero.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-indexed-array-sampler-reference.metal",
+      "config": "../g17g/m5-indexed-array-sampler-reference.mtlp-json",
+      "function": "m5_sample_indexed_array_level_zero",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 204,
+      "sha256": "b740bb69117688cbfeefa90751f314136f78ed347cf25207c421ec1cbcc11566"
+    },
+    "probe.m5-libagx-reference.and16_of32.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "and16_of32",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 142,
+      "sha256": "b774a671370e6db5afda52c4b4b93fcaec9534d7502798422488ca28940aefeb"
+    },
+    "probe.m5-libagx-reference.and16_of32.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "and16_of32",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 136,
+      "sha256": "b3b21b55d45b7f65b06b8b0905453859b6b326f3a7ede404776d9ae999a04f72"
+    },
+    "probe.m5-libagx-reference.and16_of32_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "and16_of32_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 144,
+      "sha256": "91c4024760e24748f3fbbd6bd2bb434d687db4592bfac186b68f94fe6a3db037"
+    },
+    "probe.m5-libagx-reference.and16_of32_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "and16_of32_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 144,
+      "sha256": "13ba667903476dd3ab5f851b7cc52ee7f1f626dccda0574bf89a3c615ea9bb66"
+    },
+    "probe.m5-libagx-reference.andc32_dead.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "andc32_dead",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 132,
+      "sha256": "488fcd03099f06161bca1c750782486ddc1b657dfa9f5f5b8a8b463af9e04e21"
+    },
+    "probe.m5-libagx-reference.andc32_dead.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "andc32_dead",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 122,
+      "sha256": "e55fab592f48dda9f366ba63f71da419479746ec77f2e1e3f3f0fffa78bd6c61"
+    },
+    "probe.m5-libagx-reference.andc32_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "andc32_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 164,
+      "sha256": "36187decd93d6723b6898da39ce78bb199aae2372924137bd9b058f248d77c30"
+    },
+    "probe.m5-libagx-reference.andc32_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "andc32_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 140,
+      "sha256": "8ccb05eeb879e46755b232c2be854f000d33009386f70ddedf665afaea4a520a"
+    },
+    "probe.m5-libagx-reference.andc32_swap.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "andc32_swap",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 152,
+      "sha256": "9b9632a4d09abeddb295bf486e12a8d1754a795f334228525e570d13e0a1d4f7"
+    },
+    "probe.m5-libagx-reference.andc32_swap.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "andc32_swap",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 136,
+      "sha256": "38d04b6177f5584db882085fc5cea4ebbb23f637405c2354d25dc4719d93d004"
+    },
+    "probe.m5-libagx-reference.isub_imm0_dead.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm0_dead",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "8fc2154d839c34eab749bc24321d9141897e5435d15012edb7ac4b75761da274"
+    },
+    "probe.m5-libagx-reference.isub_imm0_dead.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm0_dead",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 112,
+      "sha256": "43cc0c66b33c0ed0348e1ace1d3758d0b87f0552fcc475b61ac1e52371e04adc"
+    },
+    "probe.m5-libagx-reference.isub_imm0_int.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm0_int",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "8fc2154d839c34eab749bc24321d9141897e5435d15012edb7ac4b75761da274"
+    },
+    "probe.m5-libagx-reference.isub_imm0_int.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm0_int",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 112,
+      "sha256": "43cc0c66b33c0ed0348e1ace1d3758d0b87f0552fcc475b61ac1e52371e04adc"
+    },
+    "probe.m5-libagx-reference.isub_imm0_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm0_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 144,
+      "sha256": "96c043d050e38ebcb39c0beb6976aca3760c6d04e24ce16219f65b5f922954f2"
+    },
+    "probe.m5-libagx-reference.isub_imm0_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm0_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 134,
+      "sha256": "1951553613ffa932b19e4a3a4e79718356a27912c03d018635f45cbf8c5f8e95"
+    },
+    "probe.m5-libagx-reference.isub_imm255_dead.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm255_dead",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "087d581af8556b10e34a2b962aba4e9c283106b8836ef98ae84f80c27a648874"
+    },
+    "probe.m5-libagx-reference.isub_imm255_dead.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm255_dead",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 112,
+      "sha256": "1ae362734d43ee8521160bce9cd43ea1111efae79b41e8324cd17839fd158a5e"
+    },
+    "probe.m5-libagx-reference.isub_imm31_dead.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm31_dead",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "2da7cdf5c5f0ca445b4a074322b453792f2c25d2e40ffe773b421eb479bbc2e4"
+    },
+    "probe.m5-libagx-reference.isub_imm31_dead.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm31_dead",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 112,
+      "sha256": "5abca31a60e5e510a2b12ef8c2d472cbf150ea343d8fd4c4e4ec730cba2e9768"
+    },
+    "probe.m5-libagx-reference.isub_imm31_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm31_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 144,
+      "sha256": "ea3517339e03a515b4a5c791e565dc8ee8d2af80bf86b8fd7abf5e3fec3d9d2b"
+    },
+    "probe.m5-libagx-reference.isub_imm31_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm31_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 134,
+      "sha256": "c825028bf0f6dbd6623b7b7a4de84be90f2a80110092cdb0ea81c60ff4a88ea7"
+    },
+    "probe.m5-libagx-reference.isub_imm4_dead.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm4_dead",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "101e0eee30d07d7d18ba3b07cbec62ac29ebdf2ed8956ce48246f4e2b14202eb"
+    },
+    "probe.m5-libagx-reference.isub_imm4_dead.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm4_dead",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 112,
+      "sha256": "6a05b7991937592590c44b62d7584b73a19bfa2b49a2798dffc3316ab837b0cd"
+    },
+    "probe.m5-libagx-reference.isub_imm_loaded.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm_loaded",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 106,
+      "sha256": "815c896839af5645c4facd15e8142c88eefc6f1115170e7a0d8a3e6a165d7b0f"
+    },
+    "probe.m5-libagx-reference.isub_imm_loaded.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm_loaded",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 104,
+      "sha256": "4b8e77c12f6ebb921fdb54c3ab0cd8431ff4569c12df082c9059178794d23bd9"
+    },
+    "probe.m5-libagx-reference.isub_imm_short.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm_short",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "0fb1316f3b896fdd4cd4b1b25acc17e67a197ed7e5270f8da82c99443e514a8b"
+    },
+    "probe.m5-libagx-reference.isub_imm_short.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm_short",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 112,
+      "sha256": "d8efc968cfe33af1db2f245477452ba941274757f0836bb2009dbb833a51e1bc"
+    },
+    "probe.m5-libagx-reference.isub_imm_ushort.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm_ushort",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "b55e6f00b7365a9a73197c91ffd03b733007e3979ed2e97d3e5a3a3cb7e9252b"
+    },
+    "probe.m5-libagx-reference.isub_imm_ushort.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "isub_imm_ushort",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 112,
+      "sha256": "57043b8958ce5de57905370ed8d0332b4a8da63920f42b0a3e8cf60832d21dac"
+    },
+    "probe.m5-libagx-reference.ld_i8.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "ld_i8",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 132,
+      "sha256": "0d987688390b4c6ae8459853c13605b0f19cc273e19ad6107fb4053c3261db9b"
+    },
+    "probe.m5-libagx-reference.ld_i8.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "ld_i8",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 130,
+      "sha256": "33201e7883ca938685cb13f13e570b42c2b8f4009b9e0f55033e6c6c2a64141c"
+    },
+    "probe.m5-libagx-reference.ld_u8.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "ld_u8",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 106,
+      "sha256": "38a7c293a84e73573816ca26c404906dc16a4c077180ab77c8902314ce628b12"
+    },
+    "probe.m5-libagx-reference.ld_u8.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "ld_u8",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 104,
+      "sha256": "1dab02b4f50602db81a6185e78f282056239a6eb80a5b4e1d4f42c2865fedd87"
+    },
+    "probe.m5-libagx-reference.ld_u8_half.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "ld_u8_half",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 108,
+      "sha256": "348cd79b2a31b8ab2e496353064a20afe905366ac9e0d7ab4eb1d13bc7a95f82"
+    },
+    "probe.m5-libagx-reference.ld_u8_half.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "ld_u8_half",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 106,
+      "sha256": "41c531d5a88acbc0059e90b70a3a57266f42eed2f864c9ebeeb269f74f991157"
+    },
+    "probe.m5-libagx-reference.ld_u8_ptr.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "ld_u8_ptr",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 122,
+      "sha256": "0567a2d1f592b270c4dad4c77a4c0c9c59f8f5627f612df178610821608e6ba6"
+    },
+    "probe.m5-libagx-reference.ld_u8_ptr.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "ld_u8_ptr",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 122,
+      "sha256": "e7d452b019486c2f4e4d7cb9b51d5038e749a301dc872c14ed2159c4030ad688"
+    },
+    "probe.m5-libagx-reference.ld_u8_stride4.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "ld_u8_stride4",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 106,
+      "sha256": "3473dc99a1bec0601d6fbf707e685107782c858bbe9247278e9c3c995a1572e4"
+    },
+    "probe.m5-libagx-reference.ld_u8_stride4.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "ld_u8_stride4",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 104,
+      "sha256": "50ae279abdc061d1ca912b0f5f2bbf20752c8654284c462a698733d6f34ac647"
+    },
+    "probe.m5-libagx-reference.ld_u8_two.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "ld_u8_two",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 130,
+      "sha256": "fd0ffbaa0c011805113eaba0bb497037b0b6774b96f68009d0cdaae80066cd50"
+    },
+    "probe.m5-libagx-reference.ld_u8_two.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "ld_u8_two",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 118,
+      "sha256": "1dfda338130ab31aa74c2c4dd0611e51a9b8dd86aab055b7e13eebaebdf3058f"
+    },
+    "probe.m5-libagx-reference.popcnt16.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "popcnt16",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 120,
+      "sha256": "a4d4a1a0098a1e00e1275f7278665d84a2f053b6761df849ca6af5be311afc1c"
+    },
+    "probe.m5-libagx-reference.popcnt16.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "popcnt16",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 114,
+      "sha256": "c14b50a925d14e6d041b9bdb6c781430d288db5268944ff5eb0f072e49910b02"
+    },
+    "probe.m5-libagx-reference.popcnt32.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "popcnt32",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 118,
+      "sha256": "9bf491094cdca5e56fbe88ae18ba123a9fbb8b9a9a4151468b297747a3a91ab0"
+    },
+    "probe.m5-libagx-reference.popcnt32.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "popcnt32",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 112,
+      "sha256": "e4b33455ad07986460a3cb6d54390c00e3aacb60df9a142f5f9b8e101eb0f7ab"
+    },
+    "probe.m5-libagx-reference.popcnt32_live.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "popcnt32_live",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 130,
+      "sha256": "905e74459baacd7d8d0c6efcf076e90e838cd3ef6c0823d49430ddb6c07b1cc2"
+    },
+    "probe.m5-libagx-reference.popcnt32_live.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "popcnt32_live",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 116,
+      "sha256": "3c110bed7ce0f5d626d53cbf0a97d8b231f5cad3e37c1bb2924beb2836bc33de"
+    },
+    "probe.m5-libagx-reference.popcnt_loaded.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "popcnt_loaded",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 104,
+      "sha256": "6a8d3f208ccd899c773b608f189d5f280c9e3a41aada990439f890b74dc457a2"
+    },
+    "probe.m5-libagx-reference.popcnt_loaded.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "popcnt_loaded",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 102,
+      "sha256": "87cd888522f12abf7a6f0622c95eadd3698f43369e4481fc5cb3943c6f970a63"
+    },
+    "probe.m5-libagx-reference.popcnt_two_loads.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "popcnt_two_loads",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 146,
+      "sha256": "a0d8a687cf1b1b0d9df96359161831bb12ddbbea203483db676131babdaf9bfe"
+    },
+    "probe.m5-libagx-reference.popcnt_two_loads.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "popcnt_two_loads",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 124,
+      "sha256": "a92792e9d4e734114f55cd6b3383adfc7392e750047630fac71a76853ddd321a"
+    },
+    "probe.m5-libagx-reference.sel_heq255_w.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "sel_heq255_w",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 140,
+      "sha256": "17d51966b22ff3cb631da31364a1aedc415643debb91d363de70107e49a4359c"
+    },
+    "probe.m5-libagx-reference.sel_heq255_w.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "sel_heq255_w",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 138,
+      "sha256": "0b7fe0e2c4e99aeb948e33bf4d154b3930d291a1564bbaf77775dd7a39c7f9e0"
+    },
+    "probe.m5-libagx-reference.sel_heq3_h.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "sel_heq3_h",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 134,
+      "sha256": "984fabbe0aae47bb98fc9b39cf415d78c55df9e422ccd8da5cd012061be6f605"
+    },
+    "probe.m5-libagx-reference.sel_heq3_h.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "sel_heq3_h",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 128,
+      "sha256": "5ea878f7a14b8ad3f30837ff9d23a64efb634e6cd462c8194c9d0689a71cd547"
+    },
+    "probe.m5-libagx-reference.sel_heq4_w.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "sel_heq4_w",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 140,
+      "sha256": "a2831a3ebcfe5d29911b2895b090358bef65c08a498a983a63564d272cb7071a"
+    },
+    "probe.m5-libagx-reference.sel_heq4_w.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "sel_heq4_w",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 138,
+      "sha256": "8bd07ac48db2fec5903b159cc0377593737439b6065e1d698ccf6d7aeb1c217f"
+    },
+    "probe.m5-libagx-reference.sel_heq4_ww.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "sel_heq4_ww",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 154,
+      "sha256": "28b272b7212e28101400f68144c54e2bdcec379435c4f5612a4aed3e070ada06"
+    },
+    "probe.m5-libagx-reference.sel_heq4_ww.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-libagx-reference.metal",
+      "config": "../g17g/m5-libagx-reference.mtlp-json",
+      "function": "sel_heq4_ww",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 146,
+      "sha256": "7bc20ae8d637a4728da9c1263835f8728cad7455c1001b23ec107402c0a13b22"
+    },
+    "probe.m5-texture-read-reference.m5_read_array_indexed.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-texture-read-reference.metal",
+      "config": "../g17g/m5-texture-read-reference.mtlp-json",
+      "function": "m5_read_array_indexed",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 188,
+      "sha256": "1330719ecfd336a562f21bac82f9fd5ecb1f434ac709c5963b08773c78a3c472"
+    },
+    "probe.m5-texture-read-reference.m5_read_array_indexed.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-texture-read-reference.metal",
+      "config": "../g17g/m5-texture-read-reference.mtlp-json",
+      "function": "m5_read_array_indexed",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 172,
+      "sha256": "6f004bb5735d062ed496f291bf830d866c58c69284186f298687ad0ca2428149"
+    },
+    "probe.m5-texture-read-reference.m5_read_array_uniform.g17g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-texture-read-reference.metal",
+      "config": "../g17g/m5-texture-read-reference.mtlp-json",
+      "function": "m5_read_array_uniform",
+      "stage": "compute",
+      "arch": "applegpu_g17g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 126,
+      "sha256": "6bc88c7201a6406d3ce29bb101ea0a487667133256e5d2aa79cfc6193702ef3b"
+    },
+    "probe.m5-texture-read-reference.m5_read_array_uniform.g18g.bin": {
+      "corpus": "probe",
+      "source": "../g17g/m5-texture-read-reference.metal",
+      "config": "../g17g/m5-texture-read-reference.mtlp-json",
+      "function": "m5_read_array_uniform",
+      "stage": "compute",
+      "arch": "applegpu_g18g",
+      "symbols": {
+        "_agc.main.constant_program": 0,
+        "_agc.main": 64
+      },
+      "size": 132,
+      "sha256": "00914d7a1879e1427aa833f3578065ed2a64ec6042e3c7905fb27bac9c179aad"
+    }
+  }
+}

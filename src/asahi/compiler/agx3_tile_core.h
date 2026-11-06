@@ -84,6 +84,12 @@ struct agx3_tile_sample {
     * where it is read again. */
    bool kill;
    uint16_t value;
+   /* msaa163: the caller admits the register form on an AGX3c/AGX3d store.
+    * Apple's G18G 4x per-pixel fragment (and its G17G twin, byte-identical
+    * here) stores `rld h10 <- SR39 ; lstcol ... f44=10 f51=2 f55=1`:
+    * 270605082901ad02000071440000, native-msaa-reference-147. Only the
+    * AGX_G18_MSAA4 packer sets it; loads never take it. */
+   bool g17_register;
 };
 
 static inline struct agx3_tile_sample
@@ -122,6 +128,16 @@ bool agx3_tile_store_f13(enum agx_isa_encoding enc, uint16_t data,
                          uint16_t wait_mask, bool f13,
                          uint8_t out[AGX3_TILE_MAX_LENGTH], uint8_t *len);
 
+/* G18G only: agx3_tile_store_f13 with the G18G layer's f13 rule. f13 is
+ * chosen by the caller for AGX3b and the explicit C/D register-sample path
+ * (g17_register), which uses the data operand's last-use bit; legacy C/D
+ * whole-pixel stores keep f13 set. */
+bool agx3_tile_store_f13_g18g(enum agx_isa_encoding enc, uint16_t data,
+                              enum agx3_tile_width width, uint8_t chan_mask,
+                              uint16_t tile_off, struct agx3_tile_sample sample,
+                              uint16_t wait_mask, bool f13,
+                              uint8_t out[AGX3_TILE_MAX_LENGTH], uint8_t *len);
+
 /* Load from the tile buffer into `dest` on scoreboard slot `slot`.  `first`
  * and `last` are the load-sequence boundary markers witnessed in the corpus;
  * AGX3b encodes only `first`, while AGX3c encodes both. */
@@ -130,6 +146,24 @@ bool agx3_tile_load(enum agx_isa_encoding enc, uint16_t dest,
                     uint16_t tile_off, struct agx3_tile_sample sample,
                     uint16_t wait_mask, bool first, bool last,
                     uint8_t out[AGX3_TILE_MAX_LENGTH], uint8_t *len);
+
+/* Native1130 (Apple M6, capture 1130; run 1139): the G18 single-sample
+ * mixed-format fragment forms. A whole-pixel store whose f13 is exactly
+ * `last_use` (the payload's last read), and the four whole-pixel read forms of
+ * the 26 fragment reads -- 8-bit lanes mask 15, 16-bit lanes mask 7 or 15, one
+ * 32-bit word -- at any offset aligned to the lane width, with no incoming
+ * wait. AGX3c (the G18G transcode re-encodes it) only. */
+bool agx3_tile_store_lifetime(enum agx_isa_encoding enc, uint16_t data,
+                              enum agx3_tile_width width, uint8_t chan_mask,
+                              uint16_t tile_off, struct agx3_tile_sample sample,
+                              uint16_t wait_mask, bool last_use,
+                              uint8_t out[AGX3_TILE_MAX_LENGTH], uint8_t *len);
+bool agx3_tile_load_g18_mixed(enum agx_isa_encoding enc, uint16_t dest,
+                              enum agx3_tile_width width, uint8_t slot,
+                              uint8_t chan_mask, uint16_t tile_off,
+                              struct agx3_tile_sample sample, bool first,
+                              bool last, uint8_t out[AGX3_TILE_MAX_LENGTH],
+                              uint8_t *len);
 
 #ifdef __cplusplus
 }

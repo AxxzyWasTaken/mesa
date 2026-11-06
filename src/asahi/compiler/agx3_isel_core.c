@@ -302,6 +302,143 @@ encode_explicit(const struct agx3_isel_desc *d,
                            base, sizeof(base) / sizeof(base[0]), ov, n, out, len);
 }
 
+/* GPU1 separates integer and floating-point selects. These field locations
+ * come from its own encoder table, not the GPU0 isel layout. Native M5
+ * ushort kernels witness odd/even half results and half comparisons to 0/1,
+ * and gpu/m5-xfb-alu8-reference.metal a half comparison to 2 with a word
+ * result.
+ */
+static bool
+encode_gpu1(const struct agx3_isel_desc *d,
+              uint8_t out[AGX3_ISEL_MAX_LENGTH], uint8_t *len)
+{
+   /* A half comparand is witnessed only against an equality immediate: 0
+    * and 1 in both result widths, and 2 with a word result (applegpu_g17g,
+    * `select(0u, v, k == 2)` and `select(w, v, k == 2)` for ushort k). f30
+    * is the same 8-bit deposit in every form, and
+    * test/native/g17g/m5-libagx-reference.metal carries it at 3 with a half
+    * result and at 4 and 255 with a word result, the last with the
+    * immediate on the false side:
+    *
+    *   (k == 4) ? 0u : w      02 08 0f 84 26 80 07 02 82 00
+    *   (k == 255) ? w : 7u    02 08 1f fe 86 00 17 02 22 87
+    *   (k == 3) ? 0 : j       02 00 0d 82 26 80 17 02 82 01   half result
+    *
+    * Two half comparands (f24 = 1, the second a register: f38 = 2, f39 = 1,
+    * f31) are witnessed with a half result, for equality and unsigned
+    * less-than, on applegpu_g18g and applegpu_g17g alike
+    * (g18ref-out/probe/m6-alu-sel i_u16_*, i_s16_*, m6-alu-hints):
+    *
+    *   (a == b) ? 1 : 0     iseli16 h2 = ^h2 == ^h3 ? #1 : #0   f28, f43
+    *   (a != b) ? 1 : 0     iseli16 h2 = ^h2 == ^h3 ? #0 : #1   f28, f43
+    *   short a == short b   the same bytes as ushort
+    *   (a <  b) ? 1 : 0     iseli16 h2 = ^h2 <  ^h3 ? #1 : #0   f82 = 1
+    *   ... a, b reused      f25/f40, the comparands' cache hints
+    *   odd halves           h3 == h4, h2 == h3: any half index
+    *
+    * f28 and f43 widen the two halves by sign extension; Apple sets both for
+    * equality, where the extension cannot change the outcome, and neither
+    * for the unsigned relation.
+    *
+    * Native mixed-select probes also witness two half comparands selecting
+    * full-width registers on G17G and G18G: eq/ne, unsigned lt/gt and signed
+    * lt/gt, with live and discarded operands. This is iseli32, retaining
+    * f24=f39=1 for the comparands while f10=f54=f68=2 select the full word.
+    * Signed relations set both extension fields, as equality does. Equality
+    * additionally witnesses one selected u8 immediate, on either side. */
+   const bool half_regs = d->cmp_16 && !d->cmp1_immediate;
+   const bool ti = d->true_kind == AGX3_ISEL_IMMEDIATE;
+   const bool fi = d->false_kind == AGX3_ISEL_IMMEDIATE;
+   if (half_regs && d->dest_16 && d->cond != AGX3_ISEL_ICOND_EQ &&
+       d->cond != AGX3_ISEL_ICOND_ULT)
+      return false;
+   if (half_regs && !d->dest_16 && (ti || fi) &&
+       (d->cond != AGX3_ISEL_ICOND_EQ || (ti && fi)))
+      return false;
+   if (d->cmp_16 && !half_regs &&
+       (d->cmp1 > 255 || d->cond != AGX3_ISEL_ICOND_EQ))
+      return false;
+   /* A narrow second comparand widens into a full-width comparison only.
+    * Apple's kernels load each ushort lane into its own register, so every
+    * witnessed narrow comparand is a low half; odd halves stay refused. */
+   if (d->cmp1_16 && (d->cmp_16 || d->cmp1_immediate || (d->cmp1 & 1) ||
+                      !reg16_ok(d->cmp1)))
+      return false;
+   if (d->cmp1_sign_extend && !d->cmp1_16)
+      return false;
+   /* A signed relation with a 16-bit result is the same instruction with
+    * f82 = 5/6, on a full-width comparand: applegpu_g17g kernels in
+    * test/native/g17g/m5-compare-select-reference.metal, which is also the
+    * shape glamor's gradient stop search reaches --
+    *
+    *   (i > 1) ? 0 : 1       02010d82228107022080   slt 2, constants exchanged
+    *   (i < 1) ? 0 : 1       02010d80228106022080   sgt 0
+    *   (i < j) ? 0 : 1       02011d03228007002081   slt, register comparand
+    *
+    * A narrow comparand with a signed relation stays unwitnessed. */
+   if (d->dest_16 &&
+       (d->cond != AGX3_ISEL_ICOND_ULT && d->cond != AGX3_ISEL_ICOND_UGT &&
+        d->cond != AGX3_ISEL_ICOND_EQ) &&
+       (d->cmp_16 || d->cmp1_16))
+      return false;
+   for (unsigned i = 0; i < 4; ++i) {
+      if (d->cache[i] && d->discard[i])
+         return false;
+   }
+   if ((d->cmp1_immediate && (d->cache[1] || d->discard[1])) ||
+       (ti && (d->cache[2] || d->discard[2])) ||
+       (fi && (d->cache[3] || d->discard[3])))
+      return false;
+
+   const struct agx3_field_kv base[] = {
+      KV(9, 2), KV(10, d->dest_16 ? 1 : 2),
+      /* f11 is the destination-cache hint, as in every other GPU1 form
+       * sharing this f9/f10/f2/f11 header (iadd32's `16 + 16` witness
+       * carries f11=1 with a live result; cbs, copies and funops write it
+       * from dest_cache too). The three m5-xfb-alu8 selects store their
+       * result directly and carry f11=0 whatever the selected-operand mix,
+       * including the word-comparand register/zero shape the earlier
+       * "mixed selection" reading of this field set to 1 -- the same
+       * correction GPU0's f12 received. */
+      KV(11, d->dest_cache),
+      KV(23, 2), KV(24, d->cmp_16 ? 1 : 2),
+      /* Native ushort equality sets f28 with its half comparator. */
+      KV(28, half_regs ? d->cond >= AGX3_ISEL_ICOND_EQ : d->cmp_16),
+      KV(38, d->cmp1_immediate ? 1 : 2),
+      KV(39, (d->cmp1_immediate || d->cmp1_16 || half_regs) ? 1 : 2),
+      KV(43, half_regs ? d->cond >= AGX3_ISEL_ICOND_EQ
+                       : d->cmp1_sign_extend),
+      KV(53, ti ? 1 : 2), KV(54, d->dest_16 ? 1 : 2),
+      KV(67, fi ? 1 : 2), KV(68, d->dest_16 ? 1 : 2),
+      KV(72, 3), KV(73, d->dest_16 ? 96 : 97),
+   };
+   struct agx3_field_kv ov[24];
+   unsigned n = 0;
+   /* A GPU1 GPR destination is f2/kind2; f3/kind3 names a uniform. */
+   ov[n++] = (struct agx3_field_kv)KV(2, d->dest);
+   ov[n++] = (struct agx3_field_kv)KV(16, d->cmp0);
+   ov[n++] = (struct agx3_field_kv)KV(d->cmp1_immediate ? 30 : 31, d->cmp1);
+   ov[n++] = (struct agx3_field_kv)KV(ti ? 45 : 46, d->sel_true);
+   ov[n++] = (struct agx3_field_kv)KV(fi ? 59 : 60, d->sel_false);
+   ov[n++] = (struct agx3_field_kv)KV(82, d->cond);
+   static const unsigned cache_fields[] = {25, 40, 55, 69};
+   static const unsigned discard_fields[] = {27, 42, 57, 71};
+   for (unsigned i = 0; i < 4; ++i) {
+      ov[n++] = (struct agx3_field_kv)KV(cache_fields[i], d->cache[i]);
+      ov[n++] = (struct agx3_field_kv)KV(discard_fields[i], d->discard[i]);
+   }
+   for (unsigned i = 0; i < 8; ++i)
+      ov[n++] = (struct agx3_field_kv)KV(74 + i, (d->wait_mask >> i) & 1);
+   const unsigned first = d->dest_16 ? 6 + (d->dest & 1) : 3;
+   const unsigned last = d->dest_16 ? 8 : 4;
+   for (unsigned ep = first; ep <= last; ++ep)
+      if (agx3_bind_compose(AGX_ISA_ENCODING_AGX3C,
+                            d->dest_16 ? "iseli16" : "iseli32", ep,
+                            base, sizeof(base) / sizeof(base[0]), ov, n, out, len))
+         return true;
+   return false;
+}
+
 static bool
 encode_agx3c(const struct agx3_isel_desc *d,
              uint8_t out[AGX3_ISEL_MAX_LENGTH], uint8_t *len)
@@ -373,13 +510,17 @@ encode_agx3c(const struct agx3_isel_desc *d,
    }
    return false;
 }
-
 bool
 agx3_isel_encode(enum agx_isa_encoding encoding,
                  const struct agx3_isel_desc *d,
                  uint8_t out[AGX3_ISEL_MAX_LENGTH], uint8_t *len)
 {
    if (d == NULL || out == NULL || len == NULL)
+      return false;
+
+   /* cmp1_16 and cmp1_sign_extend describe the G18G encoder
+    * (agx3_isel_encode_g18g); this one has no such form. */
+   if (d->cmp1_16 || d->cmp1_sign_extend)
       return false;
 
    if (encoding == AGX_ISA_ENCODING_AGX3C) {
@@ -454,4 +595,44 @@ agx3_isel_encode(enum agx_isa_encoding encoding,
 
    return agx3_bind_compose(encoding, "isel", ep, form->base, form->nbase, ov,
                             n, out, len);
+}
+
+/* G18G (M6) compiles as agx3c and keeps the GPU1 integer select it was
+ * qualified with (encode_gpu1): the widened narrow comparand (cmp1_16,
+ * cmp1_sign_extend) and its own field and form choices. The uniform and cmp_mixed_width forms, which
+ * that encoder never had, take agx3_isel_encode's agx3c forms. */
+bool
+agx3_isel_encode_g18g(enum agx_isa_encoding encoding,
+                      const struct agx3_isel_desc *d,
+                      uint8_t out[AGX3_ISEL_MAX_LENGTH], uint8_t *len)
+{
+   if (d == NULL || out == NULL || len == NULL)
+      return false;
+
+   const bool agx3c_form = d->cmp_mixed_width || d->cmp0_uniform ||
+                           d->cmp1_uniform ||
+                           d->true_kind == AGX3_ISEL_UNIFORM ||
+                           d->false_kind == AGX3_ISEL_UNIFORM;
+   const bool gpu1_form = d->cmp1_16 || d->cmp1_sign_extend;
+   if (encoding != AGX_ISA_ENCODING_AGX3C || (agx3c_form && !gpu1_form))
+      return agx3_isel_encode(encoding, d, out, len);
+   if (agx3c_form)
+      return false;
+
+   /* The register comparands share a width; immediates carry no register. */
+   if (!cond_ok(d->cond) ||
+       !(d->cmp_16 ? reg16_ok(d->cmp0) : reg32_ok(d->cmp0)) ||
+       (!d->cmp1_immediate &&
+        !(d->cmp_16 ? reg16_ok(d->cmp1) : reg32_ok(d->cmp1))))
+      return false;
+   if (d->wait_mask >= (1u << 8))
+      return false;
+
+   if (d->dest_16 ? !reg16_ok(d->dest) : !reg32_ok(d->dest))
+      return false;
+   if (!operand_ok(d->true_kind, d->sel_true, d->dest_16) ||
+       !operand_ok(d->false_kind, d->sel_false, d->dest_16))
+      return false;
+
+   return encode_gpu1(d, out, len);
 }

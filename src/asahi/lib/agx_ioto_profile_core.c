@@ -33,7 +33,7 @@ is_hal300(enum agx_chip chip)
           chip == AGX_CHIP_G17C;
 }
 
-static bool
+bool
 agx_ioto_profile_control_supported(enum agx_chip chip)
 {
    switch (chip) {

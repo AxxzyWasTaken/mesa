@@ -217,7 +217,7 @@ bundle_layout(enum agx_ppp_hal200_graphics_bundle bundle, uint32_t *header,
  *                   occlusion-query-2
  *   CULL:           cull
  */
-static bool
+bool
 agx_ppp_hal200_graphics_core_supported(enum agx_chip chip)
 {
    return agx_chip_native_agx3(chip);

@@ -1,0 +1,58 @@
+{
+ "version": {
+  "major": 0,
+  "minor": 3,
+  "sub_minor": 0
+ },
+ "generator": "MetalFramework",
+ "libraries": {
+  "paths": [
+   {
+    "label": "7D3C8BBC1CA51EECF56F07F55BB872269483718FA1DBF25AF78D4645B9228476",
+    "path": "oracle.metallib"
+   }
+  ]
+ },
+ "pipelines": {
+  "render_pipelines": [
+   {
+    "vertex_function": "alias:7D3C8BBC1CA51EECF56F07F55BB872269483718FA1DBF25AF78D4645B9228476#vertexTextured",
+    "fragment_function": "alias:7D3C8BBC1CA51EECF56F07F55BB872269483718FA1DBF25AF78D4645B9228476#fragmentTextured",
+    "max_vertex_call_stack_depth": 1,
+    "max_fragment_call_stack_depth": 1,
+    "input_primitive_topology": "Triangle",
+    "max_tessellation_factor": 16,
+    "tessellation_factor_scale_enabled": false,
+    "tessellation_factor_format": "Half",
+    "tessellation_control_point_index_type": "None",
+    "tessellation_factor_step_function": "Constant",
+    "tessellation_output_winding_order": "Clockwise",
+    "tessellation_partition_mode": "Pow2",
+    "max_vertex_amplification_count": 1,
+    "rasterization_enabled": true,
+    "alpha_to_coverage_enabled": false,
+    "alpha_to_one_enabled": false,
+    "raster_sample_count": 1,
+    "color_attachments": [
+     {
+      "pixel_format": "RGBA8Unorm",
+      "write_mask": "All",
+      "blending_enabled": false,
+      "alpha_blend_operation": "Add",
+      "rgb_blend_operation": "Add",
+      "destination_alpha_blend_factor": "Zero",
+      "destination_rgb_blend_factor": "Zero",
+      "source_alpha_blend_factor": "One",
+      "source_rgb_blend_factor": "One"
+     }
+    ],
+    "depth_attachment_pixel_format": "Invalid",
+    "stencil_attachment_pixel_format": "Invalid",
+    "support_indirect_command_buffers": false,
+    "support_adding_vertex_binary_functions": false,
+    "support_adding_fragment_binary_functions": false
+   }
+  ]
+ },
+ "functions": {}
+}

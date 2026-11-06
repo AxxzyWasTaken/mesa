@@ -10,6 +10,26 @@
 
 #include <string.h>
 
+bool
+agx_vdm_state_update_encode_preamble_counts(
+   enum agx_chip chip, uint32_t ipr_bytes, uint32_t spill_bytes,
+   struct agx_vdm_state_update_preamble_counts *counts)
+{
+   if (counts)
+      memset(counts, 0, sizeof(*counts));
+
+   /* The largest even 12-bit count is 0xffe. Validate before addition so
+    * malformed metadata cannot wrap the rounding arithmetic. */
+   if (!counts || chip != AGX_CHIP_G17P ||
+       ipr_bytes > UINT32_C(0xffe) * 4 ||
+       spill_bytes > UINT32_C(0x3ffff) * 4)
+      return false;
+
+   counts->ipr_dwords = ((ipr_bytes + 7) / 8) * 2;
+   counts->spill_dwords = (spill_bytes + 3) / 4;
+   return true;
+}
+
 /*
  * Pack/unpack the complete seven-word AGX3 VDM State Update emitted by the
  * inspected Apple VDMEncoderGen5 and VDMEncoderGen6 paths:
@@ -29,7 +49,7 @@
  * neighboring command-stream generations.  This helper does not emit a live
  * command or enable lowering, scheduling, submission, or device admission.
  */
-static bool
+bool
 agx_vdm_state_update_supported(enum agx_chip chip)
 {
    return agx_vdm_state_vertex_pipeline_pair_supported(chip);
@@ -125,6 +145,7 @@ agx_vdm_state_update_is_hal300(enum agx_chip chip)
    case AGX_CHIP_G17G:
    case AGX_CHIP_G17S:
    case AGX_CHIP_G17C:
+   case AGX_CHIP_G18G:
       return true;
    default:
       return false;
@@ -142,7 +163,7 @@ agx_vdm_state_update_is_hal300(enum agx_chip chip)
  * of 0x30/0/0x31/1/0x32/2.  Both calls are transactional and fail closed
  * outside the directly observed target/input domains.
  */
-static bool
+bool
 agx_vdm_state_update_template_materialize(
    enum agx_chip chip, const struct agx_vdm_state_update_template_info *info,
    struct agx_vdm_state_update_info *raw)
@@ -259,7 +280,7 @@ agx_vdm_state_update_template_pack(
  * (ubfiz #3, #18); the HAL300 materializer only
  * omits bit 31.
  */
-static bool
+bool
 agx_vdm_state_update_vertex_ti_resources(
    enum agx_chip chip, uint32_t spill_bytes, uint32_t largest_ipr_bytes,
    struct agx_vdm_state_update_template_info *info)
@@ -349,7 +370,8 @@ agx_g17p_vertex_program_info(
           : compiler_info->nr_preamble_gprs == 0 &&
                compiler_info->preamble_scratch_size == 0);
 
-   if ((!agx_chip_native_agx3(chip) && !agx_chip_g17_m5(chip)) ||
+   if ((!agx_chip_native_agx3(chip) && !agx_chip_g17_m5(chip) &&
+        chip != AGX_CHIP_G18G) ||
        !compiler_info || !program ||
        !compiler_info->hardware_vertex || !preamble_ok ||
        compiler_info->position_off != 0 || compiler_info->varyings_off != 4 ||

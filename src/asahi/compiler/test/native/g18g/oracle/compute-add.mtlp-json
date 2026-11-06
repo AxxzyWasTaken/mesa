@@ -1,0 +1,32 @@
+{
+ "version": {
+  "major": 0,
+  "minor": 3,
+  "sub_minor": 0
+ },
+ "generator": "MetalFramework",
+ "libraries": {
+  "paths": [
+   {
+    "label": "7D3C8BBC1CA51EECF56F07F55BB872269483718FA1DBF25AF78D4645B9228476",
+    "path": "oracle.metallib"
+   }
+  ]
+ },
+ "pipelines": {
+  "compute_pipelines": [
+   {
+    "compute_function": "alias:7D3C8BBC1CA51EECF56F07F55BB872269483718FA1DBF25AF78D4645B9228476#computeAdd",
+    "threadgroup_size_is_multiple_of_thread_execution_width": false,
+    "max_total_threads_per_threadgroup": 0,
+    "max_call_stack_depth": 1,
+    "support_indirect_command_buffers": false,
+    "support_adding_binary_functions": false,
+    "optimize_for_persistent_kernel": false,
+    "forward_progress_usage": "Automatic",
+    "contention_relief": "Automatic"
+   }
+  ]
+ },
+ "functions": {}
+}

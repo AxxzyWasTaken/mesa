@@ -25,6 +25,22 @@ uint8_t agx_g17p_mrt_eot_selector(enum pipe_format format);
 
 enum pipe_format agx_g17p_rt0_pbe_format(enum pipe_format format);
 
+/* M5 keeps an R11G11B10 tile word in the packed-float tile format and stores
+ * it through an R11G11B10 PBE, so the image keeps the compression class of
+ * the textures that read it. G17P stores the raw word through R32_UINT. */
+static inline bool
+agx_rg11b10_tile_is_packed_float(enum agx_chip chip)
+{
+   return agx_chip_g17_m5(chip);
+}
+
+/* The end-of-tile PBE format of a render target on this chip. */
+enum pipe_format agx_rt0_pbe_format(enum agx_chip chip,
+                                    enum pipe_format format);
+
+/* agx_g17p_mrt_eot_selector() for this chip. */
+uint8_t agx_mrt_eot_selector(enum agx_chip chip, enum pipe_format format);
+
 #ifdef __cplusplus
 }
 #endif

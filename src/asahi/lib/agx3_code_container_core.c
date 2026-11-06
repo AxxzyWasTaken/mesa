@@ -8,6 +8,38 @@
 #include <string.h>
 
 bool
+agx3_build_g18g_container_lead(void *image, size_t capacity)
+{
+   if (!image || capacity < AGX3_G18G_CONTAINER_LEAD_SIZE)
+      return false;
+
+   /* Native G18 CODE leads: four identical tables, six helpers followed
+    * by two terminals. The shader setup selects 0x200 for fragment/tile
+    * programs or 0x400 for vertex programs and adds its SR14 offset.
+    * These are AGX3D instructions, not the M5 table's AGX3C bytecode. */
+   uint8_t *bytes = image;
+   memset(bytes, 0, AGX3_G18G_CONTAINER_LEAD_SIZE);
+   bytes[0] = 0x40;
+   bytes[1] = 0x06;
+   for (size_t i = 0x40; i < AGX3_G18G_CONTAINER_LEAD_SIZE; i += 2)
+      bytes[i] = 0x08;
+
+   static const uint8_t terminal[] = {0x00, 0xd1, 0x22, 0, 0, 0, 0, 0x74};
+   for (unsigned table = 2; table <= 5; ++table) {
+      uint8_t *base = bytes + table * 0x100;
+      for (unsigned i = 0; i < 6; ++i) {
+         uint8_t *record = base + i * 16;
+         memset(record, 0, 10);
+         record[1] = 0x0e;
+         record[2] = (6 - i) << 4;
+      }
+      memcpy(base + 0x60, terminal, sizeof(terminal));
+      memcpy(base + 0x70, terminal, sizeof(terminal));
+   }
+   return true;
+}
+
+bool
 agx3_build_m5_container_lead(void *image, size_t capacity, unsigned clusters)
 {
    if (!clusters || clusters > (UINT32_MAX - 0x40u) / 0x300u)
@@ -47,6 +79,12 @@ agx3_build_m5_container_lead(void *image, size_t capacity, unsigned clusters)
    return true;
 }
 
+/* The single-cluster M5 (G17G) lead; kept for its callers. */
+bool
+agx3_build_g17g_container_lead(void *image, size_t capacity)
+{
+   return agx3_build_m5_container_lead(image, capacity, 1);
+}
 
 size_t
 agx3_code_block_size(size_t main_span)
@@ -115,4 +153,21 @@ agx3_build_container_constant_program(
       image[2 * pair + 1] = 0x00;
    }
    memcpy(image, program, program_size);
+}
+
+void
+agx3_build_container_stop_program_agx3d(
+   uint8_t image[AGX3_CONTAINER_CONSTANT_PROGRAM_SIZE])
+{
+   /* G18G (agx3d): `end` is 08 04 and `nop` 08 00. Every applegpu_g18g
+    * fragment witness without a constant program of its own
+    * (test/native/g18g oracle.*.fragment.g18g.bin) carries exactly this:
+    * end, then 31 nops. The M5 paths only ever use the stop program. */
+   image[0] = 0x08;
+   image[1] = 0x04;
+   for (size_t offset = 2; offset < AGX3_CONTAINER_CONSTANT_PROGRAM_SIZE;
+        offset += 2) {
+      image[offset] = 0x08;
+      image[offset + 1] = 0x00;
+   }
 }

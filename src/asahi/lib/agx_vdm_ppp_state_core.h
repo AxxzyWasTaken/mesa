@@ -44,8 +44,9 @@ struct agx_vdm_ppp_state_core {
  * a semantically complete payload.
  *
  * The target allowlist contains only identities directly served by the
- * inspected G15G/G15X, G16G/G16X, G17P, and G17G/G17X Apple Metal plugins.
- * G16P and G17A remain closed despite sharing neighboring command-stream
+ * inspected G15G/G15X, G16G/G16X, G17P, and G17G/G17X Apple Metal plugins,
+ * plus G18G, whose J873 native VDM streams use this exact record for every
+ * PPP update.  G16P and G17A remain closed despite sharing neighboring command-stream
  * generations.  This helper does not emit a live command or enable command
  * allocation, submission, or device admission.
  */

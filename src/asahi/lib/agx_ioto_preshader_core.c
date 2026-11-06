@@ -43,6 +43,52 @@ agx_ioto_preshader_target_encoding(enum agx_chip chip)
    }
 }
 
+bool
+agx_ioto_preshader_program_size(uint32_t start, uint32_t end32,
+                                uint64_t alternate_end, size_t *size)
+{
+   if (!size)
+      return false;
+
+   uint64_t length;
+   if (end32 > start) {
+      length = (uint32_t)(end32 - start);
+   } else {
+      if (alternate_end < start)
+         return false;
+      length = alternate_end - start;
+   }
+
+   if (length > SIZE_MAX)
+      return false;
+
+   *size = (size_t)length;
+   return true;
+}
+
+bool
+agx_ioto_preshader_bind_range(const void *binary, size_t binary_size,
+                              uint64_t binary_va, size_t gpu_size,
+                              size_t offset, size_t size,
+                              struct agx_ioto_preshader_desc *desc)
+{
+   const uint64_t va_limit = UINT64_C(1) << 48;
+   if (!binary || !desc || !size || ((offset | size | binary_va) & 1) ||
+       offset > binary_size || size > binary_size - offset ||
+       offset > gpu_size || size > gpu_size - offset ||
+       binary_va >= va_limit || offset >= va_limit - binary_va)
+      return false;
+
+   const uint64_t address = binary_va + offset;
+   if (size > va_limit - address)
+      return false;
+
+   desc->code = (const uint8_t *)binary + offset;
+   desc->code_size = size;
+   desc->external_va = address;
+   return true;
+}
+
 static void
 agx_ioto_preshader_set_bit(uint8_t *bytes, unsigned bit, bool value)
 {

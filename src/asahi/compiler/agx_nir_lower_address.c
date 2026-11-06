@@ -14,6 +14,12 @@ struct match {
    nir_scalar base, offset;
    bool sign_extend;
    uint8_t shift;
+   int16_t byte_offset;
+};
+
+struct lower_address_options {
+   bool byte_indices;
+   bool byte_offsets;
 };
 
 static void
@@ -89,6 +95,234 @@ peel_u2u64_index(nir_scalar wide, nir_scalar *narrow, uint8_t *shift,
    return true;
 }
 
+/* nir_lower_explicit_io scales each array index by its stride with amul. A
+ * valid access has a nonnegative array index, so every such product is
+ * nonnegative, and since UBOs and SSBOs are limited to INT32_MAX bytes their
+ * sum stays below 2^31 (see the relaxed lea rules in agx_nir_algebraic.py).
+ */
+static bool
+is_amul_sum(nir_scalar s, unsigned depth)
+{
+   s = nir_scalar_chase_movs(s);
+   if (depth > 8 || !nir_scalar_is_alu(s))
+      return false;
+
+   const nir_op op = nir_scalar_alu_op(s);
+   if (op == nir_op_amul)
+      return true;
+
+   return op == nir_op_iadd &&
+          is_amul_sum(nir_scalar_chase_alu_src(s, 0), depth + 1) &&
+          is_amul_sum(nir_scalar_chase_alu_src(s, 1), depth + 1);
+}
+
+static bool
+instr_dominates(nir_instr *a, nir_instr *b)
+{
+   if (a->block != b->block)
+      return nir_block_dominates(a->block, b->block);
+
+   for (nir_instr *it = a; it != NULL; it = nir_instr_next(it)) {
+      if (it == b)
+         return true;
+   }
+
+   return false;
+}
+
+/* Whether value is an index some memory access is addressed with */
+static bool
+used_as_index(nir_def *value)
+{
+   nir_foreach_use(use, value) {
+      nir_instr *user = nir_src_use_instr(use);
+      if (user->type == nir_instr_type_alu) {
+         nir_op op = nir_instr_as_alu(user)->op;
+         if (op == nir_op_ulea_agx || op == nir_op_ilea_agx)
+            return true;
+      } else if (user->type == nir_instr_type_intrinsic) {
+         switch (nir_instr_as_intrinsic(user)->intrinsic) {
+         case nir_intrinsic_load_agx:
+         case nir_intrinsic_load_constant_agx:
+         case nir_intrinsic_store_agx:
+            return true;
+         default:
+            break;
+         }
+      }
+   }
+
+   return false;
+}
+
+/*
+ * The index scale has room for up to two doublings beyond the element size,
+ * and the bounds that let a power-of-two stride move into the scale hold for
+ * any power-of-two factor of the stride. So an access to an array element at
+ * index * stride may as well use index * (stride >> t), scaled by t more:
+ * accesses to one element at different alignments then share one index
+ * register. Only take an index * (stride >> t) that the program computes
+ * before this access to address memory with already. A new one would be
+ * merged with any equal value, and another value could be one computed far
+ * away for another purpose, which would then stay live all the way here.
+ */
+static bool
+existing_index_multiple(nir_intrinsic_instr *access, nir_scalar index,
+                        uint64_t stride, unsigned max_t, unsigned *t_out,
+                        nir_scalar *out)
+{
+   for (unsigned t = MIN2(max_t, ffsll(stride) - 1); t > 0; --t) {
+      const uint64_t k = stride >> t;
+
+      if (k == 1) {
+         *t_out = t;
+         *out = index;
+         return true;
+      }
+
+      nir_foreach_use(use, index.def) {
+         nir_instr *user = nir_src_use_instr(use);
+         if (user->type != nir_instr_type_alu)
+            continue;
+
+         nir_alu_instr *alu = nir_instr_as_alu(user);
+         if ((alu->op != nir_op_amul && alu->op != nir_op_imul) ||
+             alu->def.num_components != 1 || alu->def.bit_size != 32)
+            continue;
+
+         nir_scalar mul = nir_get_scalar(&alu->def, 0);
+         for (unsigned i = 0; i < 2; ++i) {
+            nir_scalar x = nir_scalar_chase_alu_src(mul, i);
+            nir_scalar c = nir_scalar_chase_alu_src(mul, 1 - i);
+            if (x.def == index.def && x.comp == index.comp &&
+                nir_scalar_is_const(c) && nir_scalar_as_uint(c) == k &&
+                used_as_index(&alu->def) &&
+                instr_dominates(user, &access->instr)) {
+               *t_out = t;
+               *out = mul;
+               return true;
+            }
+         }
+      }
+   }
+
+   return false;
+}
+
+/* AGX3C loads and stores add a signed 16-bit byte offset after scaling the
+ * index, so a constant addend in the index -- a struct member or a constant
+ * array element -- needs no ALU. The split must not change any valid address:
+ *
+ * - A sign-extended index gives sext(x + c) = sext(x) + c unless x + c
+ *   overflows, which no valid signed index does.
+ * - A zero-extended index gives zext(x + c) = zext(x) + c only if x + c does
+ *   not wrap. An amul sum x is nonnegative and below 2^31 for a valid access,
+ *   so this holds for c >= 0. Any other x may be negative (a reversed index
+ *   N - i folds to c + -i), so leave it alone.
+ * - An array index i + c scaled by amul is, for a valid access, nonnegative
+ *   and below 2^31 / stride, so as signed integers (i + c) * stride equals
+ *   sext(i) * stride + c * stride. With c < 0 and a byte stride, i + c could
+ *   still wrap into the last bytes of a 2 GiB buffer, so require c >= 0 or a
+ *   wider stride there.
+ *
+ * The same bounds let a power-of-two stride move into the index scale.
+ */
+static void
+fold_byte_offset(nir_builder *b, nir_intrinsic_instr *access,
+                 struct match *match, unsigned format_shift,
+                 unsigned max_shift)
+{
+   if (match->offset.def == NULL)
+      return;
+
+   const bool bytes = match->shift == AGX_NIR_MEMORY_INDEX_BYTES;
+   const unsigned scale = bytes ? 0 : format_shift + match->shift;
+   nir_scalar offset = nir_scalar_chase_movs(match->offset);
+   int64_t byte_offset = 0;
+   bool sign_extend = match->sign_extend;
+
+   if (offset.def->bit_size != 32 || !nir_scalar_is_alu(offset))
+      return;
+
+   if (nir_scalar_alu_op(offset) == nir_op_iadd) {
+      for (unsigned i = 0; i < 2; ++i) {
+         nir_scalar k = nir_scalar_chase_alu_src(offset, i);
+         nir_scalar rest = nir_scalar_chase_alu_src(offset, 1 - i);
+         if (!nir_scalar_is_const(k) || nir_scalar_is_const(rest))
+            continue;
+
+         const int64_t c = nir_scalar_as_int(k);
+         if (!sign_extend && (c < 0 || !is_amul_sum(rest, 0)))
+            return;
+
+         byte_offset = c * (INT64_C(1) << scale);
+         offset = nir_scalar_chase_movs(rest);
+         break;
+      }
+   }
+
+   /* amul(i + c, stride) or amul(i, stride) */
+   nir_scalar index = offset;
+   uint64_t stride = 0;
+   if (nir_scalar_is_alu(offset) && nir_scalar_alu_op(offset) == nir_op_amul) {
+      for (unsigned i = 0; i < 2; ++i) {
+         nir_scalar d = nir_scalar_chase_alu_src(offset, i);
+         if (nir_scalar_is_const(d) && nir_scalar_as_uint(d) <= 0x10000) {
+            stride = nir_scalar_as_uint(d);
+            index = nir_scalar_chase_movs(nir_scalar_chase_alu_src(offset, 1 - i));
+            break;
+         }
+      }
+   }
+
+   bool index_folded = false;
+   if (stride && nir_scalar_is_alu(index) &&
+       nir_scalar_alu_op(index) == nir_op_iadd) {
+      for (unsigned i = 0; i < 2; ++i) {
+         nir_scalar k = nir_scalar_chase_alu_src(index, i);
+         nir_scalar rest = nir_scalar_chase_alu_src(index, 1 - i);
+         if (!nir_scalar_is_const(k) || nir_scalar_is_const(rest))
+            continue;
+
+         const int64_t c = nir_scalar_as_int(k);
+         if (c < 0 && stride < 2)
+            break;
+
+         byte_offset += c * (int64_t)stride * (INT64_C(1) << scale);
+         index = nir_scalar_chase_movs(rest);
+         sign_extend = true;
+         index_folded = true;
+         break;
+      }
+   }
+
+   if (byte_offset < INT16_MIN || byte_offset > INT16_MAX)
+      return;
+
+   unsigned t = 0;
+   nir_scalar multiple;
+   const bool rescale =
+      stride && !bytes && (index_folded || !sign_extend) &&
+      existing_index_multiple(access, index, stride, max_shift - scale, &t,
+                              &multiple);
+
+   if (rescale) {
+      /* Either the array index lost its constant and what is left must be
+       * rescaled, or an unchanged amul is nonnegative and does not wrap.
+       */
+      match->shift += t;
+      match->offset = multiple;
+   } else if (index_folded) {
+      nir_def *x = nir_channel(b, index.def, index.comp);
+      match->offset = nir_get_scalar(nir_imul_imm(b, x, stride), 0);
+   } else {
+      match->offset = offset;
+   }
+
+   match->byte_offset = byte_offset;
+   match->sign_extend = sign_extend;
+}
+
 static enum pipe_format
 format_for_bitsize(unsigned bitsize)
 {
@@ -114,7 +348,8 @@ pass(struct nir_builder *b, nir_intrinsic_instr *intr, void *data)
        intr->intrinsic != nir_intrinsic_store_global)
       return false;
 
-   const bool byte_indices = *(const bool *)data;
+   const struct lower_address_options *options = data;
+   const bool byte_indices = options->byte_indices;
    b->cursor = nir_before_instr(&intr->instr);
 
    unsigned bitsize = intr->intrinsic == nir_intrinsic_store_global
@@ -220,6 +455,15 @@ pass(struct nir_builder *b, nir_intrinsic_instr *intr, void *data)
 
 matched:
 
+   if (options->byte_offsets && !shift_must_match &&
+       intr->intrinsic != nir_intrinsic_global_atomic &&
+       intr->intrinsic != nir_intrinsic_global_atomic_swap)
+      fold_byte_offset(b, intr, &match, format_shift, max_shift);
+
+   const unsigned mem_base =
+      match.shift | ((uint32_t)(uint16_t)match.byte_offset
+                     << AGX_NIR_MEMORY_BYTE_OFFSET_SHIFT);
+
    nir_def *offset = match.offset.def != NULL
                         ? nir_channel(b, match.offset.def, match.offset.comp)
                         : nir_imm_int(b, 0);
@@ -234,13 +478,13 @@ matched:
    if (intr->intrinsic == nir_intrinsic_load_global) {
       repl =
          nir_load_agx(b, num_components, bit_size, new_base, offset,
-                      .access = nir_intrinsic_access(intr), .base = match.shift,
+                      .access = nir_intrinsic_access(intr), .base = mem_base,
                       .format = format, .sign_extend = match.sign_extend);
 
    } else if (intr->intrinsic == nir_intrinsic_load_global_constant) {
       repl = nir_load_constant_agx(b, num_components, bit_size, new_base,
                                    offset, .access = nir_intrinsic_access(intr),
-                                   .base = match.shift, .format = format,
+                                   .base = mem_base, .format = format,
                                    .sign_extend = match.sign_extend);
    } else if (intr->intrinsic == nir_intrinsic_global_atomic) {
       repl =
@@ -256,7 +500,7 @@ matched:
          .sign_extend = match.sign_extend);
    } else {
       nir_store_agx(b, intr->src[0].ssa, new_base, offset,
-                    .access = nir_intrinsic_access(intr), .base = match.shift,
+                    .access = nir_intrinsic_access(intr), .base = mem_base,
                     .format = format, .sign_extend = match.sign_extend);
    }
 
@@ -268,8 +512,12 @@ matched:
 }
 
 bool
-agx_nir_lower_address(nir_shader *nir, bool byte_indices)
+agx_nir_lower_address(nir_shader *nir, bool byte_indices, bool byte_offsets)
 {
+   const struct lower_address_options options = {
+      .byte_indices = byte_indices,
+      .byte_offsets = byte_offsets,
+   };
    bool progress = false;
 
    /* First, clean up as much as possible. This will make fusing more effective.
@@ -285,8 +533,10 @@ agx_nir_lower_address(nir_shader *nir, bool byte_indices)
    NIR_PASS(progress, nir, agx_nir_fuse_lea);
 
    /* Next, lower load/store using the lea's */
+   nir_foreach_function_impl(impl, nir)
+      nir_metadata_require(impl, nir_metadata_dominance);
    NIR_PASS(progress, nir, nir_shader_intrinsics_pass, pass,
-            nir_metadata_control_flow, &byte_indices);
+            nir_metadata_control_flow, (void *)&options);
 
    /* Finally, lower any leftover lea instructions back to ALU to let
     * nir_opt_algebraic simplify them from here.

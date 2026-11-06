@@ -79,7 +79,10 @@ struct agx_tilebuffer_layout {
     * indeterminate padding. Always zero. */
    uint8_t reserved[3];
 
-   /* USC word corresponding to this configuration of the tilebuffer */
+   /* USC word corresponding to this configuration of the tilebuffer. Zero
+    * for native imageblock layouts and for tiles above its 64-KiB limit
+    * (G18G): such layouts use the native Ioto imageblock path and must not
+    * emit this word. */
    struct agx_usc_shared_packed usc;
 };
 
@@ -133,6 +136,14 @@ agx_build_tilebuffer_layout_with_limits(const enum pipe_format *formats,
                                       uint32_t max_bytes_per_tile,
                                       uint16_t max_samples_per_tile);
 
+/* Attachment 0 alone in the tilebuffer, every other attachment spilled to
+ * memory. */
+struct agx_tilebuffer_layout
+agx_build_tilebuffer_layout_rt0_resident(const enum pipe_format *formats,
+                                         uint8_t nr_cbufs, uint8_t nr_samples,
+                                         uint32_t max_bytes_per_tile,
+                                         uint16_t max_samples_per_tile);
+
 /* Native imageblock strides are not limited by the AGX2 USC bitfield. */
 struct agx_tilebuffer_layout
 agx_build_tilebuffer_layout_for_imageblock(
@@ -166,6 +177,18 @@ bool agx_nir_lower_tilebuffer(struct nir_shader *shader,
                               struct nir_def *write_samples, bool *translucent,
                               bool preserve_zero_mask,
                               bool lower_g17p_formats);
+
+/* As agx_nir_lower_tilebuffer, plus explicit software sRGB and R11G11B10
+ * conversions of tile values and, with x_alpha_one, 1.0 stored into the X
+ * channel of RGBX/BGRX targets (all used on G18G). */
+bool agx_nir_lower_tilebuffer_with_conversions(
+   struct nir_shader *shader, struct agx_tilebuffer_layout *tib,
+   uint8_t *colormasks, unsigned *bindless_base, struct nir_def *write_samples,
+   bool *translucent, bool preserve_zero_mask, bool lower_srgb,
+   bool lower_r11g11b10, bool lower_g17p_formats, bool x_alpha_one);
+/* Put spilled render target accesses back on immediate texture state slots
+ * after descriptor crawling has run (G17G's bindful image accesses). */
+bool agx_nir_rebind_spilled_rts(struct nir_shader *shader);
 
 bool agx_nir_lower_to_per_sample(struct nir_shader *shader);
 bool agx_nir_apply_api_mask_to_force_early(struct nir_shader *shader,
@@ -319,6 +342,56 @@ bool agx_g17p_rt0_tile_layout_supported(
 
 /* Logical active attachment mask for compact RGBA8 storage in partition zero. */
 unsigned agx_g17p_rgba8_mrt_mask(const struct agx_tilebuffer_layout *tib);
+unsigned agx_g18g_rgba8_mrt_mask(const struct agx_tilebuffer_layout *tib);
+
+/* Compact G18 four-byte slots: RGBA8 or a scalar R32 integer/float word. */
+unsigned agx_g18g_word_mrt_mask(const struct agx_tilebuffer_layout *tib);
+
+/* Resident RGBA32 or scalar R32I/U multisample attachments on G18. */
+unsigned agx_g18g_raw32_mrt_mask(const struct agx_tilebuffer_layout *tib);
+unsigned agx_g18g_ms_mrt_mask(const struct agx_tilebuffer_layout *tib);
+
+/* Native-1121 mixed-format single-sample G18 layouts (run 1130): the
+ * imageblock bytes of a 32x32 tile for an admitted format list (zero if none),
+ * and the attachment mask of an admitted layout. kernel_native_samples: the
+ * kernel advertises DRM_ASAHI_FEATURE_G18_NATIVE_TILE_SAMPLES (run 1134),
+ * tested in agx_device::params.features. */
+unsigned agx_g18g_mixed_tile_bytes(const enum pipe_format *formats,
+                                   unsigned nr_cbufs, unsigned nr_samples,
+                                   bool layered, bool kernel_native_samples);
+unsigned agx_g18g_mixed_mrt_mask(const struct agx_tilebuffer_layout *tib);
+/* Whether an all-clear (has_clear) or all-reload (has_load) background of an
+ * admitted mixed-format layout is witnessed. */
+bool agx_g18g_mixed_bg_witnessed(const struct agx_tilebuffer_layout *tib,
+                                 bool has_clear, bool has_load);
+/* The same layouts in compacted end-of-tile key form. */
+unsigned
+agx_g18g_mixed_compact_mrt_mask(const struct agx_tilebuffer_layout *tib);
+
+/* Native-1130 general single-sample mixed-format G18 layouts (run 1139).
+ * Apple packs the attachments in index order, each at the next offset aligned
+ * to its tile lane width (holes take no space), in a 32x32 tile of an
+ * eight-byte-aligned sample. agx_g18g_native_mixed_tile_bytes() returns that
+ * tile's bytes when the format list takes this layout -- two to eight
+ * attachments of witnessed formats, not owned by the RGBA8/R32 word or
+ * RGBA32/RG32 paths, and a tile the kernel admits -- and zero otherwise.
+ * agx_build_tilebuffer_layout_g18_mixed() builds it; the gallium layout and the
+ * fragment epilog both use it, so both compute the same offsets. */
+unsigned
+agx_g18g_native_mixed_tile_bytes(const enum pipe_format *formats,
+                                 unsigned nr_cbufs, unsigned nr_samples,
+                                 bool layered, bool kernel_native_samples);
+struct agx_tilebuffer_layout
+agx_build_tilebuffer_layout_g18_mixed(const enum pipe_format *formats,
+                                      uint8_t nr_cbufs);
+/* The attachment mask of a layout built that way (zero otherwise). */
+unsigned
+agx_g18g_native_mixed_mask(const struct agx_tilebuffer_layout *tib);
+
+/* The IMGWBLK f29 tile class Apple's end of tile uses for a witnessed format:
+ * 0 8-bit integer lanes, 1 16-bit lanes, 2 32-bit lanes, 3 tile bytes in the
+ * attachment's own encoding (8-bit normalized, RGB10A2, R11G11B10F). */
+int agx_g18g_native_mixed_eot_class(enum pipe_format format);
 
 /* Dense, unspilled single-sample RGBA8 layouts with three to eight targets. */
 unsigned

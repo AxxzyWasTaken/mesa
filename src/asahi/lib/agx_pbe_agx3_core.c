@@ -22,6 +22,22 @@
  * one path; Texture::getStride returns macroblocks for Interchange). */
 #define AGX_PBE_LAYOUT_INTERCHANGE 3u
 
+static void
+store_le64(uint8_t *dst, uint64_t value)
+{
+   for (unsigned i = 0; i < 8; ++i)
+      dst[i] = (uint8_t)(value >> (i * 8));
+}
+
+static uint64_t
+load_le64(const uint8_t *src)
+{
+   uint64_t value = 0;
+   for (unsigned i = 0; i < 8; ++i)
+      value |= (uint64_t)src[i] << (i * 8);
+   return value;
+}
+
 static bool
 channel_is_uncompressed(uint8_t channels)
 {
@@ -153,6 +169,10 @@ agx_pbe_agx3_2d_pack(uint32_t generation,
    const bool layer_flag = generation == AGX_PBE_AGX3_GENERATION_10 &&
                            fields->page_aligned_layers;
    uint64_t word1 = fields->buffer >> 4;
+   /* HAL300 StateFields 0x3e1a14..0x3e1a90 inserts stride-in-16-byte-units
+    * minus one at word1[59:44]. getStride at 0x566c3c divides bytes by 16.
+    * This shares the shifted-byte expression with Gen9, but retains four
+    * more address bits and one fewer stride bit. */
    if (fields->layout == AGX_PBE_LAYOUT_LINEAR ||
        fields->layout == AGX_PBE_LAYOUT_INTERCHANGE)
       word1 |= (uint64_t)(fields->stride_B - 16) << 40;
@@ -215,6 +235,46 @@ mark_mip_chain(uint32_t generation, struct agx_pbe_agx3_descriptor *out, uint32_
  * so a one-layer array is still dimension 3, and depth - 1 for a 3D texture
  * (+0x4ac, reached from the kind-3 dimension select at +0x4a4).
  */
+bool
+agx_pbe_g18_layered_pack(const struct agx_pbe_agx3_2d_fields *fields,
+                         uint32_t dimension, uint32_t layers,
+                         struct agx_pbe_agx3_descriptor *out)
+{
+   return agx_pbe_g18_layered_mip_pack(fields, dimension, layers, 0, 1, out);
+}
+
+bool
+agx_pbe_g18_layered_mip_pack(const struct agx_pbe_agx3_2d_fields *fields,
+                             uint32_t dimension, uint32_t layers,
+                             uint32_t level, uint32_t levels,
+                             struct agx_pbe_agx3_descriptor *out)
+{
+   if (out)
+      memset(out, 0, sizeof(*out));
+
+   if (!out || !fields ||
+       (dimension != AGX_PBE_DIMENSION_2D_ARRAY &&
+        dimension != AGX_PBE_DIMENSION_3D) ||
+       fields->layout == AGX_PBE_LAYOUT_LINEAR || fields->compressed ||
+       layers < 1 || layers > UINT16_MAX + 1u ||
+       !agx_pbe_g18_2d_mip_pack(fields, level, levels, out))
+      return false;
+
+   /* Original G18 storage producer: dimension at 0x219546a60..a64,
+    * layer/depth count at 0x219546da4..e10/f28..f38. Native replay528
+    * covers both tiled layouts, one-layer arrays and nonzero depth planes.
+    * Native612 adds selected levels in mip chains: the dimension/count and
+    * page flag compose with the ordinary 2D mip fields without rebasing the
+    * address or dimensions. The base codec preserves the layer flag. */
+   uint64_t word0 = load_le64(&out->bytes[0]);
+   uint64_t word1 = load_le64(&out->bytes[8]);
+   word0 = (word0 & ~UINT64_C(0xf)) | dimension;
+   word1 |= (uint64_t)(layers - 1) << 44;
+   store_le64(&out->bytes[0], word0);
+   store_le64(&out->bytes[8], word1);
+   return true;
+}
+
 static bool
 pack_layered(uint32_t generation, const struct agx_pbe_agx3_2d_fields *fields,
              unsigned dimension, uint32_t layers, uint32_t level,
@@ -269,6 +329,15 @@ agx_pbe_agx3_2d_array_pack(
 }
 
 bool
+agx_pbe_agx3_3d_pack(
+   uint32_t generation, const struct agx_pbe_agx3_2d_fields *fields,
+   uint32_t depth, struct agx_pbe_agx3_descriptor *out)
+{
+   return pack_layered(generation, fields, AGX_PBE_DIMENSION_3D, depth, 0, 1,
+                       out);
+}
+
+bool
 agx_pbe_agx3_2d_array_mip_pack(
    uint32_t generation, const struct agx_pbe_agx3_2d_fields *fields,
    uint32_t layers, uint32_t level, uint32_t levels,
@@ -286,6 +355,79 @@ agx_pbe_agx3_3d_mip_pack(
 {
    return pack_layered(generation, fields, AGX_PBE_DIMENSION_3D, depth, level,
                        levels, out);
+}
+
+/* G18 StateFields (0x219546988..0x219547150) keeps Gen10's base geometry
+ * but places sample selection at word0[59:58] and compression at bit61.
+ * Scalar multisample targets do not inherit the page-aligned-layer flag;
+ * arrays retain both that flag and their dimension even with one layer.
+ */
+static bool
+pack_gen10_multisample(const struct agx_pbe_agx3_2d_fields *fields,
+                      bool array, uint32_t layers, uint32_t samples,
+                      struct agx_pbe_agx3_descriptor *out)
+{
+   if (out)
+      memset(out, 0, sizeof(*out));
+
+   if (!out || !fields || (samples != 2 && samples != 4) ||
+       !layers || layers > UINT16_MAX + 1u ||
+       /* G18 StateFields masks the shifted image address with
+        * 0xffffffffffc. Reject unrepresentable low bits instead of dropping
+        * them; metadata retains its independent 16-byte alignment. */
+       (fields->buffer & 0x3f) ||
+       (fields->layout != AGX_PBE_LAYOUT_TWIDDLED &&
+        fields->layout != AGX_PBE_LAYOUT_GPU) ||
+       (fields->compressed
+           ? fields->layout != AGX_PBE_LAYOUT_GPU ||
+                !fields->acceleration_buffer ||
+                (fields->acceleration_buffer & 0xf) ||
+                (fields->acceleration_buffer >> 48)
+           : fields->acceleration_buffer != 0))
+      return false;
+
+   /* Keep the single-sample codec's admission and bit layout unchanged. */
+   struct agx_pbe_agx3_2d_fields base = *fields;
+   base.compressed = false;
+   base.acceleration_buffer = 0;
+   base.page_aligned_layers = false;
+   if (!agx_pbe_agx3_2d_pack(AGX_PBE_AGX3_GENERATION_10, &base, out))
+      return false;
+
+   uint64_t word0 = load_le64(&out->bytes[0]);
+   word0 = (word0 & ~UINT64_C(0xf)) |
+           (array ? AGX_PBE_DIMENSION_2D_ARRAY_MULTISAMPLE
+                  : AGX_PBE_DIMENSION_2D_MULTISAMPLE);
+   word0 |= (uint64_t)(samples >> 2) << 58;
+   word0 |= (uint64_t)fields->compressed << 61;
+
+   uint64_t word1 = load_le64(&out->bytes[8]);
+   if (array) {
+      word1 |= (uint64_t)(layers - 1) << 44;
+      word1 |= (uint64_t)fields->page_aligned_layers << 60;
+   }
+   word1 |= (uint64_t)fields->compressed << 63;
+   store_le64(&out->bytes[0], word0);
+   store_le64(&out->bytes[8], word1);
+   if (fields->compressed)
+      store_le64(&out->bytes[16], fields->acceleration_buffer >> 4);
+   return true;
+}
+
+bool
+agx_pbe_g18_2d_multisample_pack(const struct agx_pbe_agx3_2d_fields *fields,
+                                uint32_t samples,
+                                struct agx_pbe_agx3_descriptor *out)
+{
+   return pack_gen10_multisample(fields, false, 1, samples, out);
+}
+
+bool
+agx_pbe_g18_2d_array_multisample_pack(
+   const struct agx_pbe_agx3_2d_fields *fields, uint32_t layers,
+   uint32_t samples, struct agx_pbe_agx3_descriptor *out)
+{
+   return pack_gen10_multisample(fields, true, layers, samples, out);
 }
 
 bool
@@ -401,6 +543,34 @@ agx_pbe_agx3_2d_mip_pack(
       return false;
 
    mark_mip_chain(generation, out, level, levels);
+   return true;
+}
+
+bool
+agx_pbe_g18_2d_mip_pack(
+   const struct agx_pbe_agx3_2d_fields *fields, uint32_t level,
+   uint32_t levels, struct agx_pbe_agx3_descriptor *out)
+{
+   if (out)
+      memset(out, 0, sizeof(*out));
+   /* Uncompressed only, as when this profile was grounded: word2 below
+    * carries the level fields, not compression metadata. */
+   if (!fields || fields->compressed || !levels || levels > 16 ||
+       level >= levels ||
+       (fields->layout == AGX_PBE_LAYOUT_LINEAR && (level || levels != 1)) ||
+       !agx_pbe_agx3_2d_pack(AGX_PBE_AGX3_GENERATION_10, fields, out))
+      return false;
+
+   /* AGXMetalG18G 26A428 StateFields, native375: unlike Gen9's bit58,
+    * G18 marks the chain at word0 bit60. The level and levels-minus-one
+    * nibbles are word2[47:44] and [51:48]. Preserve the base address and
+    * dimensions so the hardware performs native mip-tail addressing. */
+   if (level || levels != 1) {
+      store_le64(&out->bytes[0], load_le64(&out->bytes[0]) | (UINT64_C(1) << 60));
+      store_le64(&out->bytes[8], load_le64(&out->bytes[8]) | (UINT64_C(1) << 63));
+      store_le64(&out->bytes[16],
+                 ((uint64_t)level | ((uint64_t)(levels - 1) << 4)) << 44);
+   }
    return true;
 }
 

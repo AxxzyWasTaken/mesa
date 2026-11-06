@@ -44,6 +44,17 @@ int main(void)
    CHECK(!agx3_build_m5_container_lead(bytes, sizeof(bytes), 0));
    CHECK(!agx3_build_m5_container_lead(bytes, sizeof(bytes), UINT_MAX));
    CHECK(!memcmp(before, bytes, sizeof(bytes)));
+   /* Four clusters: 0xc40 bytes, one helper table per cluster for each of
+    * the two stage groups, all identical. */
+   uint8_t four[0xc41];
+   memset(four, 0xa5, sizeof(four));
+   CHECK(!agx3_build_m5_container_lead(four, 0xc3f, 4));
+   CHECK(agx3_build_m5_container_lead(four, sizeof(four), 4));
+   CHECK(!memcmp(four, (uint8_t[]){0x40,0x0c,0,0}, 4));
+   for (unsigned table = 5; table < 12; ++table)
+      CHECK(!memcmp(four + 0x400, four + table * 0x100, 0x100));
+   CHECK(!memcmp(four + 0x400, bytes + 0x100, 0x100));
+   CHECK(four[0xc40] == 0xa5);
    struct agx_m5_va_layout layout;
    CHECK(agx_m5_va_layout(UINT64_C(0x100000000), UINT64_C(0x20000000000),
                           0, AGX_M5_SHADER_BASE, &layout));

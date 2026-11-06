@@ -255,6 +255,9 @@ agx3_g17g_graphics_program_generate(
    enum agx_chip chip, const struct agx3_g17p_graphics_program_desc *desc,
    struct agx3_g17p_graphics_program *program)
 {
+   /* G18G keeps its own builder (agx3_graphics_program.c). */
+   if (chip == AGX_CHIP_G18G)
+      return agx3_g18g_graphics_program_generate(desc, program);
 
    const enum agx_ioto_g17g_program_stage stage =
       !desc                      ? AGX_IOTO_G17G_PROGRAM_VERTEX
@@ -282,6 +285,10 @@ agx3_g17g_compute_program_generate(
    enum agx_chip chip, const struct agx3_g17p_graphics_program_desc *desc,
    struct agx3_g17p_graphics_program *program)
 {
+   /* G18G keeps its own builder; this entry point has no TPS frame. */
+   if (chip == AGX_CHIP_G18G)
+      return desc && !desc->scratch_size &&
+             agx3_g18g_compute_program_generate(desc, program);
    return desc && !desc->fragment && g17g_graphics_program_generate(
       chip, desc, AGX_IOTO_G17G_PROGRAM_COMPUTE, program, NULL);
 }
@@ -291,6 +298,9 @@ agx3_g17g_tile_program_generate(
    enum agx_chip chip, const struct agx3_g17p_graphics_program_desc *desc,
    bool store, struct agx3_g17p_graphics_program *program)
 {
+   /* G18G keeps its own builder (agx3_graphics_program.c). */
+   if (chip == AGX_CHIP_G18G)
+      return agx3_g18g_tile_program_generate(desc, store, program);
    return desc && desc->fragment && g17g_graphics_program_generate(
       chip, desc, store ? AGX_IOTO_G17G_PROGRAM_EOT
                        : AGX_IOTO_G17G_PROGRAM_BACKGROUND, program, NULL);

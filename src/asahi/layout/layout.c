@@ -179,8 +179,11 @@ ail_initialize_gpu_tiled(struct ail_layout *layout)
          layout->depth_px > 1 && offset_B >= AIL_PAGESIZE;
       /* ZLS layer strides use page units even when color/texture arrays can
        * use compact strides. A sub-page depth/stencil layer cannot be
-       * represented by the render submission's ZLS descriptor. */
-      if (layout->depth_px > 1 && layout->renderable &&
+       * represented by the render submission's ZLS descriptor.
+       *
+       * G18G keeps compact depth/stencil layers: its ZLS array stride is
+       * encoded in 128-byte cachelines below a page (agx_zls_layer_stride). */
+      if (!layout->g18g && layout->depth_px > 1 && layout->renderable &&
           util_format_is_depth_or_stencil(layout->format)) {
          layout->page_aligned_layers = true;
          layout->layer_stride_B = ALIGN_POT(offset_B, AIL_PAGESIZE);
@@ -320,10 +323,7 @@ ail_initialize_compression(struct ail_layout *layout)
 
    layout->metadata_offset_B = layout->size_B;
 
-   const struct ail_tile metadata_tile =
-      layout->policy == AIL_LAYOUT_POLICY_M5 && !layout->mipmapped_z
-         ? ail_m5_compression_tile_size(util_format_get_blocksize(layout->format))
-         : (struct ail_tile){16, 16};
+   const struct ail_tile metadata_tile = ail_metadata_tile(layout);
 
    width_sa = ALIGN_POT(width_sa, metadata_tile.width_el);
    height_sa = ALIGN_POT(height_sa, metadata_tile.height_el);
