@@ -202,6 +202,11 @@ agx_print_instr(const agx_instr *I, FILE *fp)
       }
    }
 
+   /* The shift is its own field, not I->imm, which the generic immediate above
+    * prints. */
+   if ((info.immediates & AGX_IMMEDIATE_SHIFT) && I->shift)
+      fprintf(fp, ", shift=%u", I->shift);
+
    if (info.immediates & AGX_IMMEDIATE_DIM) {
       if (print_comma)
          fprintf(fp, ", ");
