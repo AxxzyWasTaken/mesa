@@ -33,8 +33,9 @@
  *    sample, so the eight bytes-at-most targets, allocated first
  *    (hk_resident_attachments()), always stay in it. M4 Pro keeps a 2x
  *    reload's whole sample (agx_chip_uncovered_tile_ms_reload_defect()).
- *    Multiview's eight-byte budget can still spill one, which fails closed
- *    at render time. Input attachments stay plain.
+ *    A multiview pass has an eight-byte budget, so on a device with the
+ *    multiview feature 2x colour stays plain (hk_image.c). Input
+ *    attachments stay plain.
  *  - Not R11G11B10F on M4 Pro: attachments store through the format's own
  *    class (hk_eot_pbe_format()), and a compressed tile of that class reads
  *    a NaN field back as zero, however it was written. Rendering NaN into an

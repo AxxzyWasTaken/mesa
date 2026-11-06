@@ -3700,9 +3700,9 @@ hk_tilebuffer_layout(const struct hk_device *dev, const VkFormat *vk_formats,
  * 64 bytes a sample (32 KiB over 16x16 pixels), so allocated first they fit
  * too.
  *
- * shortcut: a multiview pass has an eight-byte budget, so over that it spills
- * one and fails closed at render time. Refuse 2x colour compression on a
- * device with the multiview feature if an application needs that shape. */
+ * A multiview pass has an eight-byte budget, so over that it would spill one:
+ * 2x colour is not compressed on a device with the multiview feature
+ * (hk_g17p_multiview_spill_risk()). */
 static uint8_t
 hk_resident_attachments(const struct hk_device *dev,
                         const struct hk_rendering_state *render)
@@ -5206,11 +5206,10 @@ hk_begin_rendering(VkCommandBuffer commandBuffer,
                perf_debug(cmd, "Decompressing in-place");
 
                /* libagx_decompress has no G17P binary. G17P compresses 1-8
-                * byte colour targets, single-sample or 2x on M4 Pro, which
-                * hk_resident_attachments() keeps in the tilebuffer. Only a
-                * multiview pass, whose budget is eight bytes a sample, can
-                * still spill one; fail closed with a diagnostic rather than
-                * a NULL program. */
+                * byte colour targets, single-sample or 2x on M4 Pro (not with
+                * multiview), which hk_resident_attachments() keeps in the
+                * tilebuffer, so this is unreachable; fail closed with a
+                * diagnostic rather than a NULL program. */
                if (dev->dev.chip == AGX_CHIP_G17P) {
                   mesa_loge_once("G17P: spilled render pass with a compressed "
                                  "attachment (%s) is unsupported",
