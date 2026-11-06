@@ -2996,7 +2996,14 @@ agx_emit_intrinsic(agx_builder *b, nir_intrinsic_instr *instr)
           * coverage operation. */
          const unsigned samples = MAX2(b->shader->key->fs.nr_samples, 1);
          const unsigned all = BITFIELD_MASK(samples);
-         if (samples > 1 && no_tests && nir_src_is_const(instr->src[0]) &&
+         /* AGX3_ZS_KILL_ALL_SAMPLES (0xffffff00) is Apple's 1x kill word.
+          * G17P uses it for the all-kill update, but staged at an AGX3C
+          * multisample rate it does not clear SR39: the epilog's per-sample
+          * stores still see every sample covered and a zero API sample mask
+          * writes the full colour. Let AGX3C publish the killed byte for
+          * every sample through the general path instead. */
+         if (b->shader->key->dev.encoding != AGX_ISA_ENCODING_AGX3C &&
+             samples > 1 && no_tests && nir_src_is_const(instr->src[0]) &&
              nir_src_is_const(instr->src[1]) &&
              (nir_src_as_uint(instr->src[0]) & all) == all &&
              nir_src_as_uint(instr->src[1]) == 0) {
