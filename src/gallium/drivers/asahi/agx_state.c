@@ -3127,7 +3127,12 @@ agx_compile_variant(struct agx_device *dev, struct pipe_context *pctx,
          NIR_PASS(_, nir, agx_nir_lower_to_per_sample);
       }
 
-      if (native_msaa_fbfetch) {
+      /* native_msaa_fbfetch is G17P-only, but G17G's own per-sample unroll
+       * folds the active-sample mask to a one-hot immediate as well. The
+       * packer takes only the whole-pixel 0xff immediate or a live mask
+       * register, so give the unrolled copies the register form too. */
+      if (native_msaa_fbfetch ||
+          (g17g_samples_unrolled && key->nr_samples > 1)) {
          NIR_PASS(_, nir, nir_opt_constant_folding);
          NIR_PASS(_, nir, agx_nir_lower_g17p_tile_samples, key->nr_samples);
       }
