@@ -888,7 +888,11 @@ hk_CreateDevice(VkPhysicalDevice physicalDevice,
 
    dev->perftest = debug_get_flags_option("HK_PERFTEST", hk_perf_options, 0);
 
-   if (instance->drirc.misc.disable_border_emulation) {
+   /* Native graphics compiles the emulation in only once a custom border
+    * sampler exists, and most samples then pay one branch, so D3D content keeps
+    * its correct borders there. */
+   if (instance->drirc.misc.disable_border_emulation &&
+       !agx_native_graphics(&pdev->dev)) {
       dev->perftest |= HK_PERF_NOBORDER;
    }
 
@@ -945,6 +949,23 @@ hk_CreateDevice(VkPhysicalDevice physicalDevice,
       if (agx_bo_sync_for_device(dev->physical_sparse_map, 0, bytes)) {
          result = vk_error(dev, VK_ERROR_DEVICE_LOST);
          HK_INIT_FAIL(fail_dev, "sparse-map-sync", 0);
+      }
+   }
+
+   /* Capture-replay buffers reserve their VA and bind the fill page until
+    * memory is bound, like sparse buffers, so they need it too. */
+   if (dev->vk.enabled_features.sparseBinding ||
+       dev->vk.enabled_features.bufferDeviceAddressCaptureReplay) {
+      dev->sparse_fill = agx_bo_create(&dev->dev, AIL_PAGESIZE, 0, 0,
+                                       "Sparse fill page");
+      if (!dev->sparse_fill || !agx_bo_map(dev->sparse_fill)) {
+         result = vk_error(dev, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+         HK_INIT_FAIL(fail_dev, "sparse-fill", 0);
+      }
+      memset(agx_bo_map(dev->sparse_fill), 0, AIL_PAGESIZE);
+      if (agx_bo_sync_for_device(dev->sparse_fill, 0, AIL_PAGESIZE)) {
+         result = vk_error(dev, VK_ERROR_DEVICE_LOST);
+         HK_INIT_FAIL(fail_dev, "sparse-fill-sync", 0);
       }
    }
 
@@ -1114,6 +1135,7 @@ fail_samplers:
 fail_dev:
    hk_finish_vm_status_mirror(dev);
    agx_bo_unreference(&dev->dev, dev->physical_sparse_map);
+   agx_bo_unreference(&dev->dev, dev->sparse_fill);
    agx_bo_unreference(&dev->dev, dev->code_heap.chunk);
    agx_close_device(&dev->dev);
    /* agx_close_device owns the DRM fd after agx_open_device succeeds. */
@@ -1200,6 +1222,7 @@ hk_DestroyDevice(VkDevice _device, const VkAllocationCallbacks *pAllocator)
    agx_bg_eot_cleanup(&dev->bg_eot);
    hk_finish_vm_status_mirror(dev);
    agx_bo_unreference(&dev->dev, dev->physical_sparse_map);
+   agx_bo_unreference(&dev->dev, dev->sparse_fill);
    agx_bo_unreference(&dev->dev, dev->code_heap.chunk);
    simple_mtx_destroy(&dev->code_heap.lock);
    agx_close_device(&dev->dev);

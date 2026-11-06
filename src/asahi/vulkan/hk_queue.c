@@ -587,6 +587,7 @@ queue_submit_looped(struct hk_device *dev, struct hk_queue *queue,
       }
 
       /* We need to fix up the barriers since barriers are ioctl-relative */
+      uint16_t slice_before[2] = {0, 0};
       for (unsigned scan = base_offs; scan < offs;) {
          struct drm_asahi_cmd_header *cmd = (void *)(cmdbuf + scan);
          scan += sizeof(*cmd) + cmd->size;
@@ -594,6 +595,16 @@ queue_submit_looped(struct hk_device *dev, struct hk_queue *queue,
          if (cmd->cmd_type != DRM_ASAHI_CMD_RENDER &&
              cmd->cmd_type != DRM_ASAHI_CMD_COMPUTE)
             continue;
+
+         /* A serialized command waits for every earlier one: the commands
+          * before it in this ioctl, or with none, all earlier ioctls (0).
+          * Its whole-submit index may not fit in 16 bits. */
+         if (queue->sync.serialize && !queue->sync.exact_prior) {
+            cmd->vdm_barrier = slice_before[0];
+            cmd->cdm_barrier = slice_before[1];
+            slice_before[cmd->cmd_type == DRM_ASAHI_CMD_COMPUTE]++;
+            continue;
+         }
 
          if (!hk_drm_rebase_prior(cmd, cmd + 1, submitted_vdm,
                                   submitted_cdm, prior_base,
@@ -721,7 +732,7 @@ hk_flush_bind(struct hk_bind_builder *b)
       };
    } else if (!b->mem) {
       op = (struct drm_asahi_gem_bind_op){
-         .handle = b->dev->dev.scratch_bo->uapi_handle,
+         .handle = b->dev->sparse_fill->uapi_handle,
          .flags = DRM_ASAHI_BIND_READ | DRM_ASAHI_BIND_WRITE |
                   agx_fill_bind_flags(&b->dev->dev),
          .addr = b->va->addr + b->resourceOffset,
@@ -773,7 +784,7 @@ hk_sparse_buffer_map_commit(struct hk_bind_builder *b)
       const uint64_t first = (op->addr - b->va->addr) / AIL_PAGESIZE;
       const uint64_t pages = DIV_ROUND_UP(op->range, AIL_PAGESIZE);
       const bool resident =
-         op->handle != b->dev->dev.scratch_bo->uapi_handle &&
+         op->handle != b->dev->sparse_fill->uapi_handle &&
          !(op->flags & DRM_ASAHI_BIND_UNBIND);
 
       VkResult result = hk_update_physical_sparse_map(
@@ -825,7 +836,7 @@ hk_sparse_image_map_commit(struct hk_bind_builder *b)
       const uint64_t resource_offset = op->addr - b->va->addr;
       const uint64_t size_page = ail_bytes_to_pages(op->range);
       const bool enabled =
-         op->handle != b->dev->dev.scratch_bo->uapi_handle;
+         op->handle != b->dev->sparse_fill->uapi_handle;
 
       for (uint64_t offs_page = 0; offs_page < size_page; ++offs_page) {
          const uint64_t target_page =

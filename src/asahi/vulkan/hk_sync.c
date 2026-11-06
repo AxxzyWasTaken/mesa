@@ -1676,10 +1676,17 @@ recent_add(struct hk_sync_queue *q, const struct hk_sync_footprint *fp,
    q->recent_max = MAX2(q->recent_max, point);
 }
 
-/* Raise a resolved barrier field to at least v (-1 none, 0 earlier ioctls). */
+/* Raise a resolved barrier field to at least v (-1 none, 0 earlier ioctls).
+ * With exact priors, a position past the 16-bit field raises the absolute
+ * prior instead (see resolve_one). */
 static void
-barrier_at_least(uint16_t *barrier, hk_sync_value v)
+barrier_at_least(const struct hk_queue *queue, unsigned sq, uint16_t *barrier,
+                 uint64_t *prior, hk_sync_value v)
 {
+   if (queue->sync.exact_prior && v >= DRM_ASAHI_BARRIER_NONE) {
+      *prior = MAX2(*prior, queue->sync.submitted[sq] + (uint64_t)v);
+      return;
+   }
    const hk_sync_value cur =
       *barrier == DRM_ASAHI_BARRIER_NONE ? HK_SYNC_NONE : *barrier;
    if (v > cur)
@@ -1706,7 +1713,10 @@ resolve_one(const struct submit_state *ss, unsigned sq,
       u_foreach_bit(k, kinds)
          v = MAX2(v, ss->carry_absolute[k][sq]);
       const uint64_t base = ss->queue->sync.submitted[sq];
-      if (v > base) {
+      /* A command too far back for the 16-bit field is in an earlier ioctl
+       * of this submission (at most max_commands_per_submit() each), already
+       * submitted when this one is: name it by its ordinal. */
+      if (v > base && v - base < DRM_ASAHI_BARRIER_NONE) {
          *barrier = (uint16_t)(v - base);
       } else {
          *barrier = DRM_ASAHI_BARRIER_NONE;
@@ -1727,16 +1737,14 @@ hk_sync_resolve_submit(struct hk_queue *queue,
                        uint64_t completed)
 {
    /* Validate all ordinal arithmetic before mutating command or queue state.
-    * Relative fields reserve UINT16_MAX for NONE. Historical ordinals use
-    * zero for absence, so wrapping either representation is invalid. */
+    * Historical ordinals use zero for absence, so wrapping them is invalid.
+    * Positions past the 16-bit relative fields become ordinals
+    * (resolve_one), so a submission may hold any number of commands. */
    if (queue->sync.exact_prior) {
       uint64_t added[HK_SYNC_NUM_SQ] = {0, first_cdm_is_flush ? 1 : 0};
       for (unsigned i = 0; i < count; ++i) {
-         list_for_each_entry(struct hk_cs, cs, &cmdbufs[i]->control_streams, node) {
-            const unsigned sq = hk_sync_sq(cs);
-            if (++added[sq] >= DRM_ASAHI_BARRIER_NONE)
-               return false;
-         }
+         list_for_each_entry(struct hk_cs, cs, &cmdbufs[i]->control_streams, node)
+            ++added[hk_sync_sq(cs)];
       }
       for (unsigned sq = 0; sq < HK_SYNC_NUM_SQ; ++sq) {
          if (queue->sync.submitted[sq] > UINT64_MAX - added[sq])
@@ -1869,7 +1877,8 @@ hk_sync_resolve_submit(struct hk_queue *queue,
             if (v[sq] == HK_SYNC_NONE && (recent & BITFIELD_BIT(sq)))
                v[sq] = 0;
             if (v[sq] != HK_SYNC_NONE)
-               barrier_at_least(&rec->first->sync.barrier[sq], v[sq]);
+               barrier_at_least(queue, sq, &rec->first->sync.barrier[sq],
+                                &rec->first->sync.prior[sq], v[sq]);
          }
       }
       util_dynarray_foreach(&cmd->sync_pass_records,

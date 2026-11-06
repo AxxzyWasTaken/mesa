@@ -3142,7 +3142,8 @@ hk_lower_nir(struct hk_device *dev, nir_shader *nir,
             set_layouts, sparse_store_guards, sparse_store_guards,
             dev->dev.sparse_ro_offset,
             hk_device_physical(dev)->scaled_sampling,
-            agx_chip_sampler_has_lod_bias(dev->dev.chip));
+            agx_chip_sampler_has_lod_bias(dev->dev.chip),
+            instance->drirc.misc.d3d_nearest_mip);
    NIR_PASS(_, nir, nir_lower_explicit_io, nir_var_mem_global,
             nir_address_format_64bit_global);
    NIR_PASS(_, nir, nir_lower_explicit_io, nir_var_mem_ssbo,

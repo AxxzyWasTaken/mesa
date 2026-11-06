@@ -80,6 +80,11 @@ hk_get_buffer_alignment(const struct hk_physical_device *pdev,
                        VK_BUFFER_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT))
       alignment = MAX2(alignment, 16384);
 
+   /* D3D12 heaps and tiles sit on 64 KiB boundaries, and vkd3d-proton backs
+    * its heaps with sparse-capable buffers. */
+   if (create_flags & VK_BUFFER_CREATE_SPARSE_BINDING_BIT)
+      alignment = MAX2(alignment, 64 * 1024);
+
    return alignment;
 }
 
@@ -133,7 +138,7 @@ hk_bind_scratch(struct hk_device *dev, struct agx_va *va, unsigned offset_B,
    /* The kernel refuses a fill it cannot back (ENOMEM; on M5 also its
     * hypervisor page-table budget): that is device memory exhaustion. */
    /* Map read-write scratch to the primary (bottom half) VA range */
-   int ret = agx_bo_bind(&dev->dev, dev->dev.scratch_bo, addr, size_B, 0,
+   int ret = agx_bo_bind(&dev->dev, dev->sparse_fill, addr, size_B, 0,
                          flags | DRM_ASAHI_BIND_WRITE);
    if (ret)
       return errno == ENOMEM ? VK_ERROR_OUT_OF_DEVICE_MEMORY : VK_ERROR_UNKNOWN;

@@ -4597,8 +4597,8 @@ clear_attachment_as_image(struct hk_cmd_buffer *cmd,
     * aspect, so take the format from the image. Colour keeps the view format,
     * in which the clear value is expressed.
     */
-   const bool zs = aspect & (VK_IMAGE_ASPECT_DEPTH_BIT |
-                             VK_IMAGE_ASPECT_STENCIL_BIT);
+   const bool zs = view->vk.image->aspects & (VK_IMAGE_ASPECT_DEPTH_BIT |
+                                              VK_IMAGE_ASPECT_STENCIL_BIT);
    const VkImageAspectFlags aspects = zs ? view->vk.image->aspects
                                          : view->vk.aspects;
    if (!(aspects & aspect))

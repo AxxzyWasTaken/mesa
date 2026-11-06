@@ -16,6 +16,7 @@
 #include "hk_cmd_buffer.h"
 #include "hk_descriptor_set.h"
 #include "hk_descriptor_set_layout.h"
+#include "hk_sampler.h"
 #include "hk_native_descriptor.h"
 #include "hk_shader.h"
 #include "hk_nir_sampler_bias.h"
@@ -48,6 +49,7 @@ struct lower_descriptors_ctx {
    bool scaled_sampling;
    /* Whether the hardware sampler word applies the API LOD bias. */
    bool sampler_has_lod_bias;
+   bool d3d_nearest_mip;
    mesa_shader_stage stage;
 };
 
@@ -978,6 +980,13 @@ lower_compute_lod_query(nir_builder *b, nir_tex_instr *tex,
    nir_def *last = nir_i2f32(b, nir_iadd_imm(b, levels, -1));
    level = nir_fclamp(b, level, nir_imm_float(b, 0.0), last);
 
+   /* The nearest-mip rounding bias picks the level but is not API bias. */
+   if (ctx->d3d_nearest_mip) {
+      lambda = nir_bcsel(b, nir_ieq_imm(b, mip_filter, AGX_MIP_FILTER_NEAREST),
+                         nir_fadd_imm(b, lambda, -HK_D3D_NEAREST_MIP_BIAS),
+                         lambda);
+   }
+
    nir_def *result = nir_vec2(b, level, lambda);
    if (tex->def.bit_size != 32)
       result = nir_f2fN(b, result, tex->def.bit_size);
@@ -1197,6 +1206,30 @@ lower_tex(nir_builder *b, nir_tex_instr *tex,
          }
          border = nir_vec(b, channels, 4);
       }
+      /* See hk_border_swizzle_word(). A combined image sampler applied the
+       * mapping when it was written. */
+      if (ctx->descriptor_generation == 9 && texture != sampler) {
+         nir_def *word = load_resource_deref_desc(
+            b, 1, 32, nir_src_as_deref(nir_src_for_ssa(texture)),
+            plane_offset_B + native.texture + 32 +
+               offsetof(struct hk_sampled_image_descriptor_sw, border), ctx);
+         nir_def *known = nir_ine_imm(b, nir_iand_imm(b, word, BITFIELD_BIT(31)), 0);
+         nir_def *one = T == nir_type_float ? nir_imm_float(b, 1.0f)
+                                            : nir_imm_int(b, 1);
+         nir_def *channels[4];
+         for (unsigned c = 0; c < 4; ++c) {
+            nir_def *code = nir_iand_imm(b, nir_ushr_imm(b, word, 3 * c), 7);
+            nir_def *value = nir_bcsel(b, nir_ieq_imm(b, code, 5), one,
+                                       nir_imm_int(b, 0));
+            for (unsigned i = 0; i < 4; ++i) {
+               value = nir_bcsel(b, nir_ieq_imm(b, code, i),
+                                 nir_channel(b, border, i), value);
+            }
+            channels[c] = nir_bcsel(b, known, value, nir_channel(b, border, c));
+         }
+         border = nir_vec(b, channels, 4);
+      }
+
       border = nir_convert_to_bit_size(b, border, T, tex->def.bit_size);
 
       nir_def_replace(&tex->def, border);
@@ -1744,12 +1777,13 @@ hk_nir_lower_descriptors(nir_shader *nir,
                          bool sparse_buffer_residency,
                          bool sparse_soft_unmapped,
                          uint64_t sparse_ro_offset, bool scaled_sampling,
-                         bool sampler_has_lod_bias)
+                         bool sampler_has_lod_bias, bool d3d_nearest_mip)
 {
    struct lower_descriptors_ctx ctx = {
       .stage = nir->info.stage,
       .scaled_sampling = scaled_sampling,
       .sampler_has_lod_bias = sampler_has_lod_bias,
+      .d3d_nearest_mip = d3d_nearest_mip,
       .sparse_buffer_residency = sparse_buffer_residency,
       .sparse_soft_unmapped = sparse_soft_unmapped,
       .sparse_ro_offset = sparse_ro_offset,

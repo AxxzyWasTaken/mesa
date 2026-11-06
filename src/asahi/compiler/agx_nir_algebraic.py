@@ -301,6 +301,7 @@ for s_ in range(1, 5):
 
     v = 1 << s
     is_mult = f'(is_unsigned_multiple_of_{v})'
+    is_mult_below_2g = f'(is_unsigned_multiple_of_{v}_below_2g)'
 
     fuse_lea += [
         # A + b * s = A + B * s with relaxed multiply
@@ -311,32 +312,27 @@ for s_ in range(1, 5):
         (('iadd', 'a@64', ('u2u64', ('amul', 'b@32', f'#c{is_mult}'))),
          ('ulea_agx', a, ('imul', b, ('ushr', c, s)), s)),
 
-        # A + (b 2^s + c d 2^s) = A + (b + cd) 2^s with relaxation.
+        # A + (b + c d) = A + ((b + c d) / 2^s) 2^s with relaxation, for b and
+        # d multiples of 2^s.
         #
-        # amul is bounded by the buffer size by definition, and both the GL & VK
-        # limit UBOs and SSBOs to INT32_MAX bytes. Therefore, amul has no signed
-        # wrap.
+        # The offset is the 32-bit sum X = (b + c d) mod 2^32, zero-extended;
+        # amul does not wrap. With unsigned shifts,
         #
-        # Further, because we are zero-extending the 32-bit result, the 32-bit
-        # sum must be nonnegative -- if it were negative, it would represent an
-        # offset above INT32_MAX which would be invalid given the amul and
-        # max buffer size. Thus with signed math
+        #   X / 2^s = ((b >> s) + c (d >> s)) mod 2^(32 - s)
         #
-        #   0 <= b 2^s + cd 2^s < INT32_MAX
-        #
-        # ..and hence
-        #
-        #   0 <= b + cd < INT32_MAX
-        #
-        # Those bounds together with distributivity mean that
-        #
-        #   (b 2^s + cd 2^s) mod 2^32 = 2^s ((b + cd) mod 2^32)
-        #
-        # ...which is exactly what we need to factor out the shift.
+        # because 2^s ((b >> s) + c (d >> s)) = b + c d exactly. When b is below
+        # 2^31 the sum wraps only for an offset past 4 GiB, outside every buffer,
+        # so the mod is free. A larger b is either an offset past 2 GiB or a
+        # negative one, b - 2^32 (buf[i - 1]); there the sum wraps, so mask it.
+        (('iadd', 'a@64', ('u2u64', ('iadd', f'#b{is_mult_below_2g}',
+                                     ('amul', 'c@32', f'#d{is_mult}')))),
+         ('ulea_agx', a, ('iadd', ('ushr', b, s),
+                                  ('amul', 'c@32', ('ushr', d, s))), s)),
         (('iadd', 'a@64', ('u2u64', ('iadd', f'#b{is_mult}',
                                      ('amul', 'c@32', f'#d{is_mult}')))),
-         ('ulea_agx', a, ('iadd', ('ishr', b, s),
-                                  ('amul', 'c@32', ('ishr', d, s))), s)),
+         ('ulea_agx', a, ('iand', ('iadd', ('ushr', b, s),
+                                           ('amul', 'c@32', ('ushr', d, s))),
+                                  (1 << (32 - s)) - 1), s)),
     ]
 
 # 8-bit rules are lowest precedence since we really like to fuse shifts

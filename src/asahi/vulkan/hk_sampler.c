@@ -199,7 +199,15 @@ pack_sampler(const struct hk_physical_device *pdev,
          info->flags & VK_SAMPLER_CREATE_NON_SEAMLESS_CUBE_MAP_BIT_EXT,
    };
 
-   return hk_pack_native_sampler(pdev->dev.chip, out, &state);
+   /* A point sampler reads one texel, so min and max reduce to that texel. */
+   struct hk_native_sampler_state point_state = state;
+   if (info->magFilter == VK_FILTER_NEAREST &&
+       info->minFilter == VK_FILTER_NEAREST &&
+       info->mipmapMode == VK_SAMPLER_MIPMAP_MODE_NEAREST &&
+       !info->anisotropyEnable && !info->compareEnable)
+      point_state.reduction_mode = HK_SAMPLER_REDUCTION_WEIGHTED_AVERAGE;
+
+   return hk_pack_native_sampler(pdev->dev.chip, out, &point_state);
 }
 
 /* hk_pack_native_sampler() only reports success, so print the full sampler
@@ -230,6 +238,14 @@ hk_CreateSampler(VkDevice device,
    struct hk_physical_device *pdev = hk_device_physical(dev);
    struct hk_sampler *sampler;
    VkResult result;
+
+   VkSamplerCreateInfo d3d_info;
+   if (hk_physical_device_instance(pdev)->drirc.misc.d3d_nearest_mip &&
+       info->mipmapMode == VK_SAMPLER_MIPMAP_MODE_NEAREST) {
+      d3d_info = *info;
+      d3d_info.mipLodBias += HK_D3D_NEAREST_MIP_BIAS;
+      info = &d3d_info;
+   }
 
    sampler = vk_sampler_create(&dev->vk, info, pAllocator, sizeof(*sampler));
    if (!sampler)
@@ -407,7 +423,12 @@ hk_CreateSampler(VkDevice device,
             info->pNext,
             SAMPLER_BORDER_COLOR_COMPONENT_MAPPING_CREATE_INFO_EXT);
 
-      if (swiz_info) {
+      /* Descriptor generation 9 applies the image view's component mapping
+       * to the border when the descriptor is written or sampled (see
+       * hk_border_swizzle_word()), and the mapping given here must match
+       * the view's, so swizzling here as well would apply it twice. */
+      if (swiz_info &&
+          agx_chip_descriptor_generation(pdev->dev.chip) != 9) {
          const bool is_int = vk_border_color_is_int(info->borderColor);
          bc = vk_swizzle_color_value(bc, swiz_info->components, is_int);
       }

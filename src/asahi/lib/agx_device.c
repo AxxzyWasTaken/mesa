@@ -1356,6 +1356,7 @@ agx_open_device(void *memctx, struct agx_device *dev)
 
       /* The contents of the scratch page are undefined, but making them nonzero
        * helps fuzz for bugs where we incorrectly read from the write section.
+       * Unbound sparse pages map hk's own zeroed fill page instead.
        */
       void *map = agx_bo_map(dev->scratch_bo);
       if (!map)
@@ -1778,6 +1779,6 @@ agx_gather_device_key(struct agx_device *dev)
       .needs_g13x_coherency = u_tristate_make(g13x_coh),
       .soft_fault = agx_has_soft_fault(dev),
       .emit_agx3d = g18g,
-      .shader_quad_control = agx_is_a18_pro(dev),
+      .shader_quad_control = dev->chip == AGX_CHIP_G17P,
    };
 }

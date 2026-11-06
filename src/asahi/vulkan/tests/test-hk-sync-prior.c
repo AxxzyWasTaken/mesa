@@ -1329,6 +1329,23 @@ main(void)
    test_rt_kernel_gate();
    test_timestamp_execution_scopes();
    test_timestamp_reused_compute();
+   {
+      /* A submission longer than the 16-bit barrier field: a wait on a
+       * command past it is named by its ordinal (that command went in an
+       * earlier ioctl). vkd3d-proton's test_resolve_image_exhaustive_descriptors
+       * records 65536 resolves in one command list. */
+      struct hk_queue *lq = new_queue(true);
+      struct hk_cmd_buffer *lc = new_cmd();
+      const unsigned n = 70000;
+      for (unsigned k = 0; k < n; ++k)
+         add(lc, true);
+      hk_sync_barrier(lc, HK_SYNC_COMPUTE, HK_SYNC_GFX);
+      struct hk_cs *g = add(lc, false);
+      T("long submission resolves", submit(lq, lc));
+      T("far wait becomes an ordinal",
+        g->sync.barrier[1] == DRM_ASAHI_BARRIER_NONE && g->sync.prior[1] == n);
+   }
+
    /* Each matching destination retains the exact old source prefix, including
     * reuse of a recording and independent physical destinations on the queue. */
    struct hk_queue *q = new_queue(true);
@@ -1487,17 +1504,14 @@ main(void)
    T("all-kind destination", submit(q, c));
    T("VDM CDM order",
      d->sync.prior[HK_SYNC_VDM] == 1 && d->sync.prior[HK_SYNC_CDM] == 1);
-   /* Real resolver preflight rejects relative representation overflow before
-    * mutation. */
+   /* A submission past the 16-bit relative fields resolves (far waits become
+    * ordinals) and the queue counts every command. */
    q = new_queue(true);
    a = new_cmd();
    for (unsigned n = 0; n < 65535; n++)
       add(a, true);
-   d = list_first_entry(&a->control_streams, struct hk_cs, node);
-   d->sync.index = 91;
-   T("relative overflow rejected", !submit(q, a));
-   T("relative overflow untouched",
-     q->sync.submitted[1] == 0 && d->sync.index == 91);
+   T("relative overflow resolves", submit(q, a));
+   T("relative overflow counted", q->sync.submitted[1] == 65535);
    /* Legacy packet prefixes retain all original bytes, extensions are omitted.
     */
    struct drm_asahi_cmd_render lr;

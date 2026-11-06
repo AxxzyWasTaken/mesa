@@ -940,7 +940,7 @@ hk_get_device_features(
        * offset for each mapping and its RO shadow; G17P's transactional
        * VM_BIND path retains each mapping independently. Residency metadata
        * is per resource VA, not per backing allocation. */
-      features->sparseResidencyAliased = agx_is_a18_pro(dev);
+      features->sparseResidencyAliased = sparse;
       features->sparseResidencyImage2D = sparse;
       /* The sparse binder and SSTT use the same slice layout for 3D images
        * as for 2D arrays. Report the nonstandard, one-slice block shape rather
@@ -968,7 +968,7 @@ hk_get_device_features(
        * quad encodings. The execution modes also select helper-capable
        * fragment entry and prevent merging triangles across derivative quads.
        */
-      features->shaderQuadControl = agx_is_a18_pro(dev);
+      features->shaderQuadControl = dev->chip == AGX_CHIP_G17P;
 
       /* Qualified on A18 Pro only. */
       if (dev->chip == AGX_CHIP_G17P) {
@@ -1106,18 +1106,23 @@ hk_get_device_properties(const struct agx_device *dev,
                                (agx_chip_native_agx3(dev->chip) ? 15 : 0),
       .maxUniformBufferRange = 65536,
 
-      /* From a hardware perspective, storage buffers are lowered to global
-       * address arithmetic so there is no hard limit. However, making efficient
-       * use of the hardware addressing modes depends on no signed wrapping in
-       * any `amul` operations, which are themselves bounded by
-       * maxStorageBufferRange. Therefore, limit storage buffers to INT32_MAX
-       * bytes instead of UINT32_MAX. This is believed to be acceptable for
-       * Direct3D.
+      /* Storage buffers are lowered to global address arithmetic with a
+       * zero-extended 32-bit offset, so the whole 32-bit range works. Direct3D
+       * views reach just under 4 GiB.
+       *
+       * M5 and later fold constant index addends into a signed byte offset
+       * (agx_nir_lower_address() with byte_offsets), which sign-extends a
+       * scaled index and relies on every valid offset staying below 2^31.
+       * Keep them at INT32_MAX; G13/G14 and G17P take the full range.
        */
-      .maxStorageBufferRange = INT32_MAX,
+      .maxStorageBufferRange =
+         agx_chip_isa_encoding(dev->chip) == AGX_ISA_ENCODING_AGX2 ||
+               agx_chip_isa_encoding(dev->chip) == AGX_ISA_ENCODING_AGX3B
+            ? UINT32_MAX
+            : INT32_MAX,
       .maxPushConstantsSize = HK_MAX_PUSH_SIZE,
       .maxMemoryAllocationCount = 4096,
-      .maxSamplerAllocationCount = 4000,
+      .maxSamplerAllocationCount = 1 << 20,
       .bufferImageGranularity = 0x400,
       .sparseAddressSpaceSize = agx_chip_g17_m5(dev->chip)
                                    ? HK_M5_SPARSE_ADDR_SPACE_SIZE
@@ -1417,7 +1422,8 @@ hk_get_device_properties(const struct agx_device *dev,
       .minSubgroupSize = 32,
       .maxSubgroupSize = 32,
       .maxComputeWorkgroupSubgroups = 1024 / 32,
-      .requiredSubgroupSizeStages = 0,
+      /* The only subgroup size is 32, so requiring it is always satisfied. */
+      .requiredSubgroupSizeStages = VK_SHADER_STAGE_COMPUTE_BIT,
       .maxInlineUniformBlockSize = HK_MAX_INLINE_UNIFORM_BLOCK_SIZE,
       .maxPerStageDescriptorInlineUniformBlocks = 32,
       .maxPerStageDescriptorUpdateAfterBindInlineUniformBlocks = 32,
@@ -1443,7 +1449,7 @@ hk_get_device_properties(const struct agx_device *dev,
       .maxPushDescriptors = HK_MAX_PUSH_DESCRIPTORS,
 
       /* VK_EXT_custom_border_color */
-      .maxCustomBorderColorSamplers = 4000,
+      .maxCustomBorderColorSamplers = 1 << 20,
 
       /* VK_EXT_extended_dynamic_state3 */
       .dynamicPrimitiveTopologyUnrestricted = true,
@@ -1571,6 +1577,14 @@ hk_get_device_properties(const struct agx_device *dev,
    if (agx_chip_g17_m5(dev->chip))
       properties->sparseResidencyNonResidentStrict = agx_has_soft_fault(dev);
 
+   /* G17P maps unbound pages to a zeroed fill page, so they read zero, but
+    * the page is writable: a store or copy into an unbound page is read back
+    * afterwards, which strict residency forbids. Report it only where the
+    * driconf asks (vkd3d-proton, for tiled resources tier 2). */
+   if (dev->chip == AGX_CHIP_G17P)
+      properties->sparseResidencyNonResidentStrict =
+         instance->drirc.misc.sparse_strict_residency;
+
    if (agx_chip_native_agx3(dev->chip)) {
       /* Measured per operation under the G17P drm-shim:
        *
@@ -1587,8 +1601,8 @@ hk_get_device_properties(const struct agx_device *dev,
        * G17P uses the same lane instructions in native vertex/fragment
        * programs and the compute programs implementing tessellation and
        * geometry. Other AGX3 targets retain their stage restriction. */
-      properties->subgroupQuadOperationsInAllStages = agx_is_a18_pro(dev);
-      properties->sparseResidencyNonResidentStrict = false;
+      properties->subgroupQuadOperationsInAllStages =
+         dev->chip == AGX_CHIP_G17P;
    }
 
    snprintf(properties->deviceName, sizeof(properties->deviceName), "%s",
@@ -2042,7 +2056,7 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
 
    if (agx_native_graphics(&pdev->dev)) {
       supported_extensions.KHR_shader_quad_control =
-         agx_is_a18_pro(&pdev->dev);
+         pdev->dev.chip == AGX_CHIP_G17P;
    }
 
    /* VK_KHR_shader_fma makes shaderFmaFloat32 mandatory. */
