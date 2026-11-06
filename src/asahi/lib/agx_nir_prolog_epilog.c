@@ -144,6 +144,22 @@ lower_native_emrt_handle(nir_builder *b, nir_intrinsic_instr *intr, void *data)
    return true;
 }
 
+/* G17G spills: the handles of the descriptor crawls left after
+ * agx_nir_rebind_spilled_rts(), at the stride of the 32-byte Gen10
+ * descriptors rather than the AGX2 AGX_TEXTURE_LENGTH. */
+static bool
+lower_gen10_texture_handle(nir_builder *b, nir_intrinsic_instr *intr,
+                           UNUSED void *data)
+{
+   if (intr->intrinsic != nir_intrinsic_load_texture_handle_agx)
+      return false;
+
+   b->cursor = nir_before_instr(&intr->instr);
+   nir_def *offset = nir_imul_imm(b, nir_u2u32(b, intr->src[0].ssa), 32);
+   nir_def_replace(&intr->def, nir_bindless_image_agx(b, offset, .desc_set = 0));
+   return true;
+}
+
 static bool
 lower_native_emrt_uniforms(nir_builder *b, nir_intrinsic_instr *intr, void *data)
 {
@@ -673,15 +689,20 @@ agx_nir_fs_epilog_native(nir_builder *b, const void *key_)
       key->g18_native_mixed
          ? agx_build_tilebuffer_layout_g18_mixed(key->rt_formats,
                                                  ARRAY_SIZE(key->rt_formats))
-      : key->native_imageblock
-         ? agx_build_tilebuffer_layout_resident(
+      : key->rt0_resident
+         ? agx_build_tilebuffer_layout_rt0_resident(
               key->rt_formats, ARRAY_SIZE(key->rt_formats), key->nr_samples,
-              true, key->max_sample_size_B, key->max_bytes_per_tile,
-              key->max_samples_per_tile, key->resident_mask)
-         : agx_build_tilebuffer_layout_with_limits(
-              key->rt_formats, ARRAY_SIZE(key->rt_formats), key->nr_samples,
-              true, key->max_sample_size_B, key->max_bytes_per_tile,
-              key->max_samples_per_tile);
+              key->max_bytes_per_tile, key->max_samples_per_tile)
+         : key->native_imageblock
+              ? agx_build_tilebuffer_layout_resident(
+                   key->rt_formats, ARRAY_SIZE(key->rt_formats),
+                   key->nr_samples, true, key->max_sample_size_B,
+                   key->max_bytes_per_tile, key->max_samples_per_tile,
+                   key->resident_mask)
+              : agx_build_tilebuffer_layout_with_limits(
+                   key->rt_formats, ARRAY_SIZE(key->rt_formats),
+                   key->nr_samples, true, key->max_sample_size_B,
+                   key->max_bytes_per_tile, key->max_samples_per_tile);
 
    unsigned rt_order[AGX_MAX_RENDER_TARGETS];
    for (unsigned rt = 0; rt < ARRAY_SIZE(rt_order); ++rt)
@@ -1043,10 +1064,18 @@ agx_nir_fs_epilog_native(nir_builder *b, const void *key_)
       NIR_PASS(_, b->shader, nir_shader_intrinsics_pass, lower_native_emrt_handle,
                nir_metadata_control_flow, (void *)key);
    }
-   NIR_PASS(_, b->shader, agx_nir_lower_texture_for_generation,
-            spill_generation);
+   /* G17G's spilled attachments use its Gen10 descriptors. */
+   const unsigned generation =
+      native_spills ? spill_generation : (key->rt0_resident && agx_tilebuffer_spills(&tib))
+                             ? 10 : 0;
+   NIR_PASS(_, b->shader, agx_nir_lower_texture_for_generation, generation);
    NIR_PASS(_, b->shader, agx_nir_lower_multisampled_image_store_for_generation,
-            spill_generation);
+            generation);
+   if (key->rt0_resident && generation == 10) {
+      NIR_PASS(_, b->shader, agx_nir_rebind_spilled_rts);
+      NIR_PASS(_, b->shader, nir_shader_intrinsics_pass,
+               lower_gen10_texture_handle, nir_metadata_control_flow, NULL);
+   }
 
    /* If the API shader runs once per sample, then the epilog runs once per
     * sample as well, so we need to lower our code to run for a single sample.
@@ -1148,6 +1177,11 @@ agx_nir_fs_epilog_native(nir_builder *b, const void *key_)
    b->shader->info.io_lowered = true;
    b->shader->info.fs.uses_fbfetch_output |= force_translucent;
    b->shader->info.fs.uses_sample_shading = key->link.sample_shading;
+   /* The epilog runs inside the interlock its main opened by waiting for
+    * the read class alone (a framebuffer fetch); agx_compile.c seeds the
+    * epilog's waited classes from this. */
+   b->shader->info.fs.pixel_interlock_ordered =
+      (key->main_pixel_held & 0xc) == 0x8;
 }
 
 void

@@ -239,6 +239,8 @@ agx_batch_init(struct agx_context *ctx,
    util_dynarray_init(&batch->depth_bias, ctx);
    util_dynarray_init(&batch->timestamps, ctx);
    util_dynarray_init(&batch->g17p_vdm_aliases, ctx);
+   util_dynarray_init(&batch->faulttrace_cmdbuf, ctx);
+   batch->faulttrace_seqid = 0;
 
    batch->clear = 0;
    batch->draw = 0;
@@ -255,6 +257,7 @@ agx_batch_init(struct agx_context *ctx,
    batch->native_rejected = false;
    batch->draws_refused = 0;
    batch->draws = 0;
+   batch->g17g_prims = 0;
    batch->incoherent_writes = false;
    agx_bo_unreference(dev, batch->sampler_heap.bo);
    batch->sampler_heap.bo = NULL;
@@ -401,7 +404,7 @@ agx_batch_cleanup(struct agx_context *ctx, struct agx_batch *batch, bool reset)
          struct agx_batch *writer = agx_writer_get(ctx, handle);
 
          if (writer == batch) {
-            g18_batch_debug(batch, "Releases BO @ 0x%" PRIx64, bo->va->addr);
+            batch_debug(batch, "Releases BO @ 0x%" PRIx64, bo->va->addr);
             agx_writer_remove(ctx, handle);
          }
 
@@ -424,6 +427,7 @@ agx_batch_cleanup(struct agx_context *ctx, struct agx_batch *batch, bool reset)
    util_dynarray_fini(&batch->depth_bias);
    util_dynarray_fini(&batch->timestamps);
    util_dynarray_fini(&batch->g17p_vdm_aliases);
+   util_dynarray_fini(&batch->faulttrace_cmdbuf);
 
    if (!(dev->debug & (AGX_DBG_TRACE | AGX_DBG_SYNC))) {
       agx_batch_print_stats(dev, batch);
@@ -691,11 +695,13 @@ agx_batch_reads(struct agx_batch *batch, struct agx_resource *rsrc)
    if (!rsrc->base.screen)
       return;
 
-   g18_batch_debug(batch, "Reads BO @ 0x%" PRIx64 " (%s)",
-                   rsrc->bo->va->addr,
-                   rsrc->bo->label ? rsrc->bo->label : "unlabelled");
+   batch_debug(batch, "Reads BO @ 0x%" PRIx64 " (%s)", rsrc->bo->va->addr,
+               rsrc->bo->label ? rsrc->bo->label : "unlabelled");
 
-   /* Hazard: read-after-write */
+   /* Hazard: read-after-write. A separate stencil plane is its own resource
+    * with its own writer (a stencil-only blit renders to it alone), and the
+    * BO was just added to this batch, so its writer is a hazard too.
+    */
    agx_flush_writer_except(batch->ctx, rsrc, batch, "Read from another batch",
                             false);
 
@@ -740,9 +746,9 @@ agx_batch_writes_internal(struct agx_batch *batch, struct agx_resource *rsrc,
    agx_writer_remove(ctx, rsrc->bo->handle);
    agx_writer_add(ctx, agx_batch_idx(batch), rsrc->bo->handle);
    assert(agx_batch_is_active(batch));
-   g18_batch_debug(batch, "Becomes writer of BO @ 0x%" PRIx64 " (%s)",
-                   rsrc->bo->va->addr,
-                   rsrc->bo->label ? rsrc->bo->label : "unlabelled");
+   batch_debug(batch, "Becomes writer of BO @ 0x%" PRIx64 " (%s)",
+               rsrc->bo->va->addr,
+               rsrc->bo->label ? rsrc->bo->label : "unlabelled");
 }
 
 void
@@ -898,12 +904,20 @@ agx_retire_failed_submit(struct agx_context *ctx, struct agx_batch *batch,
    free(extres);
    util_dynarray_fini(cmdbuf);
 
+   /* The kernel refuses a submission outside its admitted profile with
+    * ENOTSUPP (524, a value libc does not name). Nothing was queued and no
+    * fence will signal, so there is no completion to await and no fault to
+    * record: drop the batch and keep the context usable.
+    */
+   const bool refused = (error == 524);
+
    /* An ioctl error does not cancel accepted commands. Wait for both the
     * failed ioctl's aggregate (if published) and any earlier split compute.
     * Keep both handles alive until completion is established.
     */
-   bool complete = agx_wait_failed_submit(dev, error_syncobj, false);
-   complete &= agx_wait_failed_submit(dev, accepted_syncobj, true);
+   bool complete = refused || agx_wait_failed_submit(dev, error_syncobj, false);
+   if (!refused)
+      complete &= agx_wait_failed_submit(dev, accepted_syncobj, true);
 
    /* Never put resources in the BO cache on an inconclusive wait. Keep the
     * entire batch, its fences, context and screen until process exit. This
@@ -928,10 +942,12 @@ agx_retire_failed_submit(struct agx_context *ctx, struct agx_batch *batch,
       agx_msg("submit completion unknown; quarantining context resources\n");
    }
 
-   const bool first_fault = !ctx->any_faults;
-   ctx->any_faults = true;
-   if (first_fault && ctx->reset.reset)
-      ctx->reset.reset(ctx->reset.data, PIPE_GUILTY_CONTEXT_RESET);
+   if (!refused) {
+      const bool first_fault = !ctx->any_faults;
+      ctx->any_faults = true;
+      if (first_fault && ctx->reset.reset)
+         ctx->reset.reset(ctx->reset.data, PIPE_GUILTY_CONTEXT_RESET);
+   }
 
    errno = error;
 }
@@ -1291,6 +1307,57 @@ agx_batch_submit(struct agx_context *ctx, struct agx_batch *batch,
       return;
    }
 
+   /* Every draw in this batch was refused by the G17G profile, so its VDM
+    * stream received none of them and the render has nothing to rasterize.
+    * Submitting it anyway fails UAPI translation with a silent EINVAL, which
+    * costs the compute prepass its result as well -- and a transform-feedback
+    * capture is produced entirely by that prepass. Drop the render and keep
+    * the dispatches. A batch that simply has no draws (an ordinary clear)
+    * has no refusals and still submits its render. */
+   if (render && batch->draws_refused && !batch->draws &&
+       agx_chip_isa_encoding(dev->chip) == AGX_ISA_ENCODING_AGX3C) {
+      mesa_loge("asahi: dropping a render whose %u draws were all outside the "
+                "native profile on %s; the batch's compute work still runs",
+                batch->draws_refused, agx_chip_name(dev->chip));
+      render = NULL;
+      /* With no compute either, nothing is left to submit: an empty
+       * command buffer is an EINVAL from the M5 kernel. */
+      if (!compute)
+         batch->native_rejected = true;
+   }
+
+   /* Nothing from a batch that requested state without a proven native
+    * encoding may reach the hardware. Retire it here without a context
+    * reset: the draws simply never executed, which the application (and a
+    * conformance run) observes as wrong output for exactly those commands.
+    */
+   /* A compute batch on AGX3c is submitted one dispatch at a time (see the
+    * prepass loop below). A batch that carries compute work with no recorded
+    * dispatches has nothing the profile covers, so drop it rather than send a
+    * stream firmware will link and never retire -- which times out after
+    * forty seconds and quarantines the VM, taking the session with it. */
+   if (compute && !batch->native_rejected &&
+       dev->chip == AGX_CHIP_G17G &&
+       !cdm_dispatch_count) {
+      mesa_loge("asahi: a compute batch with %u single-dispatch commands and "
+                "%s render has no proven native encoding on %s",
+                cdm_dispatch_count, render ? "a" : "no",
+                agx_chip_name(dev->chip));
+      batch->native_rejected = true;
+   }
+
+   if (batch->native_rejected) {
+      batch_debug(batch, "DROP");
+      mesa_loge("asahi: dropping work: batch %u used state with no proven "
+                "native encoding on %s; nothing was submitted",
+                agx_batch_idx(batch), agx_chip_name(dev->chip));
+      if (ctx->batch == batch)
+         ctx->batch = NULL;
+      agx_batch_mark_submitted(batch);
+      agx_batch_cleanup(ctx, batch, false);
+      return;
+   }
+
    /* At most every BO contributes an input wait, followed by the explicit and
     * inter-context input fences. The submission then appends two output
     * fences and a private publication fence, all needing full records.
@@ -1599,7 +1666,8 @@ agx_batch_submit(struct agx_context *ctx, struct agx_batch *batch,
     * One submission per dispatch. When a render follows, it is the tail
     * submission and owns the output syncs; with no render the final dispatch
     * takes that role, so the loop below stops one short. */
-   const bool m5_split_prepass = dev->chip == AGX_CHIP_G18G && compute;
+   const bool m5_split_prepass =
+      (dev->chip == AGX_CHIP_G17G || dev->chip == AGX_CHIP_G18G) && compute;
    const unsigned m5_split_count =
       !m5_split_prepass  ? 0
       : render           ? cdm_dispatch_count
@@ -1849,14 +1917,24 @@ agx_batch_submit(struct agx_context *ctx, struct agx_batch *batch,
       .cmdbuf_size = cmdbuf.size,
    };
 
+   if (getenv("NEO_AGX_DRAW_DIAGNOSTICS"))
+      fprintf(stderr, "NEO_SUBMIT queue=%u batch=%u seq=%llu draws=%u render=%u compute=%u bytes=%zu\n",
+              ctx->queue_id, agx_batch_idx(batch), (unsigned long long)seqid,
+              batch->draws, !!render, !!compute, (size_t)cmdbuf.size);
+
    if (unlikely(dev->debug & AGX_DBG_PERF))
       ctx->submit_perf.submits++;
+   if (dev->debug & AGX_DBG_FAULTTRACE) {
+      util_dynarray_append_array(&batch->faulttrace_cmdbuf, uint8_t,
+                                 cmdbuf.data, cmdbuf.size);
+      batch->faulttrace_seqid = seqid;
+   }
    int ret = dev->ops.submit(dev, &submit, &virt);
    if (unlikely((dev->debug & AGX_DBG_PERF) && ret))
       ctx->submit_perf.failures++;
    const int submit_errno =
       ret < -1 ? -ret : (ret ? (errno ? errno : EIO) : 0);
-   if (dev->chip == AGX_CHIP_G18G && getenv("NEO_AGX_DRAW_DIAGNOSTICS"))
+   if (getenv("NEO_AGX_DRAW_DIAGNOSTICS"))
       fprintf(stderr, "NEO_SUBMIT_RESULT queue=%u batch=%u seq=%llu ret=%d errno=%d\n",
               ctx->queue_id, agx_batch_idx(batch), (unsigned long long)seqid,
               ret, submit_errno);
@@ -1883,7 +1961,24 @@ agx_batch_submit(struct agx_context *ctx, struct agx_batch *batch,
             c->layers, c->samples);
       }
 
-      if (dev->debug & AGX_DBG_ASYNCTRACE) {
+      /* Unlike `trace`, faulttrace does not wait after or decode successful
+       * submissions, so it preserves the compositor's queue chronology. BO
+       * tracking was armed at device open and each submitted batch retained
+       * its small DRM command wrapper. A wait-queue-timeline failure is
+       * observed by the current (rejected) submit but was caused by an earlier
+       * in-flight submit, so decode those candidates before the observer. */
+      if (dev->debug & AGX_DBG_FAULTTRACE) {
+         unsigned i;
+         foreach_submitted(ctx, i) {
+            struct agx_batch *candidate = &ctx->batches.slots[i];
+            agx_cmdtrace_dump_cmdbuf(
+               dev, candidate, &candidate->faulttrace_cmdbuf,
+               "in-flight-prior", candidate->faulttrace_seqid, submit_errno);
+         }
+
+         agx_cmdtrace_dump_cmdbuf(dev, batch, &batch->faulttrace_cmdbuf,
+                                  "rejected-current", seqid, submit_errno);
+      } else if (dev->debug & AGX_DBG_ASYNCTRACE) {
          agx_cmdtrace_dump_cmdbuf(dev, batch, &cmdbuf, "rejected-current",
                                   seqid, submit_errno);
       }
@@ -1960,7 +2055,7 @@ agx_batch_submit(struct agx_context *ctx, struct agx_batch *batch,
          continue;
 
       /* But any BOs written by active batches are ours */
-      if (unlikely(writer != batch) && dev->chip == AGX_CHIP_G18G) {
+      if (unlikely(writer != batch) && (dev->chip == AGX_CHIP_G18G || dev->chip == AGX_CHIP_G17G)) {
          mesa_loge("asahi: batch %u lists BO %u (%s, %zu bytes @ 0x%" PRIx64
                    ") whose active writer is batch %u",
                    agx_batch_idx(batch), bo->handle,

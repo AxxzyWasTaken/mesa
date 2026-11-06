@@ -59,6 +59,7 @@ agx_gallium_pack_native_sampler(
       return false;
 
    memset(out, 0, sizeof(*out));
+
    if (!state || !agx_chip_native_agx3(chip) ||
        agx_chip_sampler_heap_element_size(chip) != sizeof(*out))
       return false;
@@ -115,11 +116,12 @@ bool
 agx_gallium_pack_g17p_txf_sampler(
    enum agx_chip chip, struct agx_gallium_sampler_descriptor *out)
 {
-   if (chip == AGX_CHIP_G18G) {
-      if (!out)
-         return false;
+   if (!out)
+      return false;
 
-      memset(out, 0, sizeof(*out));
+   memset(out, 0, sizeof(*out));
+
+   if (chip == AGX_CHIP_G17G || chip == AGX_CHIP_G18G) {
       /* The same texel-fetch state in G17G's Gen5 record, as
        * hk_pack_native_txf_sampler() and the G17G tile reload use it: the
        * compare-mode selector is set even without a comparison. */
@@ -158,7 +160,7 @@ bool
 agx_gallium_g17p_sampler_handle(enum agx_chip chip, unsigned api_sampler,
                                 uint16_t *native_handle)
 {
-   if ((!agx_chip_native_agx3(chip) && chip != AGX_CHIP_G18G) ||
+   if ((!agx_chip_native_agx3(chip) && chip != AGX_CHIP_G18G && chip != AGX_CHIP_G17G) ||
        api_sampler >= AGX_GALLIUM_G17P_API_SAMPLERS || !native_handle)
       return false;
 
@@ -171,7 +173,7 @@ agx_gallium_g17p_custom_border_handle(enum agx_chip chip,
                                       unsigned api_sampler,
                                       uint16_t *native_handle)
 {
-   if ((!agx_chip_native_agx3(chip) && chip != AGX_CHIP_G18G) ||
+   if ((!agx_chip_native_agx3(chip) && chip != AGX_CHIP_G18G && chip != AGX_CHIP_G17G) ||
        api_sampler >= AGX_GALLIUM_G17P_API_SAMPLERS || !native_handle)
       return false;
 
@@ -437,16 +439,12 @@ agx_gallium_pack_native_pbe_impl(
     * that already runs on this hardware through Honeykrisp -- so a shape is
     * admitted here exactly when Honeykrisp admits it: 2D, and on Gen9 2D
     * arrays and 3D with mips, one- and multi-layer multisample, and the
-    * GPU-tiled compressed 2D packet. Fields with no proven Gen9/Gen10
-    * placement (sparse mode, Gen10 gamma, the software-addressing sideband
-    * Gallium uses for AGX2 image atomics, EMRT and spilled render targets)
-    * are refused rather than dropped.
-    *
-    * G18G (agx_gallium_pack_g18_native_pbe(), g18_mips) also admits the
-    * independently qualified Gen10 layered/multisample, linear and mip-chain
-    * paths. Descriptor representation does not establish storage or
-    * render-state support; callers still check those. Never discard
-    * software-addressing sidebands or unrelated extensions.
+    * GPU-tiled compressed 2D packet. Gen10 adds its layered packets (2D
+    * array and 3D, storage images included), which take the same native
+    * mip-chain fields. Fields with no proven Gen9/Gen10 placement (sparse
+    * mode, Gen10 gamma, the software-addressing sideband Gallium uses for
+    * AGX2 image atomics, EMRT and spilled render targets) are refused rather
+    * than dropped.
     */
    const bool gen10_multisample =
       g18_mips && agx3_generation == AGX_PBE_AGX3_GENERATION_10 &&
@@ -457,17 +455,24 @@ agx_gallium_pack_native_pbe_impl(
       (legacy->dimension == AGX_TEXTURE_DIMENSION_2D_ARRAY ||
        legacy->dimension == AGX_TEXTURE_DIMENSION_3D);
    const bool gen9 = agx3_generation == AGX_PBE_AGX3_GENERATION_9;
+   const bool gen10_layered =
+      agx3_generation == AGX_PBE_AGX3_GENERATION_10 &&
+      (legacy->dimension == AGX_TEXTURE_DIMENSION_2D_ARRAY ||
+       legacy->dimension == AGX_TEXTURE_DIMENSION_3D);
    const bool array =
-      gen9 && legacy->dimension == AGX_TEXTURE_DIMENSION_2D_ARRAY;
+      (gen9 && legacy->dimension == AGX_TEXTURE_DIMENSION_2D_ARRAY) ||
+      (gen10_layered &&
+       legacy->dimension == AGX_TEXTURE_DIMENSION_2D_ARRAY);
    const bool array_multisample =
       (gen9 || gen10_multisample) &&
       legacy->dimension == AGX_TEXTURE_DIMENSION_2D_ARRAY_MULTISAMPLED;
-   const bool three_d = gen9 && legacy->dimension == AGX_TEXTURE_DIMENSION_3D;
+   const bool three_d =
+      (gen9 && legacy->dimension == AGX_TEXTURE_DIMENSION_3D) ||
+      (gen10_layered && legacy->dimension == AGX_TEXTURE_DIMENSION_3D);
    const bool layered = array || array_multisample || three_d;
    const bool multisample =
-      gen10_multisample ||
-      (gen9 && (legacy->dimension == AGX_TEXTURE_DIMENSION_2D_MULTISAMPLED ||
-                array_multisample));
+      legacy->dimension == AGX_TEXTURE_DIMENSION_2D_MULTISAMPLED ||
+      array_multisample;
    const bool compressed_2d =
       legacy->compressed && gen9 &&
       legacy->dimension == AGX_TEXTURE_DIMENSION_2D &&

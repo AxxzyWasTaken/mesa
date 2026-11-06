@@ -301,6 +301,44 @@ convert_srgb(nir_builder *b, nir_def *value, unsigned comps, bool encode)
 }
 
 static bool
+rebind_spilled_rt(nir_builder *b, nir_intrinsic_instr *intr,
+                  UNUSED void *data)
+{
+   if (intr->intrinsic != nir_intrinsic_bindless_image_load &&
+       intr->intrinsic != nir_intrinsic_bindless_image_store)
+      return false;
+
+   nir_intrinsic_instr *handle = nir_src_as_intrinsic(intr->src[0]);
+   if (!handle || handle->intrinsic != nir_intrinsic_load_texture_handle_agx ||
+       !nir_src_is_const(handle->src[0]) ||
+       nir_src_as_uint(handle->src[0]) >= AGX_NUM_TEXTURE_STATE_REGS)
+      return false;
+
+   b->cursor = nir_before_instr(&intr->instr);
+   nir_rewrite_image_intrinsic(
+      intr, nir_imm_intN_t(b, nir_src_as_uint(handle->src[0]), 16),
+      nir_image_intrinsic_type_default);
+   return true;
+}
+
+/*
+ * G17G's image accesses name an immediate texture state slot; it has no
+ * grounded write through a bindless handle (agx3_pack_binary.c). The
+ * spilled render target accesses above use constant handles, which are
+ * table slots: once texture lowering has crawled their descriptors, put the
+ * loads and stores back on those slots.
+ */
+bool
+agx_nir_rebind_spilled_rts(nir_shader *shader)
+{
+   bool progress = nir_shader_intrinsics_pass(
+      shader, rebind_spilled_rt, nir_metadata_control_flow, NULL);
+   if (progress)
+      NIR_PASS(_, shader, nir_opt_dce);
+   return progress;
+}
+
+static bool
 pass(nir_builder *b, nir_intrinsic_instr *intr, void *data)
 {
    if (intr->intrinsic != nir_intrinsic_store_output &&
