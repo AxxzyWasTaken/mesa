@@ -216,6 +216,24 @@ struct PACKED agx_stage_uniforms {
     * after the existing fields so classic shader bindings do not move. Each
     * halfword has padding for Ioto's dword upload, including sampler 31. */
    uint32_t custom_border_compare_func[PIPE_MAX_SAMPLERS];
+
+   /* G18G-only fields follow, after every other chip's fields so that their
+    * uniform offsets do not move. */
+
+   /* G18G custom-border shadow comparison: PIPE_FUNC_* in bits 0..2; bit 3
+    * clamps a fixed-point depth reference. */
+   uint16_t custom_border_compare[PIPE_MAX_SAMPLERS];
+
+   /* Native texture descriptors do not carry the legacy software buffer
+    * size. Keep the bound view's texel count separate from hardware state. */
+   uint32_t texture_buffer_size[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+   uint32_t texture_buffer_rgb32[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+   uint64_t texture_buffer_address[PIPE_MAX_SHADER_SAMPLER_VIEWS];
+
+   /* G18 bound raw image addresses: base lo/hi, linear row pitch B, tiled
+    * stride el, tile width/height el, layer stride B lo/hi, sample count,
+    * actual bound-view texel size B. */
+   uint32_t image_address_metadata[PIPE_MAX_SHADER_IMAGES][10];
 };
 
 #define AGX_BORDER_COMPARE_CLAMP_REF BITFIELD_BIT(8)
@@ -273,6 +291,10 @@ struct agx_compiled_shader {
     * native texture and sampler table pointers when they access resources. */
    bool g17p_texture_resources;
 
+   /* Exact G17P compute write-only image protocol: PBE pointer and native
+    * write-control record occupy uniform halves 0..15. */
+   bool g17p_storage_write;
+
    /* The variant contains Honeykrisp-style custom-border emulation. */
    bool g17p_custom_border_emulation;
 
@@ -321,6 +343,10 @@ struct agx_fast_link_key {
 struct agx_uncompiled_shader {
    struct pipe_shader_state base;
    mesa_shader_stage type;
+   /* An application shader: API NIR that is not marked internal. Only these
+    * report compiler statistics through the GL debug callback (see
+    * agx_compile_variant). */
+   bool report_shader_info;
    struct blob early_serialized_nir;
    struct blob serialized_nir;
    uint8_t nir_blake3[BLAKE3_KEY_LEN];
@@ -328,14 +354,38 @@ struct agx_uncompiled_shader {
    struct {
       uint64_t inputs_flat_shaded;
       uint64_t inputs_linear_shaded;
+      /* Every varying slot a fragment shader reads. */
+      uint64_t inputs_read;
       uint8_t cull_distance_size;
       bool has_edgeflags;
       bool uses_fbfetch;
       bool uses_sample_shading;
+      /* The fragment shader reads the sample count (samples_log2), which
+       * G17G/G18G specialize at compile time as Apple's pipelines do. */
       bool needs_sample_count;
       bool uses_buffer_textures;
       bool uses_query_lod;
       bool writes_memory;
+      /* API output, excluding synthetic early depth/stencil mask updates. */
+      bool writes_api_sample_mask;
+
+      /* Some image intrinsic other than a read or a size/sample query:
+       * stores, atomics, texel addresses and anything not known to only
+       * read. G18G gives an image PBE only to such shaders. */
+      bool writes_images;
+
+      /* Some image intrinsic other than a read, a query or a store: the
+       * atomics and texel addresses whose libagx lowering reads the PBE's
+       * AGX2 software sideband. A G18G shader without one writes its
+       * images with native stores alone. */
+      bool reads_image_sideband;
+
+      /* Bound images whose global atomics/stores use software view metadata. */
+      uint64_t image_address_mask;
+
+      /* Bound image descriptors actually consumed as PBEs after lowering
+       * global stores/atomics. Dynamic consumers conservatively mark all. */
+      uint64_t image_pbe_mask;
 
       /* Number of bindful textures, images used */
       unsigned nr_bindful_textures, nr_bindful_images;
@@ -435,6 +485,18 @@ uint16_t agx_sampler_heap_add(struct agx_device *dev,
                               struct agx_sampler_heap *heap,
                               struct agx_sampler_packed *sampler);
 
+struct agx_cdm_dispatch {
+   uint32_t start, end;
+   /* G18G: the command carries DRM_ASAHI_COMPUTE_USES_TEXTURE_STATE. */
+   bool texture_state;
+   struct drm_asahi_g18_compute_resources resources;
+   /* CPU metadata for tracing and resolving empty indirect work after its
+    * dependencies retire; never serialized into a GPU command. */
+   uint32_t trace_mode, trace_global[3], trace_local[3], trace_program;
+   uint64_t trace_indirect, trace_shader;
+   uint64_t trace_tess_params, trace_vertex_params, trace_geometry_params;
+};
+
 struct agx_encoder {
    struct agx_bo *bo;
    uint64_t g17p_vdm_alias;
@@ -467,6 +529,20 @@ struct agx_batch {
    /* Only a loader-provided resolve may seed the multisample tile reload. */
    bool g17p_resolve_reload;
    bool g17p_resolve_preserve;
+
+   /* Set when a descriptor or state in this batch has no proven native
+    * encoding on the current chip. Nothing from the batch may reach the
+    * hardware; agx_batch_submit drops it without a context reset.
+    */
+   bool native_rejected;
+
+   /* Draws the G17G profile refused. A batch whose render carries none of its
+    * draws has nothing valid to rasterize: its VDM stream never received
+    * them, and submitting it anyway fails UAPI translation with a silent
+    * EINVAL. A batch with no refusals and no draws is an ordinary clear and
+    * still needs its render. */
+   unsigned draws_refused;
+
 
    uint64_t uploaded_clear_color[PIPE_MAX_COLOR_BUFS];
    union pipe_color_union clear_color[PIPE_MAX_COLOR_BUFS];
@@ -525,6 +601,17 @@ struct agx_batch {
    struct agx_encoder vdm;
    struct agx_encoder cdm;
 
+   /* The native M5 compute profile covers one dispatch per command: its
+    * captured control stream is a single launch, its grid, a barrier and the
+    * terminator, and the descriptor carries one dispatch identity, one
+    * submission index and one pair of dispatch stamps. A geometry-shader or
+    * transform-feedback prepass issues several launches, so on AGX3c each one
+    * is terminated where it ends and submitted as its own command, in order.
+    * Byte offsets into cdm.bo; empty on every other part, where the whole
+    * stream is submitted once. A batch can contain more launches than one
+    * geometry prepass, so retain a record for every emitted dispatch. */
+   struct util_dynarray cdm_dispatch; /* struct agx_cdm_dispatch */
+
    /* Scissor and depth-bias descriptors, uploaded at GPU time */
    struct util_dynarray scissor, depth_bias;
 
@@ -539,6 +626,14 @@ struct agx_batch {
    bool vs_scratch;
    bool fs_scratch;
    bool cs_scratch;
+
+   /* G18: program demand of every vertex/fragment/tile program this render
+    * generated, reported in drm_asahi_g18_render_resources when any API
+    * program carries a static TPS frame. */
+   struct {
+      struct drm_asahi_g18_render_resources resources;
+      bool scratch;
+   } g18;
 
    /* Whether each stage has preambles using scratch, and if so which bucket.
     * This just needs to be zero/nonzero for correctness, the magnitude in
@@ -571,6 +666,10 @@ struct asahi_vs_shader_key {
     */
    bool hw;
    bool custom_borders;
+   /* G18's native line state has no rasterizer point-size output. */
+   bool omit_point_size;
+   /* Export Layer as a flat input only when the fragment shader reads it. */
+   bool layer_as_varying;
 };
 
 struct agx_vertex_elements {
@@ -594,10 +693,30 @@ struct asahi_cs_shader_key {
    bool custom_borders;
 };
 
+/* The geometry copy program is a hardware vertex shader compiled before the
+ * fragment shader is known, so it normally reads its UVS indices from
+ * uniforms. AGX3's UVSW takes only an immediate index (every native G17P and
+ * G17G vertex program), so on those chips the copy program is compiled per
+ * fragment interpolation layout: the same flat/linear masks the draw-time
+ * link uses, so both sides derive one UVS layout. */
+struct asahi_gs_shader_key {
+   uint64_t flat_varyings;
+   uint64_t linear_varyings;
+   uint64_t link_uvs;
+   /* When trim_rast_varyings is set, the copy program rasterizes only the
+    * user varyings in rast_varyings: the ones the bound fragment shader
+    * reads. Transform feedback is written by the copy program's own stores
+    * and is not affected. */
+   uint64_t rast_varyings;
+   uint64_t trim_rast_varyings;
+};
+static_assert(sizeof(struct asahi_gs_shader_key) == 40, "no holes");
+
 union asahi_shader_key {
    struct asahi_vs_shader_key vs;
    struct asahi_fs_shader_key fs;
    struct asahi_cs_shader_key cs;
+   struct asahi_gs_shader_key gs;
 };
 
 enum agx_dirty {
@@ -1149,6 +1268,14 @@ struct agx_lower_bindings_options {
    bool g17p_plain_txf_crawl;
    bool g17p_native_sampler_handles;
    bool g17p_shadow_gather;
+   /* Keep a crawled texture bindful when its index fits the state table:
+    * the handle serves the descriptor read, the operation names the entry. */
+   bool table_index_crawls;
+   bool native_buffer_metadata;
+   uint64_t *image_address_mask;
+   uint64_t *image_pbe_mask;
+   /* G18G: no G17P query-LOD bank; LOD queries keep the ordinary handle. */
+   bool g18;
    bool g17p_bindless_storage;
    unsigned image_records;
    unsigned bindful_sampler_count;
@@ -1157,6 +1284,10 @@ struct agx_lower_bindings_options {
 bool agx_nir_lower_bindings(nir_shader *shader,
                        struct agx_lower_bindings_options *options);
 bool agx_nir_lower_custom_border_g17p(nir_shader *shader, bool shadow_gather);
+/* As agx_nir_lower_custom_border_g17p; g18 selects G18G's shadow border
+ * emulation and reports shadow operations it cannot emulate. */
+bool agx_nir_lower_custom_border_native(nir_shader *shader, bool shadow_gather,
+                                        bool g18, bool *fully_supported);
 bool agx_nir_rebind_g17p_texture_crawls(nir_shader *shader);
 bool agx_nir_lower_g17p_storage_records(nir_shader *shader,
                                         unsigned record_size_B);
@@ -1279,6 +1410,10 @@ void agx_blitter_save(struct agx_context *ctx, struct blitter_context *blitter,
 
 void agx_blit(struct pipe_context *pipe, const struct pipe_blit_info *info);
 
+bool agx_g18_msaa4_storage(const struct agx_device *dev,
+                           const struct agx_resource *rsrc,
+                           enum pipe_format format);
+
 bool agx_g17p_direct_resolve_blit_shape(const struct pipe_blit_info *info,
                                         bool source_multisampled);
 
@@ -1306,6 +1441,38 @@ struct asahi_bg_eot {
    uint64_t usc;
    uint64_t rsrc_spec;
 };
+
+/* Per-field maxima. Page-count descriptor words are exact under this merge;
+ * the per-warp KiB words are an upper bound when different programs supply
+ * the register, frame and staging maxima (graphics-scratch-design-1077). */
+static inline void
+agx_g18_note_program(struct agx_batch *batch, bool fragment,
+                     unsigned registers_16, unsigned scratch_bytes,
+                     unsigned staging_16)
+{
+   struct drm_asahi_g18_render_resources *r = &batch->g18.resources;
+   if (fragment) {
+      r->fragment_registers_16 = MAX2(r->fragment_registers_16, registers_16);
+      r->fragment_scratch_bytes = MAX2(r->fragment_scratch_bytes, scratch_bytes);
+      r->fragment_staging_16 = MAX2(r->fragment_staging_16, staging_16);
+   } else {
+      r->vertex_registers_16 = MAX2(r->vertex_registers_16, registers_16);
+      r->vertex_scratch_bytes = MAX2(r->vertex_scratch_bytes, scratch_bytes);
+      r->vertex_staging_16 = MAX2(r->vertex_staging_16, staging_16);
+   }
+   batch->g18.scratch |= scratch_bytes != 0;
+}
+
+/* Tile programs: slot 0 background (including partial), slot 1 EOT. */
+static inline void
+agx_g18_note_tile(struct agx_batch *batch, bool store, unsigned registers_16,
+                  unsigned staging_16)
+{
+   struct drm_asahi_g18_render_resources *r = &batch->g18.resources;
+   const unsigned slot = store ? 1 : 0;
+   r->tile_registers_16[slot] = MAX2(r->tile_registers_16[slot], registers_16);
+   r->tile_staging_16[slot] = MAX2(r->tile_staging_16[slot], staging_16);
+}
 
 struct asahi_bg_eot agx_build_bg_eot(struct agx_batch *batch, bool store,
                                      bool partial_render);

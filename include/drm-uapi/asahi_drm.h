@@ -349,6 +349,19 @@ enum drm_asahi_feature {
 	 * struct drm_asahi_cmd_render_with_stage_prior).
 	 */
 	DRM_ASAHI_FEATURE_COMPUTE_STAGE_BARRIERS = (1UL) << 24,
+
+	/**
+	 * @DRM_ASAHI_FEATURE_RENDER_STAGE_PREFIXES: Render commands accept
+	 * DRM_ASAHI_RENDER_STAGE_PREFIXES (struct
+	 * drm_asahi_cmd_render_with_stage_prefixes).
+	 */
+	DRM_ASAHI_FEATURE_RENDER_STAGE_PREFIXES = (1UL) << 25,
+
+	/**
+	 * @DRM_ASAHI_FEATURE_WHOLE_ATTACHMENT_RENDERS: Render commands accept
+	 * DRM_ASAHI_RENDER_WHOLE_ATTACHMENTS.
+	 */
+	DRM_ASAHI_FEATURE_WHOLE_ATTACHMENT_RENDERS = (1UL) << 27,
 	/** @DRM_ASAHI_FEATURE_M5_STENCIL_MSAA_COMPRESSION: single-layer 2x/4x compressed stencil in the native ZLS form. */
 	DRM_ASAHI_FEATURE_M5_STENCIL_MSAA_COMPRESSION = (1UL) << 26,
 	/** @DRM_ASAHI_FEATURE_COMPUTE_RESOURCES: Per-dispatch storage declarations. */
@@ -359,7 +372,28 @@ enum drm_asahi_feature {
 	 * include the earlier points of that timeline without adding GPU waits.
 	 */
 	DRM_ASAHI_FEATURE_CUMULATIVE_SIGNALS = (1UL) << 29,
+	/**
+	 * @DRM_ASAHI_FEATURE_COMPUTE_NO_QUERY_ACCESS: Compute commands accept
+	 * DRM_ASAHI_COMPUTE_NO_QUERY_ACCESS.
+	 */
+	DRM_ASAHI_FEATURE_COMPUTE_NO_QUERY_ACCESS = (1UL) << 30,
+
+	/**
+	 * @DRM_ASAHI_FEATURE_G18_GRAPHICS_SCRATCH: G18 render commands accept
+	 * DRM_ASAHI_RENDER_G18_RESOURCES. The kernel sizes the shared TA/3D
+	 * private-memory pool and both launch pairs from that suffix.
+	 */
+	DRM_ASAHI_FEATURE_G18_GRAPHICS_SCRATCH = (1ULL) << 31,
 };
+
+/*
+ * DRM_ASAHI_FEATURE_G18_NATIVE_TILE_SAMPLES: G18: single-sample,
+ * single-layer renders with 32x32 utiles also accept 40-, 56- and 72-byte
+ * samples (the hardware's native layouts), besides tiles of at most 32 KiB
+ * and 48..128-byte samples in steps of 16. A feature bit like those of enum
+ * drm_asahi_feature; a 64-bit enumerator would widen that enum's type.
+ */
+#define DRM_ASAHI_FEATURE_G18_NATIVE_TILE_SAMPLES ((1ULL) << 32)
 
 #define DRM_ASAHI_PARAM_GROUP_VM_STATUS 1
 #define DRM_ASAHI_PARAM_GROUP_QUEUE_LIMITS 2
@@ -1200,6 +1234,7 @@ enum drm_asahi_render_flags {
 	 */
 	DRM_ASAHI_RENDER_FRAGMENT_BARRIERS = (1U << 20),
 
+
 	/**
 	 * @DRM_ASAHI_RENDER_SHADER_WRITES: A graphics program in this command
 	 * writes external memory, including buffer/image stores or atomic RMW.
@@ -1217,6 +1252,36 @@ enum drm_asahi_render_flags {
 	 * the whole one. Requires DRM_ASAHI_FEATURE_COMPUTE_STAGE_BARRIERS.
 	 */
 	DRM_ASAHI_RENDER_COMPUTE_STAGE_BARRIERS = (1U << 22),
+
+	/**
+	 * @DRM_ASAHI_RENDER_STAGE_PREFIXES: The command is a struct
+	 * drm_asahi_cmd_render_with_stage_prefixes. Its tiling half waits only on
+	 * the render and compute prefixes of the tail, each no later than the
+	 * command's own prefix of that subqueue; its fragment half waits on the
+	 * whole ones. Earlier renders in the tiling prefix are waited on to
+	 * completion. Not combined with DRM_ASAHI_RENDER_FRAGMENT_BARRIERS or
+	 * DRM_ASAHI_RENDER_COMPUTE_STAGE_BARRIERS. Requires
+	 * DRM_ASAHI_FEATURE_RENDER_STAGE_PREFIXES.
+	 */
+	DRM_ASAHI_RENDER_STAGE_PREFIXES = (1U << 23),
+
+	/**
+	 * @DRM_ASAHI_RENDER_WHOLE_ATTACHMENTS: The render area covers the full
+	 * extent of every attachment, so the render's tile stores write no pixel
+	 * outside it. The kernel need not order such a render against another
+	 * one that writes the same attachments without a dependency between
+	 * them: any overlap is the application's own race. Requires
+	 * DRM_ASAHI_FEATURE_WHOLE_ATTACHMENT_RENDERS.
+	 */
+	DRM_ASAHI_RENDER_WHOLE_ATTACHMENTS = (1U << 24),
+
+	/**
+	 * @DRM_ASAHI_RENDER_G18_RESOURCES: G18 only, requires
+	 * DRM_ASAHI_FEATURE_G18_GRAPHICS_SCRATCH. The payload is a
+	 * drm_asahi_cmd_render_g18: the complete render command, including the
+	 * prior and ray-query space, followed by drm_asahi_g18_render_resources.
+	 */
+	DRM_ASAHI_RENDER_G18_RESOURCES = (1U << 25),
 };
 
 /**
@@ -1568,6 +1633,21 @@ struct drm_asahi_cmd_render_with_stage_prior {
 	__u64 ta_prior_cdm;
 };
 
+/* DRM_ASAHI_RENDER_STAGE_PREFIXES: the tiling half's render and compute
+ * prefixes, each a command index like the header barriers plus an exact prior
+ * ordinal. The reserved fields are zero. */
+struct drm_asahi_cmd_render_with_stage_prefixes {
+	struct drm_asahi_cmd_render_with_prior legacy;
+	__u16 ta_cdm_barrier;
+	__u16 reserved0;
+	__u32 reserved1;
+	__u64 ta_prior_cdm;
+	__u16 ta_vdm_barrier;
+	__u16 reserved2;
+	__u32 reserved3;
+	__u64 ta_prior_vdm;
+};
+
 struct drm_asahi_render_ray_query_stage {
 	__u64 scs_layout;
 	__u32 intersection_aux;
@@ -1583,6 +1663,35 @@ struct drm_asahi_render_ray_query_stage {
 struct drm_asahi_cmd_render_with_ray_query {
 	struct drm_asahi_cmd_render_with_prior legacy;
 	struct drm_asahi_render_ray_query_stage ray_query[2];
+};
+
+/* G18 per-render program demand, maximized over every draw of the render:
+ * 16-bit registers, the static thread-private (TPS) frame in bytes as
+ * programmed in SPECTPR (a multiple of 16), and IPR/staging halfwords. Tile
+ * programs are background, end-of-tile, partial background and partial
+ * end-of-tile; a zero register count marks an absent program, and tile
+ * programs never carry scratch. flags must be 3 (vertex and fragment
+ * present); reserved must be zero. Tile storage comes from the command. */
+struct drm_asahi_g18_render_resources {
+	__u32 version;
+	__u32 flags;
+	__u32 vertex_registers_16;
+	__u32 vertex_scratch_bytes;
+	__u32 vertex_staging_16;
+	__u32 fragment_registers_16;
+	__u32 fragment_scratch_bytes;
+	__u32 fragment_staging_16;
+	__u32 tile_registers_16[4];
+	__u32 tile_staging_16[4];
+	__u32 reserved[4];
+};
+
+/* DRM_ASAHI_RENDER_G18_RESOURCES payload: the complete render command
+ * (448 bytes: drm_asahi_cmd_render, prior_vdm/prior_cdm and the ray-query
+ * stages, all zero when absent) followed by the suffix at offset 448. */
+struct drm_asahi_cmd_render_g18 {
+	struct drm_asahi_cmd_render_with_ray_query legacy;
+	struct drm_asahi_g18_render_resources resources;
 };
 
 
@@ -1634,6 +1743,31 @@ struct drm_asahi_cmd_compute {
 	struct drm_asahi_timestamp ts_end_copies[8];
 };
 
+/* G18 per-dispatch metadata. Counts are compiler halfwords or bytes as named;
+ * the kernel converts them to native units. Both versions are exactly 64 bytes.
+ * Version 1 scales local_bytes + variable_shared_bytes by four for legacy
+ * shaders using byte offsets in element-index fields. Version 2 uses actual
+ * byte footprints for shaders with correctly lowered shared element indices.
+ * Flags: bit0 main staging known, bit1 constant program present, bit2 constant
+ * staging known, bit3 local geometry unknown (local_size must then be zero).
+ * All other flag bits and reserved must be zero. */
+struct drm_asahi_g18_compute_resources {
+	__u32 version;
+	__u32 flags;
+	__u32 registers_16;
+	__u32 scratch_bytes;
+	__u32 spectpr_scratch_bytes;
+	__u32 staging_16;
+	__u32 constant_registers_16;
+	__u32 constant_scratch_bytes;
+	__u32 constant_staging_16;
+	__u32 local_bytes;
+	__u32 imageblock_stride;
+	__u32 variable_shared_bytes;
+	__u32 local_size[3];
+	__u32 reserved;
+};
+
 struct drm_asahi_cmd_compute_with_prior {
 	struct drm_asahi_cmd_compute legacy;
 	/* Canonical kernel compute payload already has scs_layout at byte64.
@@ -1669,6 +1803,15 @@ struct drm_asahi_cmd_compute_with_prior {
 	__u64 intersection_default_control;
 };
 
+/* DRM_ASAHI_COMPUTE_G18_RESOURCES payload: the complete compute command
+ * (200 bytes: drm_asahi_cmd_compute, scs_layout, prior_vdm/prior_cdm,
+ * cdm_auxiliary_allocation and the intersection fields, all zero on G18)
+ * followed by the suffix at offset 200. */
+struct drm_asahi_cmd_compute_g18 {
+	struct drm_asahi_cmd_compute_with_prior base;
+	struct drm_asahi_g18_compute_resources resources;
+};
+
 /**
  * enum drm_asahi_compute_flags - Compute command flags
  */
@@ -1678,6 +1821,7 @@ enum drm_asahi_compute_flags {
 	 * three-buffer table from this command's three compute attachments.
 	 */
 	DRM_ASAHI_COMPUTE_G17P_ADD3_PROOF = (1L << 0),
+
 	/**
 	 * @DRM_ASAHI_COMPUTE_AS_BUILD: Acceleration-structure build work,
 	 * including compute-based transfers. Requires BOUNDED_AS_BUILD.
@@ -1698,6 +1842,30 @@ enum drm_asahi_compute_flags {
 	 * matrix instructions. Requires DRM_ASAHI_FEATURE_COMPUTE_MATRIX.
 	 */
 	DRM_ASAHI_COMPUTE_USES_MATRIX = (1L << 16),
+
+	/**
+	 * @DRM_ASAHI_COMPUTE_NO_QUERY_ACCESS: The command neither copies nor
+	 * resets queries, so it cannot observe timestamps the kernel publishes
+	 * for earlier commands and need not wait for that publication. Requires
+	 * DRM_ASAHI_FEATURE_COMPUTE_NO_QUERY_ACCESS.
+	 */
+	DRM_ASAHI_COMPUTE_NO_QUERY_ACCESS = (1L << 17),
+
+	/**
+	 * @DRM_ASAHI_COMPUTE_USES_TEXTURE_STATE: G18G only. The command's
+	 * dispatch binds texture or image state (a texture table, a sampled
+	 * texture, a storage image). The kernel selects the compute mode the
+	 * native driver uses for such commands (desc+0x62a, register 0x1a458
+	 * 0x14c08a60 instead of 0x10c08860). Other kernels refuse the bit.
+	 */
+	DRM_ASAHI_COMPUTE_USES_TEXTURE_STATE = (1L << 18),
+
+	/**
+	 * @DRM_ASAHI_COMPUTE_G18_RESOURCES: G18 only. The payload is a
+	 * drm_asahi_cmd_compute_g18: the complete compute command followed by
+	 * the versioned drm_asahi_g18_compute_resources suffix.
+	 */
+	DRM_ASAHI_COMPUTE_G18_RESOURCES = (1L << 19),
 };
 
 /**

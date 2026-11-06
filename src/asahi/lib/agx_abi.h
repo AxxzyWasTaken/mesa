@@ -48,6 +48,14 @@
  * using texture state place the ordinary vertex ABI after this prefix. */
 #define AGX_ABI_G17P_TEXTURE_POINTER_HALFS 8
 
+/* G18 threadgroup accesses take their base from uniform half 8, which the
+ * hardware preloads. Ordinary pushed pointers or preamble exports must not
+ * overwrite it: stores then land nowhere and loads read zero. Keep API
+ * compute uniforms above this slot, aligned for 64-bit pointers. The native
+ * texture/storage prefix remains in halves 0..7. */
+#define AGX_ABI_G18_SHARED_BASE_HALF 8u
+#define AGX_ABI_G18_SHARED_UNIFORM_HALFS 12u
+
 /* AGX3 threadgroup accesses take their base from uniform half 8, which
  * agx_emit_local_store/load hard-code and which the hardware preloads -- no
  * driver path ever writes it.  A shader that places its own uniforms over

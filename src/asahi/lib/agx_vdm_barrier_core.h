@@ -25,6 +25,8 @@ struct agx_vdm_barrier_core {
    uint8_t length;
 };
 
+bool agx_vdm_barrier_core_supported(enum agx_chip chip);
+
 bool agx_vdm_barrier_core_pack(enum agx_chip chip,
                                struct agx_vdm_barrier_core *out);
 

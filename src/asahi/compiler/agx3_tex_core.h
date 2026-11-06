@@ -88,8 +88,18 @@ struct agx3_tex_fetch_desc {
    bool coord_kill;
    bool final;          /* witnessed final texture-op marker */
    bool array;          /* 2D array: layer in the register after the pair */
+   /* j873's G17G literal-layer half (f31). agx3_tex_encode_fetch() does
+    * not read it: the G17G-family encoding (agx3c) stages the layer. */
+   uint16_t layer_half;
+   /*
+    * G18G stages a per-lane layer with PACK_SMPIR in its own block
+    * (agx3_tex_stage_array_layer_g18g) even for an immediate-operand fetch,
+    * so the sample takes the staged form f77 = 2.
+    */
+   bool staged_array;
    bool multisample;    /* 2D MS read; sample/layer may be staged separately */
    bool staged_sample;  /* MS sample and optional array layer in staging half4 */
+   bool g18g_ms;        /* G18 X/Y = 4/0, packed sample/layer at 2 */
    bool three_d;        /* G17P 3D read: third contiguous integer coordinate */
    uint8_t sample;      /* immediate non-array sample index, values 0..3 */
    bool texture_kill;   /* Last use of an indirect texture index */
@@ -170,6 +180,9 @@ enum agx3_tex_lod {
 #define AGX3_TEX_GRADIENT_BANK_DDY_X 10u
 #define AGX3_TEX_GRADIENT_BANK_DDX_Y 12u
 #define AGX3_TEX_GRADIENT_BANK_DDY_Y 14u
+/* G18 native 2D gradients use X/Y=16/0, derivatives=4/6/8/10 and, for
+ * arrays, the existing layer word at 2. G17 staging stays unchanged. */
+#define AGX3_TEX_G18G_GRADIENT_X 16u
 /* gradient3d continues the interleave. */
 #define AGX3_TEX_GRADIENT_BANK_DDX_Z 16u
 #define AGX3_TEX_GRADIENT_BANK_DDY_Z 18u
@@ -249,6 +262,12 @@ struct agx3_tex_sample_desc {
    enum agx3_tex_sample_abi sample_abi;
    /* As agx3_tex_fetch_desc::sparse, on every sample shape and width. */
    bool sparse;
+   /* G18G only: set by the G18G layer (agx_is_g18g()). Admits the native
+    * G18 sample shapes it encodes on AGX_ISA_ENCODING_AGX3C beyond the
+    * G17G-family admission (native371-949), and keeps its staged array
+    * layer and sample-group spelling. False keeps every other GPU's
+    * encoding. */
+   bool g18g;
 };
 
 /* Pack a scalar LOD into native texture operand bank 6. This bank is separate
@@ -299,6 +318,12 @@ bool agx3_tex_stage_gather_offset(enum agx_isa_encoding enc, uint16_t src,
                                    uint8_t slot, bool cache, bool discard,
                                    uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
 
+bool agx3_tex_stage_gather_offset_at(enum agx_isa_encoding enc, uint16_t dest,
+                                   uint16_t src, bool array,
+                                   uint16_t packed_layer, uint8_t slot,
+                                   bool cache, bool discard,
+                                   uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
+
 /* PACK_IMGWIR publishes an image write's layer register to staging half
  * `dest` (6 in bank 0), with the same operand fields as PACK_SMPIR's array
  * layer. */
@@ -320,12 +345,131 @@ bool agx3_tex_stage_array_layer_at(enum agx_isa_encoding enc, uint16_t bank,
                                    uint8_t out[AGX3_TEX_MAX_LENGTH],
                                    uint8_t *len);
 
+/*
+ * G18G's staged array block, as Apple's G18G compiler lays it out for a
+ * texture2d_array read or sample whose layer is a per-lane value: X at half
+ * 4 (SMP f19 = 4), Y at half 0 (SMP f56 = 0), and the PACK_SMPIR layer word
+ * at half 2, where G17G's block is X 0, Y 2 and the layer at 6.
+ */
+#define AGX3_TEX_G18G_ARRAY_X     4
+#define AGX3_TEX_G18G_ARRAY_Y     0
+#define AGX3_TEX_G18G_ARRAY_LAYER 2
+
+/* The PACK_SMPIR of that block: G17G's own field vector with f5 = 2, which
+ * the G18G transcoder composes into Apple's G18G bytes. */
+bool agx3_tex_stage_array_layer_g18g(uint16_t src, uint8_t slot,
+                                     uint16_t wait_mask, bool src_cache,
+                                     bool src_discard,
+                                     uint8_t out[AGX3_TEX_MAX_LENGTH],
+                                     uint8_t *len);
+
+/* The same block's layer paired with a per-lane float level or bias in one
+ * PACK_SMPIR word (f37 = 2, f76 = 2, f77 = 16), again with f5 = 2. */
+bool agx3_tex_stage_array_lod_g18g(uint16_t layer, uint16_t lod, uint8_t slot,
+                                   uint16_t wait_mask, bool layer_cache,
+                                   bool layer_discard, bool lod_cache,
+                                   bool lod_discard,
+                                   uint8_t out[AGX3_TEX_MAX_LENGTH],
+                                   uint8_t *len);
+
+/* The same pair with the level's kind explicit: AGX3_TEX_LEVEL_FLOAT for a
+ * filtered sample's level or bias (above), AGX3_TEX_LEVEL_INTEGER (f76 = 3)
+ * for a texel fetch's uint level. metal-nt applegpu_g17g / applegpu_g18g
+ * texture2d_array read(coord, layer, lod) with a per-lane layer and level
+ * (m6-fetch-lod fl_array, fl_array_int):
+ *
+ *   G17G  pack_smpir f5 6 f16 layer f30 lod f37 2 f41 1 f76 3 f77 16
+ *   G18G  pack_smpir f5 2 f16 layer f30 lod f37 2 f41 1 f76 3 f77 16
+ */
+bool agx3_tex_stage_array_typed_lod_g18g(uint16_t layer, uint16_t lod,
+                                         enum agx3_tex_level_kind kind,
+                                         uint8_t slot, uint16_t wait_mask,
+                                         bool layer_cache, bool layer_discard,
+                                         bool lod_cache, bool lod_discard,
+                                         uint8_t out[AGX3_TEX_MAX_LENGTH],
+                                         uint8_t *len);
+
+/*
+ * Where G18G reads a staged block's non-array operand words. G17G implies Y
+ * at X + 2 and reads the per-lane level or bias word at X + 6 and a 3D Z at
+ * X + 4. G18G names Y itself (SMP f56; the transcoder sets it to X + 2 for
+ * 2D and 3D) and reads the level or bias word at Y + 2 and a 3D Z at Y + 4.
+ * Every applegpu_g18g witness places them so, whatever X is:
+ *
+ *   read(uint2, lod)                     X 4   Y 0   L 2       (m6-fetch-lod)
+ *   two reads with levels in flight      X 8   Y 0   L 2,
+ *                                        X 10  Y 4   L 6       (m6-fetch-lod2)
+ *   three reads, third block             X 12  Y 8   L 10      (m6-fetch-lod2)
+ *   read(uint3, lod)                     X 8   Y 0   Z 4  L 2  (m6-fetch-lod)
+ *   read(uint3, 0), two in flight        X 16  Y 0   Z 4,
+ *                                        X 18  Y 8   Z 12      (m6-fetch-lod0)
+ *   sample(level()) / sample(bias())     X 4   Y 0   L 2       (m6-sample-lod)
+ *   sample 3D with and without level     X 8   Y 0   Z 4  L 2  (m6-sample-lod)
+ *
+ * Mesa keeps X at the block base and Y at X + 2 on both chips, so G18G's
+ * level word is X + 4 and its Z is X + 6. (A 2D shadow sample's reference is
+ * X + 4 on G17G, which is already G18G's Y + 2 word.)
+ */
+#define AGX3_TEX_G17G_LEVEL_WORD 6
+#define AGX3_TEX_G17G_Z_WORD     4
+#define AGX3_TEX_G18G_LEVEL_WORD 4
+#define AGX3_TEX_G18G_Z_WORD     6
+
+/* agx3_tex_stage_typed_lod_at()'s PACK_SMPIR, published into G18G's level
+ * word (bank + AGX3_TEX_G18G_LEVEL_WORD). The field vector is G17G's in every
+ * applegpu_g18g witness above, f5 alone following the block. */
+bool agx3_tex_stage_query_bias_g18g(bool three_d, uint16_t src, uint8_t slot,
+                                    uint16_t wait_mask,
+                                    uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
+bool agx3_tex_stage_typed_lod_g18g(uint16_t bank, uint16_t src, uint8_t slot,
+                                   uint16_t wait_mask, bool src_cache,
+                                   bool src_discard,
+                                   enum agx3_tex_level_kind kind,
+                                   uint8_t out[AGX3_TEX_MAX_LENGTH],
+                                   uint8_t *len);
+
 /* Publish the layer and per-lane half-float LOD together into operand bank 6. */
 bool agx3_tex_stage_array_lod(enum agx_isa_encoding enc, uint16_t layer,
                               uint16_t lod, uint8_t slot, uint16_t wait_mask,
                               bool layer_cache, bool layer_discard,
                               bool lod_cache, bool lod_discard,
                               uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
+
+bool agx3_tex_stage_cube_array_shadow(enum agx_isa_encoding enc,
+                                      uint16_t layer, uint8_t slot,
+                                      uint16_t wait_mask, bool layer_cache,
+                                      bool layer_discard,
+                                      uint8_t out[AGX3_TEX_MAX_LENGTH],
+                                      uint8_t *len);
+
+bool agx3_tex_stage_cube_array_g18g(enum agx_isa_encoding enc,
+                                   uint16_t face, uint16_t layer, uint16_t lod,
+                                   bool register_lod, uint8_t slot,
+                                   uint16_t wait_mask, bool layer_cache,
+                                   bool layer_discard, bool lod_cache,
+                                   bool lod_discard,
+                                   uint8_t out[AGX3_TEX_MAX_LENGTH],
+                                   uint8_t *len);
+
+bool agx3_tex_normalize_cube_array_layer(enum agx_isa_encoding enc,
+                                         uint16_t dest, uint16_t layer,
+                                         bool layer_cache, bool layer_discard,
+                                         uint8_t out[AGX3_TEX_MAX_LENGTH],
+                                         uint8_t *len);
+
+bool agx3_tex_stage_cube_z_lod_g17g(enum agx_isa_encoding enc, bool cube_array,
+                               uint16_t z, uint16_t lod, uint8_t slot,
+                               uint16_t wait_mask, bool z_cache,
+                               bool z_discard, bool lod_cache,
+                               bool lod_discard,
+                               uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
+
+bool agx3_tex_stage_cube_z_lod_g18g(enum agx_isa_encoding enc, bool cube_array,
+                                  uint16_t z, uint16_t lod, uint8_t slot,
+                                  uint16_t wait_mask, bool z_cache,
+                                  bool z_discard, bool lod_cache,
+                                  bool lod_discard,
+                                  uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
 
 /* Publish a 2D-array bias sample's minimum LOD at half 4, beside the layer and
  * bias staged in bank 6. */
@@ -393,11 +537,27 @@ bool agx3_tex_cube_cem_finalize_to(
    uint16_t axis_value, uint8_t slot,
    uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
 
+bool agx3_tex_cube_cem_finalize_g18g(
+   enum agx_isa_encoding enc, uint8_t component, bool cube_array,
+   uint16_t reciprocal, uint16_t axis_value, uint8_t slot,
+   uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
+
+/* Build the G17G per-lane level/bias word in a 32-bit register rather than
+ * in staging bank 6, for a COPY into a rotated staging block. */
+bool agx3_tex_pack_lod_word(enum agx_isa_encoding enc, uint16_t dest,
+                            uint16_t src, bool src_cache, bool src_discard,
+                            uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
+
 /* Publish the face calculated by CEM for a native cube sample. */
 bool agx3_tex_stage_cube_z(enum agx_isa_encoding enc, uint16_t src,
                            uint8_t slot, uint16_t wait_mask,
                            bool src_cache, bool src_discard,
                            uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
+
+bool agx3_tex_stage_cube_z_g18g(enum agx_isa_encoding enc, uint16_t src,
+                              uint8_t slot, uint16_t wait_mask,
+                              bool src_cache, bool src_discard,
+                              uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
 
 /* Publish CEM's face at half `face` together with the 16-bit cube-array
  * layer at half `layer`. */
@@ -425,6 +585,13 @@ bool agx3_tex_stage_cube_array_lod(enum agx_isa_encoding enc, uint16_t face,
                                    bool lod_cache, bool lod_discard,
                                    uint8_t out[AGX3_TEX_MAX_LENGTH],
                                    uint8_t *len);
+
+/* G18G only: a native G18 multisample read's 32-bit sample index, optionally
+ * ORed with a normalized layer word, published at staging half 2. */
+bool agx3_tex_stage_ms_g18g(enum agx_isa_encoding enc, uint16_t sample,
+                            uint16_t packed_layer, bool array, uint8_t slot,
+                            bool cache, bool discard,
+                            uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
 
 /* Publish a register-valued integer 2D-MS sample index into the sampler
  * operand bank. The following MS fetch uses the sample-0 instruction form;
@@ -539,6 +706,47 @@ bool agx3_tex_encode_image_write_rgba8_2d(
    enum agx_isa_encoding enc, const struct agx3_image_write_desc *d,
    uint8_t out[AGX3_IMAGE_WRITE_LENGTH], uint8_t *len);
 
+/* The G18G image writes, encoded in the agx3c table (18 bytes) for
+ * agx3_transcode_agx3d(), whose imgwci rule adds G18G's explicit Y and data
+ * fields. G18G names each operand half, and this packer stages them as
+ * Apple's G18G compiler does for a lone write: the data just below X, Y at
+ * X + 2 and a layer or z at X + 4:
+ *
+ *   components 1 (f114 4): data X-2           2D integer only (kick 19)
+ *   components 4 (f114 0): data X-8..X-2      2D, 2D array and 3D
+ *
+ * f5 names X, not G17G's bank. The write waits on its staging slot and
+ * signals that same slot, as native run112 kick 19 does. Native459 also
+ * grounds an explicit uniform heap base and immediate/GPR/uniform indices.
+ * Zero image_kind retains the original immediate-index interface. Encodes
+ * agx3c only: G18G compiles to it before its agx3d re-encode. */
+#define AGX3_IMAGE_WRITE_G18G_MAX_SLOT  4u
+#define AGX3_IMAGE_WRITE_G18G_MAX_INDEX 15u
+
+struct agx3_image_write_g18g_desc {
+   uint16_t x_half;
+   uint8_t components;
+   bool float_data;
+   enum agx3_image_write_dim dim;
+   uint16_t image_index;
+   uint8_t slot;
+   enum agx3_tex_operand_kind image_kind;
+   uint16_t uniform_base;
+   bool image_kill;
+};
+
+bool agx3_tex_encode_image_write_g18g(
+   enum agx_isa_encoding enc, const struct agx3_image_write_g18g_desc *d,
+   uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
+
+/* G18G's first grounded image write, native run112 kick 19: a 2D state-0
+ * write of one 32-bit integer component, staged data@x_half-2, X@x_half,
+ * Y@x_half+2 on staging slot 1 and signalling slot 1. */
+bool agx3_tex_encode_image_write_g18g_r32(enum agx_isa_encoding enc,
+                                          uint16_t x_half,
+                                          uint8_t out[AGX3_TEX_MAX_LENGTH],
+                                          uint8_t *len);
+
 /* A native staging COPY must preserve a coordinate GPR if later work uses
  * it. CACHE/NONE/DISCARD are independent of the staging-bank release bit. */
 /* Full-range 32-bit source for scalar M5 texture publication only. */
@@ -559,6 +767,11 @@ bool agx3_tex_stage_copy(enum agx_isa_encoding enc, uint16_t dest,
 bool agx3_tex_encode_image_write_agx3c(
    const struct agx3_image_write_desc *d, uint16_t uniform_base,
    uint8_t staging_slot, uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
+
+bool agx3_tex_stage_array_integer_lod(
+   enum agx_isa_encoding enc, uint16_t layer, uint16_t lod, uint8_t slot,
+   uint16_t wait_mask, bool layer_cache, bool layer_discard, bool lod_cache,
+   bool lod_discard, uint8_t out[AGX3_TEX_MAX_LENGTH], uint8_t *len);
 
 #ifdef __cplusplus
 }

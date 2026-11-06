@@ -127,7 +127,11 @@ agx3_cmdstream_load_le32(const uint8_t *src)
 
 /* Exact launch emitters were inspected in the base and aggregate Mac plugin
  * classes listed here.  G16P and G17A stay closed because no corresponding
- * launch emitter was present in the pinned corpus. */
+ * launch emitter was present in the pinned corpus.  G18G is admitted from its
+ * J873 compute-add capture, whose CDM stream is this 40-byte launch, a
+ * 0x60000160 barrier and the 0x40000000 terminate, decoded exactly as on
+ * G17G.  The terminate word shares this gate; link padding has its own,
+ * because no J873 capture contains it. */
 static inline bool
 agx3_cdm_launch_target_grounded(enum agx_chip chip)
 {
@@ -143,6 +147,7 @@ agx3_cdm_launch_target_grounded(enum agx_chip chip)
    case AGX_CHIP_G17G:
    case AGX_CHIP_G17S:
    case AGX_CHIP_G17C:
+   case AGX_CHIP_G18G:
       return true;
    default:
       return false;
@@ -156,6 +161,9 @@ static inline bool
 agx3_cdm_indirect_launch_target_grounded(enum agx_chip chip)
 {
    switch (chip) {
+   /* G18G: performEnqueueKernel's six-word store, AGXMetalG18G 0x219484680;
+    * the template's upper half of word 4 is 0. */
+   case AGX_CHIP_G18G:
    case AGX_CHIP_G15G:
    case AGX_CHIP_G15S:
    case AGX_CHIP_G15C:
@@ -180,6 +188,8 @@ static inline bool
 agx3_cdm_indirect_launch_36_target_grounded(enum agx_chip chip)
 {
    switch (chip) {
+   /* G18G: the nine-word store, AGXMetalG18G 0x2194846b4. */
+   case AGX_CHIP_G18G:
    case AGX_CHIP_G15G:
    case AGX_CHIP_G15S:
    case AGX_CHIP_G15C:
@@ -510,7 +520,15 @@ agx3_cdm_stream_link_unpack(
 
 /* The AGX3 ComputeControlFlowEmitterGen1 implementations for the base and
  * aggregate G15, G16/HAL200, G17P and G17/HAL300 plugin classes all emit the
- * same four-byte type-5 link-padding token. */
+ * same four-byte type-5 link-padding token.  G18G is not inferred from them:
+ * its only CDM capture (compute-add) has no link padding, so it fails closed
+ * until one does. */
+static inline bool
+agx3_cdm_link_padding_target_grounded(enum agx_chip chip)
+{
+   return chip != AGX_CHIP_G18G && agx3_cdm_launch_target_grounded(chip);
+}
+
 static inline bool
 agx3_cdm_link_padding_pack(
    const struct agx3_cdm_link_padding_info *info,
@@ -520,7 +538,7 @@ agx3_cdm_link_padding_pack(
       return false;
 
    memset(packed, 0, AGX3_CDM_LINK_PADDING_SIZE);
-   if (!info || !agx3_cdm_launch_target_grounded(info->chip) ||
+   if (!info || !agx3_cdm_link_padding_target_grounded(info->chip) ||
        info->count > 7)
       return false;
 
@@ -543,7 +561,7 @@ agx3_cdm_link_padding_unpack(
 
    memset(info, 0, sizeof(*info));
    if (!packed || available < AGX3_CDM_LINK_PADDING_SIZE ||
-       !agx3_cdm_launch_target_grounded(chip))
+       !agx3_cdm_link_padding_target_grounded(chip))
       return false;
 
    const uint32_t word = agx3_cmdstream_load_le32((const uint8_t *)packed);
@@ -556,7 +574,9 @@ agx3_cdm_link_padding_unpack(
 }
 
 /* Exact four-byte barrier emitters are pinned in G15G/G15X, G16G/G16X,
- * G17P, G17G and G17X.  G16P and G17A remain unwitnessed here. */
+ * G17P, G17G and G17X.  G16P and G17A remain unwitnessed here.  G18G's
+ * compute-add capture ends its dispatch with the flag-free 0x60000160, which
+ * is the only G18G barrier admitted: see agx3_cdm_barrier_flags_grounded. */
 static inline bool
 agx3_cdm_barrier_target_grounded(enum agx_chip chip)
 {
@@ -572,6 +592,7 @@ agx3_cdm_barrier_target_grounded(enum agx_chip chip)
    case AGX_CHIP_G17G:
    case AGX_CHIP_G17S:
    case AGX_CHIP_G17C:
+   case AGX_CHIP_G18G:
       return true;
    default:
       return false;
@@ -589,6 +610,11 @@ agx3_cdm_barrier_flags_grounded(enum agx_chip chip, uint8_t flags)
    case AGX_CHIP_G17S:
    case AGX_CHIP_G17C:
       return true;
+   case AGX_CHIP_G18G:
+      /* Only the flag-free word is captured on G18G (compute-add).  Other
+       * flags are not inferred from the G17G HAL300 layout; they fail closed
+       * until a G18G capture shows them. */
+      return flags == 0;
    default:
       return flags == 0 || flags == 0x5;
    }
@@ -755,7 +781,14 @@ agx3_cdm_sstt_flush_invalidate_validate(enum agx_chip chip,
 }
 
 /* endVirtualSubstream and the Gen7 first-class substream emitter encode the
- * virtual substream as an eight-bit, one-biased field at bits 21..28. */
+ * virtual substream as an eight-bit, one-biased field at bits 21..28.  No
+ * G18G capture contains one, so G18G fails closed here even for flags 0. */
+static inline bool
+agx3_cdm_substream_barrier_target_grounded(enum agx_chip chip)
+{
+   return chip != AGX_CHIP_G18G && agx3_cdm_barrier_target_grounded(chip);
+}
+
 static inline bool
 agx3_cdm_substream_barrier_pack(
    const struct agx3_cdm_substream_barrier_info *info,
@@ -765,7 +798,8 @@ agx3_cdm_substream_barrier_pack(
       return false;
 
    memset(packed, 0, AGX3_CDM_BARRIER_SIZE);
-   if (!info || !agx3_cdm_barrier_flags_grounded(info->chip, info->flags) ||
+   if (!info || !agx3_cdm_substream_barrier_target_grounded(info->chip) ||
+       !agx3_cdm_barrier_flags_grounded(info->chip, info->flags) ||
        info->substream == UINT8_MAX)
       return false;
 
@@ -785,7 +819,7 @@ agx3_cdm_substream_barrier_unpack(
 
    memset(info, 0, sizeof(*info));
    if (!packed || available < AGX3_CDM_BARRIER_SIZE ||
-       !agx3_cdm_barrier_target_grounded(chip))
+       !agx3_cdm_substream_barrier_target_grounded(chip))
       return false;
 
    const uint32_t word = agx3_cmdstream_load_le32((const uint8_t *)packed);

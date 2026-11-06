@@ -349,9 +349,11 @@ hk_g17p_shared_compression_eligible(enum agx_chip chip, unsigned plane,
  * Admitted: the G17P colour formats (1-8 byte texels, so a single-sample
  * tilebuffer never spills a compressed target), one layer, any mip count
  * (one level for one-byte texels, see hk_m5_compression_one_byte()),
- * one sample, a colour attachment, and otherwise only sampled,
- * input-attachment and transfer usages. Shared images (external memory,
- * WSI) stay plain.
+ * one sample, a colour attachment or a transfer destination (which
+ * hk_image_init() makes renderable, so its uploads take the PBE path like
+ * an attachment's: sampled textures, as native compresses them), and
+ * otherwise only sampled, input-attachment and transfer usages. Shared
+ * images (external memory, WSI) stay plain.
  *
  * Every level of a compressed mip chain is described by the level-0 surface
  * and metadata addresses plus the level fields, in the PBE and
@@ -410,10 +412,13 @@ hk_m5_color_compression_eligible(enum agx_chip chip, unsigned plane,
           info->samples == VK_SAMPLE_COUNT_1_BIT &&
           info->tiling == VK_IMAGE_TILING_OPTIMAL &&
           !(info->flags & ~allowed_flags) &&
-          (info->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) &&
+          (info->usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                          VK_IMAGE_USAGE_TRANSFER_DST_BIT)) &&
           !(info->usage & ~allowed_usage) && info->extent.width >= 16 &&
           info->extent.height >= 16 &&
-          hk_g17p_compression_color_format(info->format);
+          (hk_g17p_compression_color_format(info->format) ||
+           /* M5 stores it in its own class (agx_rt0_pbe_format). */
+           info->format == VK_FORMAT_B10G11R11_UFLOAT_PACK32);
 }
 
 /* Multisample colour formats with a qualified compressed metadata shape:

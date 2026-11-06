@@ -9,6 +9,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* Native M5 leading block, including both complete GPU1 helper tables. */
+bool agx3_build_g17g_container_lead(void *image, size_t capacity);
+
+/* G18 uses four AGX3D helper tables in a larger leading block. */
+#define AGX3_G18G_CONTAINER_LEAD_SIZE 0x640u
+bool agx3_build_g18g_container_lead(void *image, size_t capacity);
+
 /* Write the 0x40-byte program immediately before a G17P container entry.
  * Apple's HAL200 compiler emits distinct vertex/compute, plain-fragment, and
  * sampled-fragment programs.  sampled_fragment is valid only for fragment. */
@@ -27,6 +34,10 @@ bool agx3_build_m5_container_lead(void *image, size_t capacity,
                                   unsigned clusters);
 
 size_t agx3_code_block_size(size_t main_span);
+/* The fragment stop constant program in the G18G (agx3d) encoding. */
+void agx3_build_container_stop_program_agx3d(
+   uint8_t image[AGX3_CONTAINER_CONSTANT_PROGRAM_SIZE]);
+
 bool agx3_build_code_block(void *image, size_t capacity, const void *main,
                           size_t main_size, size_t main_span,
                           const uint8_t *constant_program,

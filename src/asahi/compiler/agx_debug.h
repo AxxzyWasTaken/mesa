@@ -30,6 +30,8 @@ enum agx_compiler_dbg {
    AGX_DBG_SPILL       = BITFIELD_BIT(11),
    AGX_DBG_NOPROMOTE   = BITFIELD_BIT(12),
    AGX_DBG_LATECOV     = BITFIELD_BIT(13),
+   AGX_DBG_REFUSE      = BITFIELD_BIT(14),
+   AGX_DBG_BINARIES    = BITFIELD_BIT(15),
 };
 /* clang-format on */
 
@@ -38,6 +40,35 @@ uint64_t agx_get_compiler_debug(void);
 /* Why the last agx_compile_shader_nir() on this thread returned false
  * ("" when it succeeded), for the driver's "cannot encode" error. */
 const char *agx_last_compile_refusal(void);
+
+/* G18 multisample admission/code generation remains explicitly selectable. */
+bool agx_g18_msaa4_enabled(void);
+
+/* Native-1094 grounded G18 encodings (run 1109); AGX_G18_NATIVE1109=0 opts out. */
+bool agx_g18_native1109_enabled(void);
+
+/* Native-1094 grounded G18 changes of run 1121; AGX_G18_NATIVE1121=0 opts out. */
+bool agx_g18_native1121_enabled(void);
+
+/* Native-1121 grounded G18 changes of run 1128; AGX_G18_NATIVE1128=0 opts out. */
+bool agx_g18_native1128_enabled(void);
+
+/* Native-1121 grounded G18 mixed-format tile path of run 1130;
+ * AGX_G18_NATIVE1130=0 opts out. */
+bool agx_g18_native1130_enabled(void);
+
+/* Native-1130 grounded general G18 single-sample mixed-format tile path of
+ * run 1139 (index-order layout, partial masks, blend reads, zero masks);
+ * AGX_G18_NATIVE1139=0 restores the run-1134 behaviour for A/B. */
+bool agx_g18_native1139_enabled(void);
+
+/* The run-1139 path builds on run 1130's: AGX_G18_NATIVE1130=0 restores the
+ * run-1128 behaviour whatever AGX_G18_NATIVE1139 says. */
+static inline bool
+agx_g18_native_mixed_enabled(void)
+{
+   return agx_g18_native1130_enabled() && agx_g18_native1139_enabled();
+}
 
 /* Fragment-structure code generation choices that remain selectable. */
 enum agx_fs_structure_flag {

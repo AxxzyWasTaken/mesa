@@ -7,6 +7,7 @@
 
 #include <string.h>
 
+#include "agx3_binder.h"
 #include "agx3_pack.h"
 
 /* A 32-bit register source that carries no modifier -- the only source shape
@@ -23,6 +24,19 @@ dest_is_reg32(const struct agx3_sel_instr *I)
    return I->has_dest && I->dest_size == AGX3_SEL_SIZE_32;
 }
 
+/* The compact conversion/reciprocal specimens end their source's lifetime.
+ * Native G17G and G18G live-input references clear f27 for flt2int and f29
+ * for int2flt/f32rcp. In these ten-byte forms both occupy byte 8, bit 5;
+ * register deposits, rounding modes and waits occupy different bits.
+ * Keep a live source available to later instructions, including stores.
+ */
+static void
+preserve_unary_source(enum agx_isa_encoding encoding, bool live, uint8_t *bytes)
+{
+   if (encoding == AGX_ISA_ENCODING_AGX3C && live)
+      bytes[8] &= ~0x20;
+}
+
 bool
 agx3_select_encode(enum agx_isa_encoding encoding,
                    const struct agx3_sel_instr *I,
@@ -30,6 +44,38 @@ agx3_select_encode(enum agx_isa_encoding encoding,
 {
    if (out == NULL || len == NULL || I == NULL)
       return false;
+
+   /*
+    * G18G (agx3d): these compact packers write agx3b/agx3c bytes, so none of
+    * them serves it. Only `end` is encoded, from the field vector agx3c's
+    * `end` also has (f0 = 3, f1 = 39) through the agx3d table: 08 04, the
+    * last word of every applegpu_g18g program (775 aligned pairs of the
+    * j813-linux gpu/m5-*-reference corpus, and all 41 native texts).
+    */
+   if (encoding == AGX_ISA_ENCODING_AGX3D) {
+      static const struct agx3_field_kv end_fields[] = {{0, 3}, {1, 39}};
+      memset(out, 0, AGX3_SEL_MAX_LENGTH);
+      *len = 0;
+      if (I->saturate)
+         return false;
+      if (I->op == AGX3_SEL_OP_END)
+         return agx3_bind_compose(encoding, "end", AGX3_BIND_APPLE_ORDER,
+                                  end_fields, 2, NULL, 0, out, len);
+      /* A 32-bit immediate into a register: the agx3c LDIMM row of
+       * agx3_alu_table.h (f9=2 f10=2 f15=3 f16=105, f2 destination, f14
+       * value), which the applegpu_g18g ldimm witnesses 41 03 00 08 and
+       * 11 07 00 00 80 3f carry exactly; see agx3_alu_compose(). */
+      if (I->op == AGX3_SEL_OP_MOV_IMM && dest_is_reg32(I) &&
+          (I->dest & 1) == 0 && I->dest < 256) {
+         const struct agx3_field_kv base[] = {
+            {9, 2}, {10, 2}, {15, 3}, {16, 105},
+         };
+         const struct agx3_field_kv ov[] = {{2, I->dest}, {14, I->imm}};
+         return agx3_bind_compose(encoding, "ldimm", AGX3_BIND_APPLE_ORDER,
+                                  base, 4, ov, 2, out, len);
+      }
+      return false;
+   }
 
    /* Only the two AGX3 encodings; agx2 has its own packer. */
    if (encoding != AGX_ISA_ENCODING_AGX3B &&
@@ -242,6 +288,7 @@ agx3_select_encode(enum agx_isa_encoding encoding,
       if (!agx3_pack_f32_to_int_rtz_reg(encoding, mode, I->dest, I->src[0].reg,
                                         &e))
          return false;
+      preserve_unary_source(encoding, I->src[0].live, e.bytes);
       memcpy(out, e.bytes, e.length);
       *len = e.length;
       return true;
@@ -254,6 +301,7 @@ agx3_select_encode(enum agx_isa_encoding encoding,
          return false;
       if (!agx3_pack_i32_to_f32_reg(encoding, I->dest, I->src[0].reg, &e))
          return false;
+      preserve_unary_source(encoding, I->src[0].live, e.bytes);
       memcpy(out, e.bytes, e.length);
       *len = e.length;
       return true;
@@ -266,6 +314,7 @@ agx3_select_encode(enum agx_isa_encoding encoding,
          return false;
       if (!agx3_pack_u32_to_f32_reg(encoding, I->dest, I->src[0].reg, &e))
          return false;
+      preserve_unary_source(encoding, I->src[0].live, e.bytes);
       memcpy(out, e.bytes, e.length);
       *len = e.length;
       return true;
@@ -304,6 +353,7 @@ agx3_select_encode(enum agx_isa_encoding encoding,
          return false;
       if (!agx3_pack_f32_rcp_reg(encoding, I->dest, I->src[0].reg, &e))
          return false;
+      preserve_unary_source(encoding, I->src[0].live, e.bytes);
       memcpy(out, e.bytes, e.length);
       *len = e.length;
       return true;

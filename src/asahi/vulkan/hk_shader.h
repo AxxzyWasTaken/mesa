@@ -503,9 +503,13 @@ hk_any_variant(struct hk_api_shader *obj)
 /* Link a complete pipeline's fragment shader for the state the pipeline
  * fixes, so its first draw finds the linked program. */
 void hk_prelink_pipeline_fragment(struct hk_device *dev,
-                                  struct hk_api_shader *vs,
+                                  const struct hk_shader *hw_vs,
                                   struct hk_api_shader *fs,
                                   const struct vk_graphics_pipeline_state *state);
+void hk_prelink_object_fragment(struct hk_device *dev,
+                                struct hk_api_shader *fs);
+void hk_prelink_vertex(struct hk_device *dev, struct hk_api_shader *vs,
+                       bool hw_program, bool sw_program);
 
 static inline struct hk_shader *
 hk_fs_variant(struct hk_api_shader *obj, unsigned samples)
@@ -563,6 +567,10 @@ hk_rast_mesh_variant(struct hk_api_shader *obj)
 struct hk_linked_shader {
    struct agx_linked_shader b;
 
+   /* A specialized fragment executable may own a different constant program
+    * and uniform layout. Its launch source lives as long as this executable. */
+   struct hk_shader *variant_source;
+
    /* Immutable G17P compute-program templates keyed by uniform-range shape.
     * Entries are published lock-free while command buffers record in
     * parallel and are released with this linked executable. */
@@ -615,6 +623,15 @@ struct hk_linked_shader {
    } usc;
 };
 
+/* Executable resource requirements may differ from the API shader's after
+ * specialization. Use this for both loader and surrounding launch records. */
+static inline struct hk_shader *
+hk_linked_shader_source(struct hk_shader *source,
+                        const struct hk_linked_shader *linked)
+{
+   return linked && linked->variant_source ? linked->variant_source : source;
+}
+
 /* `main_part`, when non-NULL, replaces main->b as the linked main part
  * (the inline-blend monolithic fragment program); main still supplies the
  * API shader's uniform and resource layout. */
@@ -636,6 +653,12 @@ struct hk_linked_shader *hk_fast_link(struct hk_device *dev, bool fragment,
                                       struct agx_shader_part *prolog,
                                       struct agx_shader_part *epilog,
                                       unsigned nr_samples_shaded);
+
+struct hk_linked_shader *
+hk_fast_link_fragment_variant(struct hk_device *dev,
+                              const struct hk_shader *source,
+                              const struct agx_shader_part *part,
+                              const struct agx_fs_epilog_key *key);
 
 extern const struct vk_device_shader_ops hk_device_shader_ops;
 
@@ -704,6 +727,7 @@ hk_nir_lower_descriptors(nir_shader *nir,
                          uint32_t set_layout_count,
                          struct vk_descriptor_set_layout *const *set_layouts,
                          bool sparse_buffer_residency,
+                         bool sparse_soft_unmapped,
                          uint64_t sparse_ro_offset, bool scaled_sampling,
                          bool sampler_has_lod_bias);
 

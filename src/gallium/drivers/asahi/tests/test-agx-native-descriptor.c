@@ -163,6 +163,24 @@ test_g17p_txf_sampler(void)
    CHECK(memcmp(&sampler,
                 &(struct agx_gallium_sampler_descriptor){0},
                 sizeof(sampler)) == 0);
+
+   /* G18G packs the same fetch sampler as G17G's Gen5 record (the generation
+    * hk_pack_native_sampler emits there): the compare-mode selector is set
+    * even without a comparison. */
+   static const uint8_t expected_g18g[AGX_GALLIUM_SAMPLER_AGX3_SIZE] = {
+      0x00, 0x00, 0x0f, 0x68, 0x1b, 0x04, 0x00, 0x00,
+   };
+   memset(&sampler, 0xa5, sizeof(sampler));
+   CHECK(agx_gallium_pack_g17p_txf_sampler(AGX_CHIP_G18G, &sampler));
+   if (memcmp(&sampler, expected_g18g, sizeof(expected_g18g)) != 0) {
+      const uint8_t *b = (const uint8_t *)&sampler;
+      fprintf(stderr, "G18G txf sampler bytes:");
+      for (unsigned i = 0; i < sizeof(expected_g18g); ++i)
+         fprintf(stderr, " %02x", b[i]);
+      fprintf(stderr, "\n");
+   }
+   CHECK(memcmp(&sampler, expected_g18g, sizeof(expected_g18g)) == 0);
+   CHECK(!agx_gallium_pack_g17p_txf_sampler(AGX_CHIP_G18G, NULL));
    CHECK(!agx_gallium_pack_g17p_txf_sampler(AGX_CHIP_G17P, NULL));
 }
 
@@ -258,6 +276,16 @@ test_g17p_sampler_handles(void)
          AGX_CHIP_G15S, cases[i].api, &custom));
       CHECK(native == cases[i].native &&
             custom == AGX_GALLIUM_G17P_CUSTOM_BORDER_BASE + cases[i].api);
+
+      /* G18G shares the G17P sampler table layout: its API samplers follow
+       * the fetch sampler at slot 0 the same way. */
+      native = custom = UINT16_MAX;
+      CHECK(agx_gallium_g17p_sampler_handle(AGX_CHIP_G18G, cases[i].api,
+                                            &native));
+      CHECK(agx_gallium_g17p_custom_border_handle(
+         AGX_CHIP_G18G, cases[i].api, &custom));
+      CHECK(native == cases[i].native &&
+            custom == AGX_GALLIUM_G17P_CUSTOM_BORDER_BASE + cases[i].api);
    }
 
    uint16_t untouched = 0x5555;
@@ -272,6 +300,13 @@ test_g17p_sampler_handles(void)
    CHECK(!agx_gallium_g17p_custom_border_handle(AGX_CHIP_G17G, 0,
                                                  &untouched));
    CHECK(!agx_gallium_g17p_custom_border_handle(AGX_CHIP_G17P, 0, NULL));
+   CHECK(!agx_gallium_g17p_sampler_handle(
+      AGX_CHIP_G18G, AGX_GALLIUM_G17P_API_SAMPLERS, &untouched));
+   CHECK(!agx_gallium_g17p_custom_border_handle(
+      AGX_CHIP_G18G, AGX_GALLIUM_G17P_API_SAMPLERS, &untouched));
+   CHECK(untouched == 0x5555);
+   CHECK(!agx_gallium_g17p_sampler_handle(AGX_CHIP_G18G, 0, NULL));
+   CHECK(!agx_gallium_g17p_custom_border_handle(AGX_CHIP_G18G, 0, NULL));
 }
 
 static void
@@ -375,6 +410,8 @@ test_agx3_pbe(void)
       CHECK(memcmp(native.opaque, expected.bytes, sizeof(expected.bytes)) == 0);
       CHECK(!agx_gallium_pack_native_pbe(AGX_DESCRIPTOR_GENERATION_10,
                                           &native, &msaa));
+      /* G18G admits the qualified Gen10 multisample PBE. */
+      CHECK(agx_gallium_pack_g18_native_pbe(&native, &msaa));
       msaa.levels = 2;
       CHECK(!agx_gallium_pack_native_pbe(AGX_DESCRIPTOR_GENERATION_9,
                                           &native, &msaa));

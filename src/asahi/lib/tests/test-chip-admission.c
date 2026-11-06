@@ -227,6 +227,60 @@ main(void)
    assert(agx_chip_usc_helper_table_slots(AGX_CHIP_G17P, 6) == 6);
    assert(agx_chip_usc_helper_table_slots(AGX_CHIP_G17P, 10) == 10);
 
+   /* The M5 Max (T6050, G17C) is admitted on the M5 bring-up path with its
+    * four clusters only. */
+   struct drm_asahi_params_global t6050c = g15_params('C', 0x6050, 4);
+   t6050c.gpu_generation = 17;
+   t6050c.gpu_hal_generation = DRM_ASAHI_GPU_HAL_300;
+   assert(agx_chip_from_params(&t6050c) == AGX_CHIP_G17C);
+   assert(agx_chip_g17_m5(AGX_CHIP_G17C));
+   assert(agx_params_m5_bringup_supported(&t6050c));
+   assert(!agx_params_driver_supported(&t6050c));
+
+   bad = t6050c;
+   bad.num_clusters_total = 2;
+   assert(!agx_params_m5_bringup_supported(&bad));
+
+   bad = t6050c;
+   bad.chip_id = 0x6051;
+   assert(!agx_params_m5_bringup_supported(&bad));
+
+   bad = t6050c;
+   bad.num_dies = 2;
+   assert(!agx_params_m5_bringup_supported(&bad));
+
+   /* The M5 (T8142, G17G) is admitted by its exact kernel identity. */
+   struct drm_asahi_params_global m5 = {
+      .gpu_generation = 17,
+      .gpu_variant = 'G',
+      .chip_id = 0x8142,
+      .num_dies = 1,
+      .num_clusters_total = 1,
+      .usc_generation = 3,
+      .gpu_hal_generation = DRM_ASAHI_GPU_HAL_300,
+   };
+   assert(!agx_params_driver_supported(&m5));
+   assert(agx_params_m5_supported(&m5));
+   assert(!agx_params_m5_supported(&t6050c));
+   m5.chip_id = 0x8140;
+   assert(!agx_params_m5_supported(&m5));
+   m5.chip_id = 0x8142;
+   m5.gpu_variant = 'P';
+   assert(!agx_params_m5_supported(&m5));
+   m5.gpu_variant = 'G';
+   m5.num_dies = 2;
+   assert(!agx_params_m5_supported(&m5));
+   m5.num_dies = 1;
+   m5.num_clusters_total = 2;
+   assert(!agx_params_m5_supported(&m5));
+   m5.num_clusters_total = 1;
+   m5.usc_generation = 2;
+   assert(!agx_params_m5_supported(&m5));
+   m5.usc_generation = 3;
+   m5.gpu_hal_generation = DRM_ASAHI_GPU_HAL_200;
+   assert(!agx_params_m5_supported(&m5));
+   assert(!agx_params_m5_supported(NULL));
+
    printf("chip admission: ok\n");
    return 0;
 }

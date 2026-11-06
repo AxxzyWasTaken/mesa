@@ -38,8 +38,10 @@ struct agx_vdm_state_vertex_pipeline_pair {
  * semantics are not completely grounded.
  *
  * The target allowlist contains only identities directly served by the
- * inspected Apple Metal plugins.  G16P and G17A share neighboring command-
- * stream generations but are not claimed by those plugins and fail closed.
+ * inspected Apple Metal plugins, plus G18G, whose J873 native VDM state and
+ * fragment PPP records carry this exact pair.  G16P and G17A share
+ * neighboring command-stream generations but are not claimed by those
+ * plugins and fail closed.
  * This helper does not represent the surrounding VDM State record, emit a
  * live command, or enable scheduling, submission, or device admission.
  */

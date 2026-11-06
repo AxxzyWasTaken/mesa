@@ -1041,8 +1041,11 @@ hk_get_device_properties(const struct agx_device *dev,
 
    /* Note: update nir_shader_compiler_options.max_samples when changing this. */
    const VkSampleCountFlagBits sample_counts =
-      VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_2_BIT | VK_SAMPLE_COUNT_4_BIT |
-      (agx_chip_g17_m5(dev->chip) ? VK_SAMPLE_COUNT_8_BIT : 0);
+      dev->chip == AGX_CHIP_G18G
+         ? VK_SAMPLE_COUNT_1_BIT
+         : (VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_2_BIT |
+            VK_SAMPLE_COUNT_4_BIT |
+            (agx_chip_g17_m5(dev->chip) ? VK_SAMPLE_COUNT_8_BIT : 0));
 
    /* Integer colour attachments and sampled multisample images use the same
     * native tile store/reload and texel-fetch paths as other colour formats.
@@ -1563,6 +1566,11 @@ hk_get_device_properties(const struct agx_device *dev,
       .advancedBlendAllOperations = true,
    };
 
+   /* Strict residency on M5 relies on soft faults; see
+    * hk_sparse_buffer_unmapped(). */
+   if (agx_chip_g17_m5(dev->chip))
+      properties->sparseResidencyNonResidentStrict = agx_has_soft_fault(dev);
+
    if (agx_chip_native_agx3(dev->chip)) {
       /* Measured per operation under the G17P drm-shim:
        *
@@ -2008,7 +2016,9 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
          debug_get_bool_option("ASAHI_M5_NATIVE_RT", false);
       supported_extensions.KHR_ray_tracing_pipeline = native_rt;
       supported_extensions.KHR_ray_tracing_maintenance1 = native_rt;
-      supported_extensions.KHR_pipeline_library = native_rt;
+      /* Graphics pipeline libraries need VK_KHR_pipeline_library whether or
+       * not ray tracing pipelines are exposed. */
+      supported_extensions.KHR_pipeline_library |= native_rt;
    }
    supported_extensions.KHR_cooperative_matrix =
       agx_chip_g17_m5(pdev->dev.chip) &&

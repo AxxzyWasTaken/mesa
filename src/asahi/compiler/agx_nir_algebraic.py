@@ -383,6 +383,17 @@ for bits in range(1, 16):
          ('ubitfield_extract', a, 16, bits)),
     ])
 
+# Computing (2*b)*b first can overflow even when a - 2*a*b*b is finite.
+# Multiplying a first bounds the intermediates when the final result is finite;
+# keeping the factor of two in the final FMA also avoids overflow before the
+# subtraction. Only reassociate non-precise FP32 operations with no shared
+# intermediate. Run after the generic algebraic passes to preserve this order.
+avoid_square_overflow = [
+    (('~ffma@32', ('fneg', a),
+      ('~fmul(is_used_once)', ('~fmul(is_used_once)', 2.0, b), b), a),
+     ('ffma', -2.0, ('fmul', ('fmul', a, b), b), a)),
+]
+
 fold_aligned_bounds = []
 for shift in (1, 2):
     size = 1 << shift
@@ -394,6 +405,23 @@ for shift in (1, 2):
                ('iadd', ('iand', 'a@32', -size),
                               delta + size - 1), 'b@32'),
              ('ult', ('ushr', folded_offset, shift), ('ushr', b, shift))))
+
+# D3D float-to-integer conversions saturate and map NaN to 0. DXVK spells them
+# out as a conversion plus clamping selects; the M5 hardware conversion already
+# does exactly this (verified for both signs of NaN, infinities and every
+# boundary), so fold the selects into the bare conversion.
+fold_d3d_float_to_int = [
+    (('bcsel', ('fneu', 'a@32', a), 0,
+      ('bcsel', ('flt', a, -2147483648.0), -0x80000000,
+       ('bcsel', ('flt', 2147483520.0, a), 0x7fffffff, ('f2i32', a)))),
+     ('f2i32', a)),
+    (('bcsel', ('flt', 4294967040.0, 'a@32'), 0xffffffff,
+      ('f2u32', ('bcsel', ('fneu', a, a), 0.0, ('fmax', a, 0.0)))),
+     ('f2u32', a)),
+    (('bcsel', ('flt', 4294967040.0, 'a@32'), 0xffffffff,
+      ('f2u32', ('fmax', a, 0.0))),
+     ('f2u32', a)),
+]
 
 fold_selected_f2i32 = [
     (('bcsel@32(agx_selected_f2i32_controls_match)', 'a@1',
@@ -441,6 +469,8 @@ agx_selected_f2i32_controls_match(const nir_alu_instr *instr)
     print(nir_algebraic.AlgebraicPass("agx_nir_lower_algebraic_late",
                                       lower_sm5_shift + lower_pack +
                                       lower_selects).render())
+    print(nir_algebraic.AlgebraicPass("agx_nir_avoid_square_overflow",
+                                      avoid_square_overflow).render())
     print(nir_algebraic.AlgebraicPass("agx_nir_fuse_selects",
                                       opt_selects).render())
     print(nir_algebraic.AlgebraicPass("agx_nir_fold_pixel_coord",
@@ -449,6 +479,8 @@ agx_selected_f2i32_controls_match(const nir_alu_instr *instr)
                                       fold_extract16_bfe).render())
     print(nir_algebraic.AlgebraicPass("agx_nir_fuse_doubled_add",
                                       fuse_doubled_add).render())
+    print(nir_algebraic.AlgebraicPass("agx_nir_fold_d3d_float_to_int",
+                                      fold_d3d_float_to_int).render())
     print(nir_algebraic.AlgebraicPass("agx_nir_fuse_algebraic_late",
                                       fuse_extr + fuse_ubfe +
                                       fuse_imad + ixor_bcsel +

@@ -5,6 +5,7 @@
 
 #include "hk_agx3_vdm_decode.h"
 
+#include "compiler/shader_enums.h"
 #include "util/blob.h"
 #include "util/bitscan.h"
 
@@ -132,6 +133,66 @@ hk_agx3_g17p_vertex_program_info(
       .user_size = compiler_info->user_size,
    };
    return agx_g17p_vertex_program_info(chip, &shared, program);
+}
+
+bool
+hk_agx3_g17g_vertex_program_info(
+   enum agx_chip chip,
+   const struct hk_agx3_g17p_vertex_compile_info *compiler_info,
+   struct agx_vdm_state_update_program_info *program)
+{
+   const bool position = compiler_info && compiler_info->uvs_size == 4 &&
+                         compiler_info->uvs_written == 0;
+   /* Dynamic-topology pipelines retain the default point-size output even
+    * for triangle draws. Use the shared UVS footprint encoding for that
+    * fifth word; layer/viewport output remains a separate profile.
+    */
+   const bool position_psiz = compiler_info &&
+      compiler_info->uvs_size == 5 && compiler_info->psiz_off == 4 &&
+      compiler_info->layer_viewport_off == 5 && compiler_info->clip_off == 5 &&
+      compiler_info->uvs_written == 0;
+   /* Native applegpu_g17g color and color+point-size vertex pipelines report
+    * __GPU_LD_MD root.field1.field3 = 8/9 with field4 absent. This is the
+    * same all-f32 VsStateConfig footprint consumed by the shared encoder,
+    * with HAL300's pre-HAL300 flags absent. Fragment coefficient state is
+    * validated independently before any draw can be submitted.
+    */
+   const bool color = compiler_info &&
+      compiler_info->user_size == 4 &&
+      compiler_info->uvs_written == BITFIELD64_BIT(VARYING_SLOT_VAR0) &&
+      compiler_info->psiz_off == 8 &&
+      (compiler_info->layer_viewport_off == 8 ||
+       compiler_info->layer_viewport_off == 9) &&
+      compiler_info->clip_off == compiler_info->layer_viewport_off;
+   if ((chip != AGX_CHIP_G17G && chip != AGX_CHIP_G18G) || !compiler_info ||
+       (chip == AGX_CHIP_G17G &&
+        (!color && ((!position && !position_psiz) ||
+                    compiler_info->user_size != 0)))) {
+      if (program)
+         memset(program, 0, sizeof(*program));
+      return false;
+   }
+   /* G18G: the M5 GL path builds the draw record from the shader's actual
+    * UVS footprint for general layouts, so admit every layout that passes
+    * the shared invariant-checked builder; the profile restriction above is
+    * the G17G witness set. */
+   return hk_agx3_g17p_vertex_program_info(chip, compiler_info, program);
+}
+
+bool
+hk_agx3_decode_vdm_record(enum agx_chip chip, const void *command,
+                          size_t available,
+                          struct agx_vdm_decoded_record *record)
+{
+   return agx_vdm_decode_one(chip, command, available, record);
+}
+
+bool
+hk_agx3_encode_vdm_state_update_template(
+   enum agx_chip chip, const struct agx_vdm_state_update_template_info *info,
+   struct agx_vdm_state_update *out)
+{
+   return agx_vdm_state_update_template_pack(chip, info, out);
 }
 
 bool

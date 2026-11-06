@@ -740,7 +740,7 @@ create_gs_rast_shader(const nir_shader *gs, const struct lower_gs_state *state,
    }
 
    /* Optimize out pointless gl_PointSize outputs. Bizarrely, these occur. */
-   if (shader->info.gs.output_primitive != MESA_PRIM_POINTS)
+   if (gs->info.gs.output_primitive != MESA_PRIM_POINTS)
       shader->info.outputs_written &= ~VARYING_BIT_PSIZ;
 
    nir_builder b_ =

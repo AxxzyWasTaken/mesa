@@ -446,9 +446,13 @@ agx_read_registers(const agx_context *ctx, const agx_instr *I, unsigned s)
                    agx_channels(I->src[s]) == 1);
             return 2;
          }
+         /* G17P and G18G retain a full uint texel-fetch level for their
+          * integer sampler publication. Track both halves through RA.
+          */
          if ((I->op == AGX_OPCODE_TEXTURE_LOAD ||
               I->op == AGX_OPCODE_IMAGE_LOAD) &&
-             ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3B &&
+             (ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3B ||
+              agx_is_g18g(&ctx->key->dev)) &&
              I->lod_mode == AGX_LOD_MODE_LOD_MIN &&
              I->src[s].type != AGX_INDEX_IMMEDIATE)
              return 2;

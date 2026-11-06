@@ -55,8 +55,10 @@ hk_g17p_prewarm_poly_kernels(struct hk_device *dev)
 {
 #define PREWARM(program, args)                                                \
    do {                                                                        \
-      if (!hk_g17p_compute_program_cache_prewarm(                              \
-             dev, program, sizeof(struct args)))                               \
+      if (agx_chip_g17_m5(dev->dev.chip)                                       \
+             ? !agx_get_precompiled(&dev->bg_eot, program)                     \
+             : !hk_g17p_compute_program_cache_prewarm(                         \
+                  dev, program, sizeof(struct args)))                          \
          return false;                                                         \
    } while (0)
 
@@ -73,6 +75,11 @@ hk_g17p_prewarm_poly_kernels(struct hk_device *dev)
    PREWARM(LIBAGX_TESS_QUAD_1, libagx_tess_quad_args);
 
 #undef PREWARM
+
+   /* M5 resets the geometry heap with an immediate-write kernel. */
+   if (agx_chip_g17_m5(dev->dev.chip) &&
+       !agx_get_precompiled(&dev->bg_eot, LIBAGX_WRITE_U32S))
+      return false;
 
    return true;
 }
@@ -143,7 +150,8 @@ hk_upload_rodata(struct hk_device *dev)
       memcpy(map + offs + i * sampler_size, &txf, sampler_size);
    offs += sampler_count * sampler_size;
 
-   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) {
+   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+       dev->dev.chip == AGX_CHIP_G18G) {
       const uint64_t pointers[2] = {
          dev->sampled_images.base_va,
          dev->samplers.table.bo->va->addr,
@@ -263,15 +271,17 @@ hk_init_sampler_heap(struct hk_device *dev, struct hk_sampler_heap *h)
    VkResult result =
       hk_descriptor_table_init(dev, &h->table, sampler_size, 1024,
                                agx_native_graphics(&dev->dev) ? 4096
-                               : agx_chip_g17_m5(dev->dev.chip) ? 2048
-                                                                : 1024);
+                               : (agx_chip_g17_m5(dev->dev.chip) ||
+                                  dev->dev.chip == AGX_CHIP_G18G) ? 2048
+                                                                  : 1024);
 
    if (result != VK_SUCCESS) {
       ralloc_free(h->ht);
       return result;
    }
 
-   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) {
+   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+       dev->dev.chip == AGX_CHIP_G18G) {
       /* Native indexed read() and sample() share the sampler table prefix.
        * Reserve texel-fetch sampler zero once, so mixed shaders need no
        * per-fetch pointer switch or descriptor copy. Preserve at least the
@@ -942,7 +952,8 @@ hk_CreateDevice(VkPhysicalDevice physicalDevice,
    if (result != VK_SUCCESS)
       HK_INIT_FAIL(fail_dev, "sampler-heap", 0);
 
-   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) {
+   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+       dev->dev.chip == AGX_CHIP_G18G) {
       /* Capacity stays HK_MAX_DESCRIPTORS, but memory is added a chunk at a
        * time as image and buffer views are created. */
       result = hk_descriptor_table_init(dev, &dev->sampled_images, 32,
@@ -980,11 +991,11 @@ hk_CreateDevice(VkPhysicalDevice physicalDevice,
    }
    hk_g17p_bg_eot_dev_cache_init(dev);
 
-   /* Geometry and tessellation are advertised core functionality on G17P.
-    * Upload their immutable internal kernels with the device instead of
+   /* Geometry and tessellation are advertised core functionality on G17P and
+    * M5. Upload their immutable internal kernels with the device instead of
     * making the first vkCmdDraw that needs each kernel serialize on the
     * cache lock and allocate its executable image. */
-   if (agx_native_graphics(&dev->dev) &&
+   if ((agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) &&
        !hk_g17p_prewarm_poly_kernels(dev)) {
       result = VK_ERROR_OUT_OF_DEVICE_MEMORY;
       HK_INIT_FAIL(fail_bg_eot, "poly-prewarm", 0);
@@ -1095,7 +1106,8 @@ fail_rodata:
 fail_queries:
    hk_descriptor_table_finish(dev, &dev->occlusion_queries);
 fail_sampled_images:
-   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip))
+   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+       dev->dev.chip == AGX_CHIP_G18G)
       hk_descriptor_table_finish(dev, &dev->sampled_images);
 fail_samplers:
    hk_destroy_sampler_heap(dev, &dev->samplers);
@@ -1176,7 +1188,8 @@ hk_DestroyDevice(VkDevice _device, const VkAllocationCallbacks *pAllocator)
    }
 
    hk_destroy_sampler_heap(dev, &dev->samplers);
-   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip))
+   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+       dev->dev.chip == AGX_CHIP_G18G)
       hk_descriptor_table_finish(dev, &dev->sampled_images);
    hk_descriptor_table_finish(dev, &dev->occlusion_queries);
    agx_bo_unreference(&dev->dev, dev->rodata.heap_bo);
