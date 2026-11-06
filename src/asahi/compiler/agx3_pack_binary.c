@@ -2038,9 +2038,13 @@ agx3_emit_storage_image_write(struct util_dynarray *emission,
       I->src[4].type == AGX_INDEX_IMMEDIATE && !I->src[4].memory &&
       !I->src[4].abs && !I->src[4].neg && I->src[4].value <= 15;
    /* Cube stores reach the packer as 2D arrays with the face folded into the
-    * layer, and 1D stores as 2D. */
-   const bool array = I->dim == AGX_DIM_2D_ARRAY;
-   const bool three_d = I->dim == AGX_DIM_3D;
+    * layer, and 1D stores as 2D. G17G writes a layered image as 3D, the layer
+    * staged like z: Gallium describes its PBE as 3D (agx_batch_upload_pbe), a
+    * single-level 3D slice being a 2D-array layer. The G17P PACK_IMGWIR layer
+    * did not reach the G17G write (every layer landed in layer 0). */
+   const bool array = I->dim == AGX_DIM_2D_ARRAY && !m5;
+   const bool three_d = I->dim == AGX_DIM_3D ||
+                        (m5 && I->dim == AGX_DIM_2D_ARRAY);
    const unsigned coords = (array || three_d) ? 3 : 2;
    if ((!m5 && enc != AGX_ISA_ENCODING_AGX3B) || I->nr_dests != 0 ||
        (m5 && ((I->dim != AGX_DIM_2D && !array && !three_d) ||
