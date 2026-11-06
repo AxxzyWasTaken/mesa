@@ -845,6 +845,7 @@ static const _mesa_glsl_extension _mesa_glsl_supported_extensions[] = {
    EXT(EXT_shader_pixel_local_storage),
    EXT(EXT_shader_realtime_clock),
    EXT(EXT_shader_samples_identical),
+   EXT(EXT_shader_texture_lod),
    EXT(EXT_shadow_samplers),
    EXT(EXT_tessellation_point_size),
    EXT_AEP(EXT_tessellation_shader),

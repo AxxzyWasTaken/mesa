@@ -309,6 +309,7 @@ EXT(EXT_shader_io_blocks                    , dummy_true                        
 EXT(EXT_shader_pixel_local_storage          , EXT_shader_pixel_local_storage         ,  x ,  x ,  x ,  30, 2014)
 EXT(EXT_shader_realtime_clock               , EXT_shader_realtime_clock              , GLL, GLC,  x ,  31, 2018)
 EXT(EXT_shader_samples_identical            , EXT_shader_samples_identical           , GLL, GLC,  x ,  31, 2015)
+EXT(EXT_shader_texture_lod                  , ARB_shader_texture_lod                 ,  x ,  x ,  x , ES2, 2011)
 EXT(EXT_shadow_funcs                        , ARB_shadow                             , GLL,  x ,  x ,  x , 2002)
 EXT(EXT_shadow_samplers                     , ARB_shadow                             ,  x ,  x ,  x , ES2, 2012)
 EXT(EXT_stencil_two_side                    , EXT_stencil_two_side                   , GLL,  x ,  x ,  x , 2001)
