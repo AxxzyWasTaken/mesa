@@ -46,7 +46,10 @@ agx_fs_epilog_apply_device_policy(enum agx_chip chip,
       return;
 
    const bool g17p = agx_chip_native_agx3(chip);
-   key->preserve_zero_mask = g17p;
+   /* G17G loses a covered pixel with no tile store the same way G17P does:
+    * a draw under glColorMask(GL_FALSE x4) loses the destination, including
+    * the background clear of the same render (gpu/cmask-probe.c). */
+   key->preserve_zero_mask = g17p || agx_chip_g17_m5(chip);
    key->m5_coverage = agx_chip_g17_m5(chip);
    key->g17p_tile_formats = g17p || agx_chip_g17_m5(chip);
 }
