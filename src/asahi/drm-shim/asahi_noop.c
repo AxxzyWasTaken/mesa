@@ -1215,9 +1215,22 @@ asahi_ioctl_noop(int fd, unsigned long request, void *arg)
 static int
 asahi_ioctl_queue_create(int fd, unsigned long request, void *arg)
 {
-   const struct drm_asahi_queue_create *create = arg;
+   struct drm_asahi_queue_create *create = arg;
+   static uint32_t next_queue_id = 1;
 
+   /* Model authorization and a credential change after the screen probe. */
+   static unsigned high_requests;
+   const char *policy = getenv("ASAHI_SHIM_HIGH_PRIORITY");
+   if (create->priority == DRM_ASAHI_PRIORITY_HIGH) {
+      high_requests++;
+      if (policy && (!strcmp(policy, "deny") ||
+                     (!strcmp(policy, "once") && high_requests > 1))) {
+         errno = EACCES;
+         return -1;
+      }
+   }
    shim_usc_exec_base = create->usc_exec_base;
+   create->queue_id = next_queue_id++;
    return 0;
 }
 

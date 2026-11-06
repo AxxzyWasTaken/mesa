@@ -854,6 +854,7 @@ dd_context_create(struct dd_screen *dscreen, struct pipe_context *pipe)
    dctx->pipe = pipe;
    dctx->base.priv = pipe->priv; /* expose wrapped priv data */
    dctx->base.screen = &dscreen->base;
+   dctx->base.context_priority = pipe->context_priority;
    dctx->base.stream_uploader = pipe->stream_uploader;
    dctx->base.const_uploader = pipe->const_uploader;
 
