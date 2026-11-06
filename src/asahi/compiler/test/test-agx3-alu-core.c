@@ -4277,16 +4277,20 @@ static void test_m5_native_half_immediates(void)
                                     false, vectors[i].wait, bytes, &len)
          : agx3_alu_hadd_minifloat(AGX_ISA_ENCODING_AGX3C, vectors[i].dest,
                                     vectors[i].src, vectors[i].immediate, false,
-                                    hint, false, vectors[i].wait, bytes, &len);
+                                    false, hint, false, vectors[i].wait, bytes,
+                                    &len);
       assert(encoded);
       exact(bytes, len, vectors[i].bytes);
    }
    assert(!agx3_alu_hadd_minifloat(AGX_ISA_ENCODING_AGX3C, 0, 0, 256,
-                                   false, AGX3_ALU_HINT_NONE, false, 0, bytes, &len));
+                                   false, false, AGX3_ALU_HINT_NONE, false, 0,
+                                   bytes, &len));
    assert(!agx3_alu_hadd_minifloat(AGX_ISA_ENCODING_AGX3C, 0, 256, 0x30,
-                                   false, AGX3_ALU_HINT_NONE, false, 0, bytes, &len));
+                                   false, false, AGX3_ALU_HINT_NONE, false, 0,
+                                   bytes, &len));
    assert(!agx3_alu_hadd_minifloat(AGX_ISA_ENCODING_AGX3C, 0, 0, 0x30,
-                                   false, AGX3_ALU_HINT_NONE, false, 0x100, bytes, &len));
+                                   false, false, AGX3_ALU_HINT_NONE, false, 0x100,
+                                   bytes, &len));
    puts("M5 half immediates: twenty-four original Apple instructions PASS");
 }
 
