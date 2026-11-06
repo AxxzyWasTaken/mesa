@@ -5958,7 +5958,7 @@ agx3_alu_hadd_one_neg(enum agx_isa_encoding enc, uint16_t dest,
                       bool dest_cache, uint16_t wait_mask,
                       uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
 {
-   return agx3_alu_hadd_minifloat(enc, dest, src, UINT8_C(0x30), true,
+   return agx3_alu_hadd_minifloat(enc, dest, src, UINT8_C(0x30), true, false,
                                   hint, dest_cache, wait_mask, out, len);
 }
 
@@ -6549,7 +6549,7 @@ agx3_alu_fcmp_select16_const_reg_gpu1(
 bool
 agx3_alu_hadd_minifloat(enum agx_isa_encoding enc, uint16_t dest,
                       uint16_t src, uint16_t immediate, bool src_neg,
-                      enum agx3_alu_hint hint,
+                      bool saturate, enum agx3_alu_hint hint,
                       bool dest_cache, uint16_t wait_mask,
                       uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
 {
@@ -6565,16 +6565,17 @@ agx3_alu_hadd_minifloat(enum agx_isa_encoding enc, uint16_t dest,
    const struct agx3_field_kv base[] = {
       {9, 2}, {10, 1}, {24, 1}, {25, 1}, {41, 2}, {42, 1},
    };
-   struct agx3_field_kv fields[17] = {
+   struct agx3_field_kv fields[18] = {
       {2, dest},
       {16, immediate},
       {34, src},
       {47, src_neg},
+      {14, saturate},
       {11, dest_cache},
       {43, hint == AGX3_ALU_HINT_CACHE},
       {45, hint == AGX3_ALU_HINT_DISCARD},
    };
-   unsigned n = 7;
+   unsigned n = 8;
    if (m5) {
       fields[n++] = (struct agx3_field_kv){49, 3};
       fields[n++] = (struct agx3_field_kv){50, 41};

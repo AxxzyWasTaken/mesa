@@ -303,6 +303,11 @@ struct agx_shader_info {
     * clears it if another part precedes this one in the executable. */
    bool agx3_fltnorm_start;
    struct agx3_colour_link_info agx3_colour_link;
+
+   /* Pixel classes this fragment part waited for outside control flow, so
+    * holds on every path into the next part. A G17G epilog must not wait for
+    * them again (framebuffer fetch: the main waits for class 8). */
+   uint8_t agx3_pixel_held;
 };
 
 struct agx_precompiled_kernel_info {

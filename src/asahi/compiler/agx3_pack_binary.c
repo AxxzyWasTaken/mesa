@@ -6281,6 +6281,33 @@ agx3_translate_dynamic_stack_load(const agx_instr *I, uint8_t slot,
    if (I->format == AGX_FORMAT_I8)
       return agx3_translate_byte_stack(I, false, slot, 0, d);
 
+   /* A half vector covers whole registers and the same bytes as the word
+    * load the private-array witness grounds: load the bits as words. Both
+    * halves of every word must be selected, so only an even, contiguous
+    * vector takes this form; an odd or sparse one stays refused. */
+   if (I->format == AGX_FORMAT_I16) {
+      if (!agx3_dynamic_stack_load(I) || I->nr_dests != 1 || !I->mask ||
+          (I->mask & ~15))
+         return false;
+      const agx_index dst = I->dest[0], index = I->src[0];
+      const unsigned channels = util_bitcount(I->mask);
+      if (dst.size != AGX_SIZE_16 || agx_channels(dst) != channels ||
+          I->mask != (1u << channels) - 1 || (channels & 1) ||
+          !agx3_tex_plain_reg(dst) || (dst.value & 1) ||
+          dst.value + channels > 256 ||
+          !agx3_tex_plain_reg(index) || index.size != AGX_SIZE_32 ||
+          agx_channels(index) != 1 || (index.value & 1) || index.value > 254 ||
+          (index.cache && index.discard))
+         return false;
+      *d = (struct agx3_tps_desc){
+         .data = dst.value, .width = AGX3_MEM_W32,
+         .mask = (uint8_t)((1u << (channels / 2)) - 1),
+         .index = index.value, .index_kill = index.discard,
+         .frame_region = 1, .retain_tps = true, .slot = slot,
+      };
+      return true;
+   }
+
    if (!agx3_dynamic_stack_load(I) || I->nr_dests != 1 ||
        I->format != AGX_FORMAT_I32 || !I->mask || (I->mask & ~15))
       return false;
@@ -20353,7 +20380,7 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
          }
 
          if (enc == AGX_ISA_ENCODING_AGX3C && I->op == AGX_OPCODE_HADD &&
-             I->nr_dests == 1 && I->nr_srcs == 2 && !I->saturate &&
+             I->nr_dests == 1 && I->nr_srcs == 2 &&
              agx3_half_reg(I->dest[0]) && agx_channels(I->dest[0]) == 1) {
             const bool swap = I->src[0].type == AGX_INDEX_IMMEDIATE;
             const agx_index src = I->src[swap ? 1 : 0], imm = I->src[swap ? 0 : 1];
@@ -20363,8 +20390,9 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
                 !imm.abs && !imm.neg && !imm.memory) {
                uint8_t bytes[AGX3_ALU_MAX_LENGTH], len;
                if (!agx3_alu_hadd_minifloat(enc, I->dest[0].value, src.value,
-                      imm.value, src.neg, agx3_post_ra_hint(src),
-                      I->dest[0].cache, wait, bytes, &len) ||
+                      imm.value, src.neg, I->saturate,
+                      agx3_post_ra_hint(src), I->dest[0].cache, wait, bytes,
+                      &len) ||
                    !agx3_append(emission, bytes, len))
                   AGX3_REFUSE(I);
                continue;
@@ -20415,7 +20443,7 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
                 imm.discard || imm.size != AGX_SIZE_16 ||
                 agx_channels(imm) != 1 ||
                 !agx3_alu_hadd_minifloat(enc, dst.value, src.value, imm.value, src.neg,
-                                       agx3_post_ra_hint(src), dst.cache, wait,
+                                       false, agx3_post_ra_hint(src), dst.cache, wait,
                                        bytes, &len) ||
                 !agx3_append(emission, bytes, len))
                AGX3_REFUSE(I);

@@ -136,6 +136,14 @@ agx_build_tilebuffer_layout_with_limits(const enum pipe_format *formats,
                                       uint32_t max_bytes_per_tile,
                                       uint16_t max_samples_per_tile);
 
+/* Attachment 0 alone in the tilebuffer, every other attachment spilled to
+ * memory. */
+struct agx_tilebuffer_layout
+agx_build_tilebuffer_layout_rt0_resident(const enum pipe_format *formats,
+                                         uint8_t nr_cbufs, uint8_t nr_samples,
+                                         uint32_t max_bytes_per_tile,
+                                         uint16_t max_samples_per_tile);
+
 /* Native imageblock strides are not limited by the AGX2 USC bitfield. */
 struct agx_tilebuffer_layout
 agx_build_tilebuffer_layout_for_imageblock(
@@ -178,6 +186,9 @@ bool agx_nir_lower_tilebuffer_with_conversions(
    uint8_t *colormasks, unsigned *bindless_base, struct nir_def *write_samples,
    bool *translucent, bool preserve_zero_mask, bool lower_srgb,
    bool lower_r11g11b10, bool lower_g17p_formats, bool x_alpha_one);
+/* Put spilled render target accesses back on immediate texture state slots
+ * after descriptor crawling has run (G17G's bindful image accesses). */
+bool agx_nir_rebind_spilled_rts(struct nir_shader *shader);
 
 bool agx_nir_lower_to_per_sample(struct nir_shader *shader);
 bool agx_nir_apply_api_mask_to_force_early(struct nir_shader *shader,

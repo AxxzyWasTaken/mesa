@@ -832,6 +832,15 @@ int main(void)
       CHECK_NATIVE(agx3_alu_hadd_mod_m5(0, add_pair, dead, abs, neg, true,
                                         false, 0, b, &n),
                    add);
+      /* The G17G fsat lowering adds the minifloat negative zero and needs
+       * saturation: field 14 selects the wider ep2 form (0x81 in byte 4). */
+      const uint8_t sat_add[] = {0x10, 0x80, 0x1c, 0x13,
+                                 0x81, 0x00, 0x00, 0x02};
+      CHECK_NATIVE(agx3_alu_hadd_minifloat(AGX_ISA_ENCODING_AGX3C, 2, 19,
+                                           0x80, false, true,
+                                           AGX3_ALU_HINT_DISCARD, false, 0,
+                                           b, &n),
+                   sat_add);
       CHECK_NATIVE(
          agx3_alu_half_add_imm_to_f32_m5(0, 0, 48, true, true,
                                          AGX3_ALU_HINT_DISCARD, true, 0, b, &n),
