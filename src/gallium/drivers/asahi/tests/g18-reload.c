@@ -28,7 +28,8 @@ int main(int argc, char **argv)
    const int width = 64, height = 64;
    if (argc != 3) return 2;
    const int samples = atoi(argv[1]);
-   const GLenum format = getenv("RELOAD_RGBA") ? GL_RGBA8 : GL_RGB8;
+   const GLenum format = getenv("RELOAD_PACKED_FLOAT") ? GL_R11F_G11F_B10F :
+                         getenv("RELOAD_RGBA") ? GL_RGBA8 : GL_RGB8;
    if (samples != 0 && samples != 2 && samples != 4) return 2;
    setvbuf(stdout, NULL, _IOLBF, 0);
    EGLDisplay dpy = eglGetPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA,

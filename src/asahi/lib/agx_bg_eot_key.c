@@ -165,13 +165,20 @@ agx_g17p_configure_rt0_eot_key(enum pipe_format format,
       format == PIPE_FORMAT_R32G32_UINT;
 
    key->g17p_rt0_eot_words = 0;
+   /* R11G11B10 is a raw I32 word unless the tile keeps M5's packed-float
+    * format. G18G gathers its key as G17G (agx_gather_device_key), so
+    * key->dev.chip alone would pick the M5 rule; its end-of-tile lowering
+    * (agx_bg_eot.c) tests the real chip and stores one raw R32_UINT word, so
+    * the key has to follow agx_is_g18g() to match that store. */
+   const bool rg11b10_raw_word =
+      agx_is_g18g(&key->dev) ||
+      !agx_rg11b10_tile_is_packed_float(key->dev.chip);
    key->g17p_rt0_eot_i32 =
       format == PIPE_FORMAT_R32_FLOAT ||
       format == PIPE_FORMAT_R32G32_FLOAT || format == PIPE_FORMAT_R32_UINT ||
       format == PIPE_FORMAT_R32_SINT || format == PIPE_FORMAT_R32G32_SINT ||
       format == PIPE_FORMAT_R32G32_UINT ||
-      (format == PIPE_FORMAT_R11G11B10_FLOAT &&
-       !agx_rg11b10_tile_is_packed_float(key->dev.chip)) ||
+      (format == PIPE_FORMAT_R11G11B10_FLOAT && rg11b10_raw_word) ||
       format == PIPE_FORMAT_R9G9B9E5_FLOAT ||
       format == PIPE_FORMAT_R32G32B32X32_FLOAT ||
       format == PIPE_FORMAT_R32G32B32A32_FLOAT ||

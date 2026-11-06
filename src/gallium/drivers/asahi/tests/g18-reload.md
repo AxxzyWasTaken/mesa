@@ -22,6 +22,17 @@ MESA_SHADER_CACHE_DISABLE=true G18_STOP_ON_SUBMIT_ERROR=1 ./g18-reload 2 rgb-2x.
 MESA_SHADER_CACHE_DISABLE=true G18_STOP_ON_SUBMIT_ERROR=1 ./g18-reload 4 rgb-4x.rgba
 ```
 
+`RELOAD_PACKED_FLOAT=1` selects `GL_R11F_G11F_B10F` instead, so the tile holds
+one packed-float word and the end-of-tile program stores it as a raw 32-bit
+word on G18G. Pure red and green are exact in that format, so the same
+per-pixel check applies. Run it at 1x, 2x and 4x:
+
+```sh
+MESA_SHADER_CACHE_DISABLE=true G18_STOP_ON_SUBMIT_ERROR=1 RELOAD_PACKED_FLOAT=1 ./g18-reload 0 packed-1x.rgba
+MESA_SHADER_CACHE_DISABLE=true G18_STOP_ON_SUBMIT_ERROR=1 RELOAD_PACKED_FLOAT=1 ./g18-reload 2 packed-2x.rgba
+MESA_SHADER_CACHE_DISABLE=true G18_STOP_ON_SUBMIT_ERROR=1 RELOAD_PACKED_FLOAT=1 ./g18-reload 4 packed-4x.rgba
+```
+
 Success requires exit zero and `wrong=0` for all 4096 pixels. Retain the raw
 process logs, image hashes and matching kernel submission/retirement evidence.
 The expected left half is opaque red and right half opaque green, with no
