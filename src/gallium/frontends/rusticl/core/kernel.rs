@@ -1312,6 +1312,42 @@ fn extract<'a, const S: usize>(buf: &'a mut &[u8]) -> &'a [u8; S] {
     val.try_into().unwrap()
 }
 
+fn checked_local_mem_layout(offset: u64, bytes: usize) -> Option<(u64, u64)> {
+    if bytes == 0 {
+        return None;
+    }
+    let alignment = bytes.min(0x80).next_power_of_two() as u64;
+    let aligned = offset.checked_add(alignment - 1)? & !(alignment - 1);
+    Some((aligned, aligned.checked_add(u64::try_from(bytes).ok()?)?))
+}
+
+fn checked_local_mem_usage(static_bytes: u64, sizes: &[usize], limit: u64) -> Option<u64> {
+    if static_bytes > limit {
+        return None;
+    }
+    sizes.iter().try_fold(static_bytes, |offset, &bytes| {
+        let (_, end) = checked_local_mem_layout(offset, bytes)?;
+        (end <= limit).then_some(end)
+    })
+}
+
+#[test]
+fn checked_local_mem_usage_rejects_excess_alignment_and_overflow() {
+    assert_eq!(checked_local_mem_usage(0, &[], 32768), Some(0));
+    assert_eq!(checked_local_mem_usage(32768, &[], 32768), Some(32768));
+    assert_eq!(checked_local_mem_usage(32769, &[], 32768), None);
+    assert_eq!(checked_local_mem_usage(0, &[32768], 32768), Some(32768));
+    assert_eq!(checked_local_mem_usage(256, &[32512], 32768), Some(32768));
+    assert_eq!(checked_local_mem_usage(0, &[32769], 32768), None);
+    assert_eq!(checked_local_mem_usage(256, &[32513], 32768), None);
+    assert_eq!(checked_local_mem_usage(0, &[1, 32640], 32768), Some(32768));
+    assert_eq!(checked_local_mem_usage(0, &[1, 32641], 32768), None);
+    assert_eq!(checked_local_mem_usage(0, &[0], 32768), None);
+    assert_eq!(checked_local_mem_usage(u64::MAX, &[1], u64::MAX), None);
+    assert_eq!(checked_local_mem_usage(1, &[usize::MAX], u64::MAX), None);
+    assert_eq!(checked_local_mem_usage(0, &[usize::MAX], 32768), None);
+}
+
 /// Helper class to build an execution environment for a single kernel invocation.
 struct KernelExecBuilder<'a> {
     dev: &'static Device,
@@ -1733,20 +1769,30 @@ impl Kernel {
 
         self.optimize_local_size(dev, work_dim, &mut grid, &mut block);
 
+        let hw_max_grid = dev.max_grid_size();
+        let variant = if offsets == [0; 3]
+            && grid[0] <= hw_max_grid[0]
+            && grid[1] <= hw_max_grid[1]
+            && grid[2] <= hw_max_grid[2]
+            && (work_group_size_hint == [0; 3] || block == work_group_size_hint)
+        {
+            NirKernelVariant::Optimized
+        } else {
+            NirKernelVariant::Default
+        };
+        let build = &nir_kernel_builds[variant];
+        let local_sizes: Vec<usize> = build.compiled_args.iter().filter_map(|arg| {
+            if let CompiledKernelArgType::APIArg(idx) = arg.kind {
+                if let Some(KernelArgValue::LocalMem(size)) = &arg_values[idx] {
+                    return Some(*size);
+                }
+            }
+            None
+        }).collect();
+        checked_local_mem_usage(build.shared_size, &local_sizes, dev.local_mem_size())
+            .ok_or(CL_OUT_OF_RESOURCES)?;
+
         Ok(Box::new(move |cl_ctx, ctx| {
-            let hw_max_grid = ctx.dev.max_grid_size();
-
-            let variant = if offsets == [0; 3]
-                && grid[0] <= hw_max_grid[0]
-                && grid[1] <= hw_max_grid[1]
-                && grid[2] <= hw_max_grid[2]
-                && (work_group_size_hint == [0; 3] || block == work_group_size_hint)
-            {
-                NirKernelVariant::Optimized
-            } else {
-                NirKernelVariant::Default
-            };
-
             let nir_kernel_build = &nir_kernel_builds[variant];
             let mut exec_builder =
                 KernelExecBuilder::new(ctx.dev, nir_kernel_build.input_size, buffer_arcs.len() + 2);
@@ -1877,9 +1923,9 @@ impl Kernel {
                             }
                             KernelArgValue::LocalMem(size) => {
                                 // TODO 32 bit
-                                let pot = cmp::min(*size, 0x80);
-                                variable_local_size = variable_local_size
-                                    .next_multiple_of(pot.next_power_of_two() as u64);
+                                let (offset, end) = checked_local_mem_layout(variable_local_size, *size)
+                                    .ok_or(CL_OUT_OF_RESOURCES)?;
+                                variable_local_size = offset;
                                 if ctx.dev.address_bits() == 64 {
                                     let variable_local_size: [u8; 8] =
                                         variable_local_size.to_ne_bytes();
@@ -1889,7 +1935,7 @@ impl Kernel {
                                         (variable_local_size as u32).to_ne_bytes();
                                     exec_builder.add_values(&variable_local_size);
                                 }
-                                variable_local_size += *size as u64;
+                                variable_local_size = end;
                             }
                             KernelArgValue::Sampler(sampler) => {
                                 samplers.push(sampler.pipe());

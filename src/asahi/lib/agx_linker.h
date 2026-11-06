@@ -88,7 +88,8 @@ struct agx_linked_shader {
 void agx3_build_container_lead(uint8_t *image, enum agx_chip chip,
                                unsigned cores_per_cluster);
 void agx3_build_usc_base_page(uint8_t *image, size_t size, enum agx_chip chip,
-                              unsigned cores_per_cluster);
+                              unsigned cores_per_cluster,
+                              unsigned num_clusters);
 
 bool agx_fast_link(struct agx_linked_shader *linked, struct agx_device *dev,
                    bool fragment, struct agx_shader_part *main,
