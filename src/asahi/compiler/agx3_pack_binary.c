@@ -17,6 +17,7 @@
  * form could consume stale data.
  */
 
+#include "c11/threads.h"
 #include "agx3_mesh_core.h"
 #include "agx3_alu_core.h"
 #include "agx3_atomic_core.h"
@@ -133,24 +134,43 @@ agx3_index_kind(const agx_index x)
 /* The first refusal of the current pack, kept without AGX_MESA_DEBUG so that a
  * compile failure (and the driver's fallback warning) names the instruction
  * and gate. Reset by agx3_pack_binary(). */
-static __thread char agx3_first_refusal[96];
+/* Thread-specific rather than a __thread array, for the same static-TLS
+ * reason as agx_last_compile_refusal(). */
+#define AGX3_REFUSAL_SIZE 640
+static tss_t agx3_refusal_key;
+static once_flag agx3_refusal_once = ONCE_FLAG_INIT;
+
+static void
+agx3_refusal_key_init(void)
+{
+   tss_create(&agx3_refusal_key, free);
+}
+
+static char *
+agx3_refusal_buffer(bool create)
+{
+   call_once(&agx3_refusal_once, agx3_refusal_key_init);
+   char *buf = tss_get(agx3_refusal_key);
+   if (!buf && create) {
+      buf = calloc(1, AGX3_REFUSAL_SIZE);
+      if (buf && tss_set(agx3_refusal_key, buf) != thrd_success) {
+         free(buf);
+         buf = NULL;
+      }
+   }
+   return buf;
+}
 
 const char *
 agx3_last_pack_refusal(void)
 {
-   return agx3_first_refusal;
+   const char *buf = agx3_refusal_buffer(false);
+   return buf ? buf : "";
 }
 
 static void
 agx3_report_refusal_why(const agx_instr *I, unsigned line, const char *why)
 {
-   if (!agx3_first_refusal[0])
-      snprintf(agx3_first_refusal, sizeof(agx3_first_refusal), "%s at line %u%s%s",
-               agx_opcodes_info[I->op].name, line, why ? ", " : "", why ? why : "");
-
-   if (!(agx_compiler_debug & AGX_DBG_SHADERS))
-      return;
-
    char shape[512];
    int n = snprintf(shape, sizeof(shape), "d%u:%s%u",
                     I->nr_dests ? 16u << I->dest[0].size : 0u,
@@ -179,6 +199,18 @@ agx3_report_refusal_why(const agx_instr *I, unsigned line, const char *why)
       if (chans != 1 && n > 0 && n < (int)sizeof(shape))
          n += snprintf(shape + n, sizeof(shape) - n, "x%u", chans);
    }
+
+   /* Keep the operand shape in the first refusal too: an application's
+    * failing shader is rarely reproducible, and its log is all there is. */
+   char *first = agx3_refusal_buffer(true);
+   if (first && !first[0])
+      snprintf(first, AGX3_REFUSAL_SIZE,
+               "%s at line %u%s%s [%s lod=%u dim=%u]",
+               agx_opcodes_info[I->op].name, line, why ? ", " : "",
+               why ? why : "", shape, (unsigned)I->lod_mode, (unsigned)I->dim);
+
+   if (!(agx_compiler_debug & AGX_DBG_SHADERS))
+      return;
 
    /* mask, format, shift and nest decide gates that the operand list cannot
     * show. A control-flow refusal turns entirely on `nest` -- a break out of
@@ -11504,7 +11536,9 @@ agx3_reusable_cube_scratch(agx_context *ctx, unsigned maximum,
 bool
 agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
 {
-   agx3_first_refusal[0] = 0;
+   char *first_refusal = agx3_refusal_buffer(false);
+   if (first_refusal)
+      first_refusal[0] = 0;
    const enum agx_isa_encoding enc = ctx->key->dev.encoding;
 
    /*
@@ -14902,7 +14936,8 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
              * quad either; Apple's own witness for the form is a compute
              * kernel. */
             const bool compute_gradient = compute_sample_stage &&
-               I->lod_mode == AGX_LOD_MODE_LOD_GRAD;
+               (I->lod_mode == AGX_LOD_MODE_LOD_GRAD ||
+                I->lod_mode == AGX_LOD_MODE_LOD_GRAD_MIN);
             /* Native runtime-indexed vertex pipelines ground both a per-lane
              * explicit level and explicit gradients in every noncube sample
              * dimension, including depth comparisons and array layers. */

@@ -58,9 +58,18 @@ for s in [8, 16, 32, 64]:
          ("ubitfield_extract", 'value', ('iand', 'offset', s - 1), 'bits'))
     ]
 
+# Based on the VIR lowering: step back one ulp when RTNE rounded away from zero.
+def f2f16_rtz(x):
+    return ('bcsel', ('flt', ('fabs', x), ('fabs', ('f2f32', ('f2f16_rtne', x)))),
+            ('isub', ('f2f16_rtne', x), 1), ('f2f16_rtne', x))
+
 lower_pack = [
+    # The hardware converts with RTNE; D3D's f32tof16 (and AMD's packHalf)
+    # truncate, and GLSL leaves the rounding to the implementation.
     (('pack_half_2x16_split', a, b),
-     ('pack_32_2x16_split', ('f2f16', a), ('f2f16', b))),
+     ('pack_32_2x16_split', f2f16_rtz(a), f2f16_rtz(b))),
+    (('pack_half_2x16_rtz_split', a, b),
+     ('pack_32_2x16_split', f2f16_rtz(a), f2f16_rtz(b))),
 
     # We don't have 8-bit ALU, so we need to lower this. But if we lower it like
     # this, we can at least coalesce the pack_32_2x16_split and only pay the
@@ -87,10 +96,7 @@ lower_pack = [
     (('unpack_64_2x32_split_x', ('pack_64_2x32_split', a, b)), a),
     (('unpack_64_2x32_split_y', ('pack_64_2x32_split', a, b)), b),
 
-    # Based on the VIR lowering
-    (('f2f16_rtz', 'a@32'),
-     ('bcsel', ('flt', ('fabs', a), ('fabs', ('f2f32', ('f2f16_rtne', a)))),
-      ('isub', ('f2f16_rtne', a), 1), ('f2f16_rtne', a))),
+    (('f2f16_rtz', 'a@32'), f2f16_rtz(a)),
 
     # Codegen depends on this trivial case being optimized out.
     (('ubitfield_extract', 'value', 'offset', 0), 0),

@@ -514,11 +514,11 @@ check_g17p_subgroup_vote_compute(void)
 }
 
 static bool
-check_g17p_signed_immediate_ballot_rejected(void)
+check_g17p_signed_immediate_ballot_compiles(void)
 {
    nir_builder b = nir_builder_init_simple_shader(
       MESA_SHADER_COMPUTE, &agx_nir_options,
-      "unwitnessed G17P signed-immediate ballot");
+      "G17P ballot of a signed-immediate compare");
    b.shader->info.workgroup_size[0] = 32;
    b.shader->info.workgroup_size[1] = 1;
    b.shader->info.workgroup_size[2] = 1;
@@ -537,9 +537,13 @@ check_g17p_signed_immediate_ballot_rejected(void)
    free(part.binary);
    ralloc_free(b.shader);
 
-   if (compiled)
-      fprintf(stderr, "unwitnessed signed-immediate ballot was accepted\n");
-   return !compiled;
+   /* The AGX3B ballot has no signed-immediate compare form other than
+    * against zero. The optimizer ballots the opposite compare through the
+    * register form instead (agx3b_ballot_compare_encodable()), and the packer
+    * still refuses any unwitnessed form, so the shader compiles. */
+   if (!compiled)
+      fprintf(stderr, "signed-immediate ballot failed to compile\n");
+   return compiled;
 }
 
 static bool
@@ -2461,7 +2465,7 @@ main(int argc, char **argv)
    }
    if (argc == 2 && !strcmp(argv[1], "--subgroup-vote-only")) {
       const bool valid = check_g17p_subgroup_vote_compute() &&
-                         check_g17p_signed_immediate_ballot_rejected();
+                         check_g17p_signed_immediate_ballot_compiles();
       fprintf(stderr, "G17P subgroup vote: %s\n", valid ? "PASS" : "FAIL");
       return valid ? 0 : 1;
    }
@@ -2618,7 +2622,7 @@ main(int argc, char **argv)
        !check_active_count_lowering(true))
       return 1;
    if (!check_g17p_subgroup_vote_compute() ||
-       !check_g17p_signed_immediate_ballot_rejected())
+       !check_g17p_signed_immediate_ballot_compiles())
       return 1;
    if (!check_g17p_subgroup_quad_compute(true) ||
        !check_g17p_subgroup_quad_compute(false))

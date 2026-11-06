@@ -6,6 +6,7 @@
  */
 
 #include "agx_compile.h"
+#include "c11/threads.h"
 #include "asahi/clc/asahi_clc.h"
 #include "asahi/isa/disasm.h"
 #include "agx3_transcode.h"
@@ -84,18 +85,50 @@ agx_get_compiler_debug(void)
    return debug_get_option_agx_compiler_debug();
 }
 
-static __thread char agx_refusal[192];
+/* The last compile refusal of this thread. It lives in thread-specific storage
+ * rather than a __thread array: libgallium and libvulkan_asahi use the
+ * initial-exec TLS model, and a dlopen() of either only gets glibc's small
+ * static TLS surplus, which an 896-byte array exhausts (EGL then fails to load
+ * with "cannot allocate memory in static TLS block"). */
+#define AGX_REFUSAL_SIZE 896
+static tss_t agx_refusal_key;
+static once_flag agx_refusal_once = ONCE_FLAG_INIT;
+
+static void
+agx_refusal_key_init(void)
+{
+   tss_create(&agx_refusal_key, free);
+}
+
+static char *
+agx_refusal_buffer(bool create)
+{
+   call_once(&agx_refusal_once, agx_refusal_key_init);
+   char *buf = tss_get(agx_refusal_key);
+   if (!buf && create) {
+      buf = calloc(1, AGX_REFUSAL_SIZE);
+      if (buf && tss_set(agx_refusal_key, buf) != thrd_success) {
+         free(buf);
+         buf = NULL;
+      }
+   }
+   return buf;
+}
 
 const char *
 agx_last_compile_refusal(void)
 {
-   return agx_refusal;
+   const char *buf = agx_refusal_buffer(false);
+   return buf ? buf : "";
 }
 
 static void
 agx_set_refusal(const agx_context *ctx, const char *what, unsigned line)
 {
-   snprintf(agx_refusal, sizeof(agx_refusal), "%s%s (%s:%u)", what,
+   char *buf = agx_refusal_buffer(true);
+   if (!buf)
+      return;
+   snprintf(buf, AGX_REFUSAL_SIZE, "%s%s (%s:%u)", what,
             ctx ? (ctx->is_preamble ? " [constant program]" : " [main]") : "",
             __FILE__, line);
 }
@@ -8908,6 +8941,16 @@ agx_emit_tex(agx_builder *b, nir_tex_instr *instr)
    else if (!agx_is_null(compare))
       compare_offset = compare;
 
+   /* AGX3 encodes texture and sampler table indices up to 15 as immediates;
+    * a larger constant index (a descriptor heap offset) takes the register
+    * form, a 64-bit index. */
+   if (b->shader->key->dev.encoding != AGX_ISA_ENCODING_AGX2) {
+      if (texture.type == AGX_INDEX_IMMEDIATE && texture.value > 15)
+         texture = agx_mov_imm(b, 64, texture.value);
+      if (sampler.type == AGX_INDEX_IMMEDIATE && sampler.value > 15)
+         sampler = agx_mov_imm(b, 64, sampler.value);
+   }
+
    agx_index tmp = agx_vec_temp(b->shader, dst.size, instr->is_sparse ? 8 : 4);
    agx_instr *I = agx_texture_sample_to(
       b, tmp, coords, lod, bindless, texture, sampler, compare_offset,
@@ -9904,6 +9947,44 @@ agx3_inline_cheap_vertex_preamble(nir_shader *nir)
    nir_progress(true, main, nir_metadata_none);
 }
 
+/* The hardware takes a derivative from the neighbouring lanes' registers, so
+ * every lane of the quad must have computed the operand. A source loaded before
+ * a branch but sunk into it is computed only by the lanes that branch, and a
+ * derivative inside that branch then reads garbage from the others. Explicit
+ * derivatives in control flow are rare, so keep sinking everywhere else. */
+static bool
+agx_has_derivative_in_control_flow(nir_shader *nir)
+{
+   if (nir->info.stage != MESA_SHADER_FRAGMENT)
+      return false;
+
+   nir_foreach_function_impl(impl, nir) {
+      nir_foreach_block(block, impl) {
+         if (block->cf_node.parent == &impl->cf_node)
+            continue;
+
+         nir_foreach_instr(instr, block) {
+            if (instr->type != nir_instr_type_intrinsic)
+               continue;
+
+            switch (nir_instr_as_intrinsic(instr)->intrinsic) {
+            case nir_intrinsic_ddx:
+            case nir_intrinsic_ddx_fine:
+            case nir_intrinsic_ddx_coarse:
+            case nir_intrinsic_ddy:
+            case nir_intrinsic_ddy_fine:
+            case nir_intrinsic_ddy_coarse:
+               return true;
+            default:
+               break;
+            }
+         }
+      }
+   }
+   return false;
+}
+
+
 static bool agx3_nir_lower_uniform_dma(nir_shader *nir,
                                        const struct agx_shader_key *key,
                                        struct agx_shader_info *info);
@@ -10297,6 +10378,9 @@ agx_optimize_nir(nir_shader *nir, bool soft_fault, bool uniform_atomics,
                                nir_move_load_input | nir_move_load_frag_coord |
                                nir_move_comparisons | nir_move_copies |
                                nir_move_load_ssbo | nir_move_alu;
+   if (agx_has_derivative_in_control_flow(nir))
+      move_all &= ~(nir_move_load_input | nir_move_load_frag_coord |
+                    nir_move_alu);
 
    /* Sinking a G17P buffer load into the arm that reads it saves the load when
     * the arm is skipped. Sink leaves it at the top of that block; moving it on
@@ -13033,7 +13117,7 @@ agx_compile_function_nir_attempt(nir_shader *nir, nir_function_impl *impl,
        * If the encoder refuses an instruction, discard the emitted prefix and
        * report compilation failure. */
       if (!agx3_pack_binary(ctx, binary)) {
-         char what[160];
+         char what[768];
          snprintf(what, sizeof(what), "AGX3 binary packer refused %s",
                   agx3_last_pack_refusal()[0] ? agx3_last_pack_refusal()
                                               : "an instruction");
@@ -13510,6 +13594,9 @@ agx_preprocess_nir_internal(nir_shader *nir, bool g17p, bool native_fragment_dep
                                nir_move_load_input | nir_move_load_frag_coord |
                                nir_move_comparisons | nir_move_copies |
                                nir_move_load_ssbo | nir_move_alu;
+   if (agx_has_derivative_in_control_flow(nir))
+      move_all &= ~(nir_move_load_input | nir_move_load_frag_coord |
+                    nir_move_alu);
 
    NIR_PASS(_, nir, nir_opt_sink, move_all);
    NIR_PASS(_, nir, nir_opt_move, move_all);
@@ -15346,7 +15433,9 @@ agx_compile_shader_nir(nir_shader *nir, struct agx_shader_key *key,
       agx_preserve_quad_control(nir);
 
    agx_compiler_debug = agx_get_compiler_debug();
-   agx_refusal[0] = 0;
+   char *refusal = agx_refusal_buffer(false);
+   if (refusal)
+      refusal[0] = 0;
    /* The native constant-program decision is per compile
     * (agx_shader_key::g17p_native_uniforms, read through ctx); the global
     * agx_compiler_debug is never modified here. */
@@ -15457,6 +15546,7 @@ agx_compile_shader_nir(nir_shader *nir, struct agx_shader_key *key,
    NIR_PASS(_, nir, nir_lower_alu_to_scalar, NULL, NULL);
    NIR_PASS(_, nir, nir_lower_load_const_to_scalar);
 
+   NIR_PASS(_, nir, agx_nir_lower_denorm_preserve);
    if (key->dev.chip == AGX_CHIP_G17P)
       NIR_PASS(_, nir, agx_nir_lower_fma_rte);
 
