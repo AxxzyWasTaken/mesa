@@ -162,6 +162,12 @@ lower_tex_crawl(nir_builder *b, nir_instr *instr, void *data)
    if (options && options->buffer_metadata && tex->op == nir_texop_txs &&
        tex->sampler_dim == GLSL_SAMPLER_DIM_BUF) {
       res = load_buffer_metadata(b, ptr, AGX_G17P_BUFFER_TEXTURE_SIZE_OFFSET, 32);
+   } else if (options && options->gen10 && tex->op == nir_texop_txs &&
+              tex->sampler_dim == GLSL_SAMPLER_DIM_BUF) {
+      /* Gallium's Gen10 buffer texture keeps its element count in the
+       * descriptor's last word (agx_pack_texture), where Gen10 leaves it
+       * free; Gen10 has no G17P metadata record. */
+      res = load_buffer_metadata(b, ptr, AGX_GEN10_BUFFER_TEXTURE_SIZE_OFFSET, 32);
    } else if (gen9 && tex->op == nir_texop_txs &&
        tex->sampler_dim != GLSL_SAMPLER_DIM_BUF) {
       res = libagx_txs_gen9(b, ptr, lod, nir_imm_int(b, nr_comps),
@@ -1276,11 +1282,13 @@ image_texel_address(nir_builder *b, nir_intrinsic_instr *intr,
 
    if (dim == GLSL_SAMPLER_DIM_BUF && return_index) {
       return nir_channel(b, coord, 0);
-   } else if (dim == GLSL_SAMPLER_DIM_BUF && (buffer_metadata || gen9 || gen10)) {
+   } else if (dim == GLSL_SAMPLER_DIM_BUF && (buffer_metadata || gen9)) {
       /* Buffer atomics receive the PBE handle, but Gen9 has no AGX2
        * software address/offset fields. Use the same sideband as buffer
-       * loads and stores, relative to the start of the descriptor.
-       */
+       * loads and stores, relative to the start of the descriptor. Gen10
+       * Gallium has no such record: the PBE is a plain linear packet whose
+       * buffer field names the texels, so it falls through to the generic
+       * path below. */
       nir_def *desc = nir_iadd_imm(
          b, desc_address, -AGX_G17P_BUFFER_TEXTURE_PBE_OFFSET);
       nir_def *base = load_buffer_metadata(
@@ -1291,11 +1299,17 @@ image_texel_address(nir_builder *b, nir_intrinsic_instr *intr,
       return nir_iadd(b, base,
                       nir_imul(b, nir_u2u64(b, element),
                                nir_u2u64(b, blocksize_B)));
-   } else if (dim == GLSL_SAMPLER_DIM_BUF) {
+   } else if (dim == GLSL_SAMPLER_DIM_BUF && !(gen9 || gen10)) {
       return libagx_buffer_texel_address(b, desc_address, coord, blocksize_B);
    } else if (gen9 || gen10) {
+      /* Gen9 keeps the addressing word in the storage tail that follows the
+       * texture/PBE pair, 40 bytes past the PBE handle. Gen10 has no tail
+       * record; Gallium packs the same word into the PBE's last eight
+       * bytes, which no Gen10 field occupies. */
       nir_def *sw_address =
-         nir_iadd_imm(b, desc_address, AGX_G17P_IMAGE_ATOMIC_SW_FROM_PBE);
+         nir_iadd_imm(b, desc_address,
+                      gen10 ? AGX_GEN10_IMAGE_ATOMIC_SW_OFFSET
+                            : AGX_G17P_IMAGE_ATOMIC_SW_FROM_PBE);
       if (dim == GLSL_SAMPLER_DIM_MS) {
          /* MS storage uses a linear PBE over the tiled allocation. Its
           * native width is the buffer window, not the source image width.
