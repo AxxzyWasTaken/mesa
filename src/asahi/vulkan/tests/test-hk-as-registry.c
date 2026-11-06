@@ -44,10 +44,9 @@ __wrap_agx_bo_create(struct agx_device *d, size_t size, unsigned align,
    assert(bo->_map);
    return bo;
 }
-int __wrap_agx_bo_bind(struct agx_device *, struct agx_bo *, uint64_t,
-                      uint64_t, uint64_t, uint32_t);
+__typeof__(agx_bo_bind) __wrap_agx_bo_bind;
 int __wrap_agx_bo_bind(struct agx_device *d, struct agx_bo *b, uint64_t addr,
-                      uint64_t size, uint64_t offset, uint32_t flags)
+                      size_t size, uint64_t offset, uint32_t flags)
 { return 0; }
 static uint64_t next_va = 0x1000000000;
 struct agx_va *__wrap_agx_va_alloc(struct agx_device *, uint64_t, uint64_t,
