@@ -35,10 +35,10 @@
  *    reload's whole sample (agx_chip_uncovered_tile_ms_reload_defect()).
  *    Multiview's eight-byte budget can still spill one, which fails closed
  *    at render time. Input attachments stay plain.
- *  - R11G11B10F on M4 Pro: attachments of one layer, 1x and 2x. They store
- *    through their own class (hk_eot_pbe_format()). That class has no integer
- *    view, so unlike the formats below it has no bitwise copy, and it does
- *    not keep NaN: such a field reads back zero, however it was written.
+ *  - Not R11G11B10F on M4 Pro: attachments store through the format's own
+ *    class (hk_eot_pbe_format()), and a compressed tile of that class reads
+ *    a NaN field back as zero, however it was written. Rendering NaN into an
+ *    R11G11B10F attachment has to keep it, so they stay plain.
  *  - Depth: D16_UNORM, D32_SFLOAT and both planes of D32_SFLOAT_S8_UINT,
  *    one level, one layer, one sample; on M4 Pro also the depth plane at
  *    2x, without input-attachment, feedback-loop or sample-location use
@@ -103,7 +103,7 @@ hk_g17p_compression_color_format(VkFormat format)
    /* Not B10G11R11_UFLOAT: G17P packs it into one tile word and stores it
     * through an R32_UINT PBE (agx_g17p_rt0_pbe_format), a different
     * compression class from the R11G11B10 texture that reads it back. M4 Pro
-    * attachments are the exception, in hk_hal200_compression_eligible(). */
+    * stores it through its own class, which loses NaN when compressed. */
    case VK_FORMAT_R16G16_UNORM:
    case VK_FORMAT_R16G16_SNORM:
    case VK_FORMAT_R16G16_UINT:
@@ -158,16 +158,9 @@ hk_hal200_compression_eligible(enum agx_chip chip, unsigned plane,
     * Colour's layered/MSAA packet support is independent of this restriction.
     */
    const bool m4_pro = g16s;
-   /* shortcut: a compressed R11G11B10F NaN field reads back zero and no view
-    * reads the raw word, so copies lose NaN. Only attachments are admitted,
-    * since a texture can be uploaded with any bits; write raw uploads as
-    * uncompressed tiles if an attachment turns out to need them. */
-   const bool r11g11b10f =
-      m4_pro && info->format == VK_FORMAT_B10G11R11_UFLOAT_PACK32 &&
-      info->imageType == VK_IMAGE_TYPE_2D && info->arrayLayers == 1 &&
-      (info->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-   const bool color = hk_g17p_compression_color_format(info->format) ||
-                      r11g11b10f;
+   /* Not B10G11R11_UFLOAT: a compressed tile of its class reads NaN back as
+    * zero, and a render or copy into the attachment must keep NaN. */
+   const bool color = hk_g17p_compression_color_format(info->format);
    g16s = g16s && color;
 
    /* Shared images keep their plain layout contract. Read each header field
