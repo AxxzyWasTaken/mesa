@@ -13508,6 +13508,7 @@ typedef void* <name>MTLSharedEvent_id</name>;
         <enum value="29" name="VK_DRIVER_ID_MESA_GFXSTREAM" comment="Mesa open source project" />
         <enum value="30" name="VK_DRIVER_ID_APE_SOFT" comment="Ape open source project" />
         <enum value="31" name="VK_DRIVER_ID_RESERVED_31" comment="Reserved for undisclosed driver project" />
+        <enum value="35" name="VK_DRIVER_ID_AURORA_BOREALIS" comment="Aurora Silicon" />
     </enums>
     <enums name="VkConditionalRenderingFlagBitsEXT" type="bitmask">
         <enum bitpos="0" name="VK_CONDITIONAL_RENDERING_INVERTED_BIT_EXT" />

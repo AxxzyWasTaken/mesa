@@ -35,6 +35,10 @@ def declare_options():
           "list is only viewed as itself or its sRGB/UNORM twin, so that it "
           "can be compressed",
           c_name="mutable_format_srgb_pair"),
+        B("hk_report_honeykrisp_driver_id", False,
+          "Report VK_DRIVER_ID_MESA_HONEYKRISP instead of the Borealis ID, "
+          "for translation layers that do not know the Borealis ID yet",
+          c_name="report_honeykrisp_driver_id"),
     ]
 
     debug_options = []

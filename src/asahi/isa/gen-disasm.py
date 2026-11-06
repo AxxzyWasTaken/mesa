@@ -48,8 +48,15 @@ def safe_name(name):
 
     return name.lower()
 
+# Must match AGX_DISASM_WORDS in disasm-internal.h: 6 words cover the 24-byte
+# AGX3d forms. At 4, no exact or known bit at or above bit 128 was emitted, so
+# fields of 20- to 24-byte instructions above bit 127 were never matched and
+# were reported as unknown bits.
+DISASM_WORDS = 6
+
 def chunk(x):
-    chunks = [hex((x >> (32 * i)) & ((1 << 32) - 1)) for i in range(4)]
+    assert x < (1 << (32 * DISASM_WORDS))
+    chunks = [hex((x >> (32 * i)) & ((1 << 32) - 1)) for i in range(DISASM_WORDS)]
     while len(chunks) > 1 and chunks[-1] == '0x0':
         chunks.pop()
 
@@ -165,6 +172,12 @@ signed
 ${isa_prefix}_disassemble_instr(BITSET_WORD *code, FILE *fp, unsigned offset, size_t available, bool verbose)
 {
   return _disassemble_instr(code, fp, decodings, ARRAY_SIZE(decodings), available, offset, verbose);
+}
+
+signed
+${isa_prefix}_instr_length(const uint8_t *code, size_t available, const char **display)
+{
+  return _instr_length(code, decodings, ARRAY_SIZE(decodings), available, display);
 }"""
 
 try:

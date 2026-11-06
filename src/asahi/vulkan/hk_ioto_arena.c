@@ -22,6 +22,7 @@ hk_ioto_arena_finish(struct hk_cmd_buffer *cmd)
 {
    struct hk_ioto_arena *arena = &cmd->ioto;
 
+   hk_device_free_span(hk_cmd_buffer_device(cmd), arena->span);
    memset(arena, 0, sizeof(*arena));
 }
 
@@ -50,6 +51,23 @@ hk_ioto_arena_grow(struct hk_cmd_buffer *cmd, size_t size, const char *label)
    struct hk_ioto_arena *arena = &cmd->ioto;
 
    hk_ioto_arena_clean(cmd);
+
+   /* See HK_CMD_SPAN_SIZE: one upload writes about 500 bytes of programs. */
+   if (!arena->map && size <= HK_CMD_SPAN_SIZE &&
+       hk_g17p_cached_cmd_memory(&dev->dev)) {
+      struct agx_ptr ptr;
+      if (hk_cmd_pool_alloc_span(hk_cmd_buffer_pool(cmd), HK_CMD_SLAB_IOTO,
+                                 HK_CMD_SPAN_SIZE, HK_CMD_SPAN_SIZE, &ptr,
+                                 &arena->span) != VK_SUCCESS)
+         return false;
+
+      arena->map = ptr.cpu;
+      arena->base = ptr.gpu;
+      arena->cursor = 0;
+      arena->capacity = HK_CMD_SPAN_SIZE;
+      arena->chunk_bytes += HK_CMD_SPAN_SIZE;
+      return true;
+   }
 
    const size_t chunk =
       hk_ioto_arena_chunk_size(size, AGX_IOTO_PROGRAM_ALIGNMENT);

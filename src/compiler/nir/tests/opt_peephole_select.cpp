@@ -161,3 +161,54 @@ TEST_F(nir_opt_peephole_select_test, opt_load_ubo_speculate)
    nir_index_blocks(main->impl);
    EXPECT_EQ(main->impl->num_blocks, 1);
 }
+
+/* An if with rcp in one arm and a cheap arm of the same size in the other. */
+static bool
+flattens(nir_builder *b, bool rcp_first, unsigned expensive_limit,
+         nir_selection_control control = nir_selection_control_none)
+{
+   nir_def *x = nir_load_var(b, nir_variable_create(b->shader, nir_var_shader_in, glsl_float_type(), "x"));
+   nir_def *values[2];
+
+   nir_if *nif = nir_push_if(b, nir_flt_imm(b, x, 1.0));
+   nif->control = control;
+   for (unsigned arm = 0; arm < 2; arm++) {
+      if (arm)
+         nir_push_else(b, NULL);
+      const bool rcp = rcp_first == (arm == 0);
+      values[arm] = nir_fadd_imm(b, rcp ? nir_frcp(b, x) : nir_fadd_imm(b, x, 2.0), 3.0);
+   }
+   nir_pop_if(b, NULL);
+   nir_store_var(b, nir_variable_create(b->shader, nir_var_shader_out, glsl_float_type(), "y"),
+                 nir_if_phi(b, values[0], values[1]), 1);
+
+   nir_opt_peephole_select_options options = {
+      .limit = 64,
+      .expensive_alu_ok = true,
+      .expensive_limit = expensive_limit,
+   };
+   bool progress = nir_opt_peephole_select(b->shader, &options);
+   nir_validate_shader(b->shader, NULL);
+   return progress;
+}
+
+TEST_F(nir_opt_peephole_select_test, expensive_limit)
+{
+   /* Both arms count, whichever holds the expensive ALU. */
+   EXPECT_FALSE(flattens(&bld, true, 3));
+}
+
+TEST_F(nir_opt_peephole_select_test, expensive_limit_second_arm)
+{
+   EXPECT_FALSE(flattens(&bld, false, 3));
+}
+
+TEST_F(nir_opt_peephole_select_test, expensive_limit_within)
+{
+   EXPECT_TRUE(flattens(&bld, true, 4));
+}
+
+TEST_F(nir_opt_peephole_select_test, expensive_limit_explicit_flatten)
+{
+   EXPECT_TRUE(flattens(&bld, true, 3, nir_selection_control_flatten));
+}

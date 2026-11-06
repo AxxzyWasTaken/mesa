@@ -16,6 +16,8 @@ files_asahi = files(
   'agx_state.c',
   'agx_streamout.c',
   'agx_uniforms.c',
+  'agx_xfb_cpu.c',
+  'agx_swtnl.c',
 )
 
 if with_tests
@@ -57,6 +59,32 @@ driver_asahi = declare_dependency(
 )
 
 if with_tests and with_tools.contains('drm-shim')
+  asahi_g17g_raster_state_test = executable(
+    'asahi-g17g-raster-state',
+    files('tests/test-agx-g17g-raster-state.c'),
+    include_directories : [
+      inc_gallium_aux, inc_gallium, inc_include, inc_src, inc_asahi,
+      inc_virtio_gpu, inc_virtio_vdrm,
+    ],
+    dependencies : [
+      idep_nir, idep_mesautil, idep_agx_pack, dep_libdrm, idep_libagx,
+      idep_libagx_shaders_h, idep_xmlconfig,
+    ],
+    link_with : [
+      libasahi, libasahiwinsys, libasahi_compiler, libasahi_lib,
+      libasahi_layout, libasahi_decode, libgallium, libgalliumvl_stub,
+    ],
+    build_by_default : false,
+  )
+  test(
+    'asahi-g17g-raster-state',
+    prog_python,
+    args : [files('tests/run-shim.py'), libasahi_noop_drm_shim, asahi_g17g_raster_state_test],
+    env : ['ASAHI_SHIM_CHIP=g18g', 'ASAHI_GL_NOOP_SHIM=1',
+           'MESA_SHADER_CACHE_DISABLE=true'],
+    suite : ['asahi'],
+  )
+
   test(
     'asahi-g17p-texture-crawl',
     executable(
@@ -116,7 +144,7 @@ if with_tests and with_tools.contains('drm-shim')
     build_by_default : false,
   )
 
-  foreach chip : ['g13g', 'g15c', 'g15s', 'g17p']
+  foreach chip : ['g13g', 'g15c', 'g15s', 'g17p', 't6041', 't6041x']
     foreach mode : ['vs', 'query']
       test(
         'asahi-' + chip + '-gallium-' + mode,
@@ -150,7 +178,8 @@ if with_tests and with_tools.contains('drm-shim')
     ],
     link_with : [
       libasahi, libasahiwinsys, libasahi_compiler, libasahi_lib,
-      libasahi_layout, libasahi_decode, libgallium, libgalliumvl_stub,
+      libasahi_layout, libasahi_decode, libagx3b_disasm, libgallium,
+      libgalliumvl_stub,
     ],
     build_by_default : false,
   )
@@ -212,7 +241,7 @@ if with_tests and with_tools.contains('drm-shim')
     )
   endforeach
 
-  foreach chip : ['g13g', 'g17p']
+  foreach chip : ['g13g', 'g17p', 't6041', 't6041x']
     test(
       'asahi-' + chip + '-gallium-submit',
       prog_python,
@@ -224,7 +253,7 @@ if with_tests and with_tools.contains('drm-shim')
 
   # The shim has to be preloaded before libc's open(), so the test runs the
   # binary through a wrapper that sets LD_PRELOAD and the chip selector.
-  foreach chip : ['g13g', 'g17p']
+  foreach chip : ['g13g', 'g17p', 't6041']
     test(
       'asahi-' + chip + '-gallium-xfb-program',
       prog_python,
@@ -258,22 +287,24 @@ if with_tests and with_tools.contains('drm-shim')
     )
   endforeach
 
-  test(
-    'asahi-g17p-gallium-blit',
-    prog_python,
-    args : [
-      files('tests/run-shim.py'),
-      libasahi_noop_drm_shim,
-      asahi_g17p_blit_test,
-    ],
-    env : [
-      'ASAHI_SHIM_CHIP=g17p',
-      'ASAHI_SHIM_VALIDATE_G17P_STREAM=1',
-      'ASAHI_SHIM_G17P_EXPECT_COMPUTE=1',
-      'ASAHI_SHIM_G17P_EXPECT_STRONG_COMPUTE_BARRIER=1',
-    ],
-    suite : ['asahi'],
-  )
+  foreach chip : ['g17p', 't6041', 't6041x']
+    test(
+      'asahi-' + chip + '-gallium-blit',
+      prog_python,
+      args : [
+        files('tests/run-shim.py'),
+        libasahi_noop_drm_shim,
+        asahi_g17p_blit_test,
+      ],
+      env : [
+        'ASAHI_SHIM_CHIP=' + chip,
+        'ASAHI_SHIM_VALIDATE_G17P_STREAM=1',
+        'ASAHI_SHIM_G17P_EXPECT_COMPUTE=1',
+        'ASAHI_SHIM_G17P_EXPECT_STRONG_COMPUTE_BARRIER=1',
+      ],
+      suite : ['asahi'],
+    )
+  endforeach
 
   test(
     'asahi-g17p-gallium-blit-encode',

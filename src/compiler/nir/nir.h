@@ -3845,7 +3845,9 @@ typedef struct nir_loop_info {
    /* Estimated cost (in number of instructions) of the loop */
    unsigned instr_cost;
 
-   /* Contains fp64 ops that will be lowered */
+   /* Contains fp64 ops that will be lowered, or constant local initializers
+    * which can expose their inputs before software lowering.
+    */
    bool has_soft_fp64;
 
    /* Guessed trip count based on array indexing */
@@ -7191,6 +7193,10 @@ typedef struct nir_opt_peephole_select_options {
    unsigned limit; /* Set to max to flatten all control flow. */
    bool indirect_load_ok;
    bool expensive_alu_ok;
+   /* With expensive_alu_ok, flatten an if holding expensive ALU only up to
+    * this many instructions. Zero means no such limit.
+    */
+   unsigned expensive_limit;
    bool discard_ok;
 } nir_opt_peephole_select_options;
 

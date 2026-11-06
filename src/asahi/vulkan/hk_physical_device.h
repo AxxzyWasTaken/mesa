@@ -17,8 +17,8 @@
 /*
  * User-visible driver identity, reported in VkPhysicalDeviceDriverProperties
  * by every physical device this driver opens.  It does not depend on the chip,
- * so a newly enabled GPU reports it with no further change.  driverID stays
- * VK_DRIVER_ID_MESA_HONEYKRISP until Borealis has its own registered ID.
+ * so a newly enabled GPU reports it with no further change.  The driverID is
+ * VK_DRIVER_ID_AURORA_BOREALIS, registered by Khronos for Aurora Silicon.
  */
 #define HK_DRIVER_NAME "Borealis"
 #define HK_DRIVER_INFO_SUFFIX ", Borealis, derived from Honeykrisp"
@@ -108,6 +108,9 @@ VkResult hk_create_drm_physical_device(struct vk_instance *vk_instance,
                                        struct vk_physical_device **pdev_out);
 
 void hk_physical_device_destroy(struct vk_physical_device *vk_device);
+
+void hk_border_emulation_recall(struct hk_physical_device *pdev);
+void hk_border_emulation_remember(struct hk_physical_device *pdev);
 
 #if defined(VK_USE_PLATFORM_WAYLAND_KHR) ||                                    \
    defined(VK_USE_PLATFORM_XCB_KHR) || defined(VK_USE_PLATFORM_XLIB_KHR) ||    \

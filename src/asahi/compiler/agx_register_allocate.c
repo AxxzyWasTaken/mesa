@@ -398,14 +398,18 @@ dest_limit(const struct ra_ctx *rctx, const agx_instr *I, unsigned d)
     * reads as for texture reads. Coordinate and other staged sources are
     * bounded separately through texture_gpr below. AGX3C's destination is
     * eight bits: G17G samples and reads land at halves 148 and 174 under
-    * register pressure (port/rawit k_tex_hi, k_read_hi). */
-   if (rctx->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3B &&
+    * register pressure (port/rawit k_tex_hi, k_read_hi). G18G keeps the
+    * seven-bit bound its mixed descriptor samples were qualified with. */
+   if ((rctx->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3B ||
+        agx_is_g18g(&rctx->shader->key->dev)) &&
        (I->op == AGX_OPCODE_TEXTURE_SAMPLE ||
         I->op == AGX_OPCODE_TEXTURE_LOAD || I->op == AGX_OPCODE_IMAGE_LOAD))
       limit = MIN2(limit, 128);
-   /* A move from the uniform file packs to a G17P COPY, which names a
-    * seven-bit destination like the half COPY. */
-   if (rctx->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3B &&
+   /* A move from the uniform file packs to a compact COPY on G17P and
+    * G18G, which names a seven-bit destination like the half COPY. Other
+    * instructions can still allocate the full register file. */
+   if ((rctx->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3B ||
+        agx_is_g18g(&rctx->shader->key->dev)) &&
        I->op == AGX_OPCODE_MOV && I->src[0].type == AGX_INDEX_UNIFORM)
       limit = MIN2(limit, AGX3_COPY_REG16_DEST_HALVES);
    if (rctx->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3B &&
@@ -416,6 +420,13 @@ dest_limit(const struct ra_ctx *rctx, const agx_instr *I, unsigned d)
        ra_class_for_index(I->dest[d]) == RA_GPR &&
        BITSET_TEST(rctx->texture_gpr, I->dest[d].value))
       limit = MIN2(limit, 128);
+   /* The G18G stream packer accepts direct coordinate bases through half
+    * 60. Keep the complete coordinate vector in the low bank, including
+    * after an overlapping TEX destination evicts a still-live value. */
+   if (agx_is_g18g(&rctx->shader->key->dev) &&
+       ra_class_for_index(I->dest[d]) == RA_GPR &&
+       BITSET_TEST(rctx->texture_gpr, I->dest[d].value))
+      limit = MIN2(limit, 64);
    if (rctx->shader->key->dev.encoding == AGX_ISA_ENCODING_AGX3B &&
        ra_class_for_index(I->dest[d]) == RA_GPR &&
        (I->op == AGX_OPCODE_LOG2 ||
@@ -2799,6 +2810,7 @@ agx3_cube_register_budget(agx_context *ctx)
 {
    unsigned budget = AGX3B_NUM_REGS;
    unsigned alignment = 8;
+   bool shared_cem = false, packed_layer = false;
    agx_foreach_instr_global(ctx, I) {
       agx_foreach_ssa_dest(I, d)
          alignment = MAX2(alignment,
@@ -2807,15 +2819,32 @@ agx3_cube_register_budget(agx_context *ctx)
           (I->dim != AGX_DIM_CUBE && I->dim != AGX_DIM_CUBE_ARRAY))
          continue;
 
+      /* A plain cube sample stages a register level or bias with CEM's face
+       * in a form that encodes the face's high bit, so only the level needs
+       * a seven-bit register, and RA keeps it there (texture_gpr). A cube
+       * array stages its face in a seven-bit field, from its own CEM scratch
+       * (agx3_reserve_cube_scratch) where it has one. The bias with
+       * minimum also places a packed word above the allocation. */
       const bool bias_min = I->lod_mode == AGX_LOD_MODE_AUTO_LOD_BIAS_MIN;
-      const bool register_lod = bias_min ||
-         ((I->lod_mode == AGX_LOD_MODE_LOD_MIN ||
-           I->lod_mode == AGX_LOD_MODE_AUTO_LOD_BIAS) &&
-          I->src[1].type != AGX_INDEX_IMMEDIATE);
+      /* With its own scratch, nothing of a cube sample sits above the
+       * allocation but a cube array's packed layer word. Its budget keeps
+       * the shader at 576 threads: Counter-Strike 2's register-heavy
+       * cube-array material passes ran faster at 177 halves than at 185
+       * (512 threads), though they spill a little more. */
+      const bool own_scratch = !I->agx3_cube_scalar_coords && I->nr_srcs == 7;
       budget = MIN2(budget,
-                    (I->dim == AGX_DIM_CUBE_ARRAY || register_lod) ? 112 :
-                    AGX3B_NUM_REGS - 8);
+                    ((I->dim == AGX_DIM_CUBE_ARRAY && !own_scratch) || bias_min)
+                       ? 112 : own_scratch ? AGX3B_NUM_REGS - 16
+                                           : AGX3B_NUM_REGS - 8);
+      shared_cem |= !own_scratch;
+      packed_layer |= own_scratch && I->src[1].type != AGX_INDEX_IMMEDIATE &&
+                      (I->lod_mode == AGX_LOD_MODE_LOD_MIN ||
+                       I->lod_mode == AGX_LOD_MODE_AUTO_LOD_BIAS);
    }
+   /* The shared CEM scratch and a cube array's prepacked layer word both sit
+    * above the allocation, below half 191. */
+   if (shared_cem && packed_layer)
+      budget = MIN2(budget, AGX3B_NUM_REGS - 16);
    return ROUND_DOWN_TO(budget, alignment);
 }
 
@@ -2934,6 +2963,28 @@ agx_ra_impl(agx_context *ctx, bool disable_remat)
     */
    if (ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3B)
       max_possible_regs = MIN2(max_possible_regs, AGX3B_NUM_REGS);
+
+   /* G18G's eight-bit operand fields also encode r126/r127, but those names
+    * do not behave as ordinary data registers. Physical scalar readbacks
+    * from r124/r125 succeed while stores from r126/r127 leave their output
+    * untouched; a vec4 spanning them loses the entire store. Native G18G
+    * pressure kernels reach r125 and spill the remaining live values.
+    * Keep the unavailable halves out of allocation, including spill temps.
+    * G18G uses the G17G allocator before the final AGX3D transcode.
+    */
+   if (ctx->key->dev.emit_agx3d) {
+      /* Round before deciding whether to spill. Rounding only at assignment
+       * could leave demand above the aligned file after the spill pass. */
+      unsigned alignment = 8;
+      agx_foreach_instr_global(ctx, I) {
+         agx_foreach_ssa_dest(I, d) {
+            alignment = MAX2(alignment,
+                            util_next_power_of_two(agx_index_size_16(I->dest[d])));
+         }
+      }
+      max_possible_regs =
+         MIN2(max_possible_regs, ROUND_DOWN_TO(AGX3D_NUM_REGS, alignment));
+   }
 
    /* Native G17G pressure shaders spill at 126 dwords. Direct M5 tests of
     * IADD/EXTR followed by STDEV agree: pair 250 works, pair 252 does not.
@@ -3087,20 +3138,48 @@ agx_ra_impl(agx_context *ctx, bool disable_remat)
 
       agx_spill(ctx, max_possible_regs, remat);
 
-      if (remat && ctx->remat_fallback_spilled) {
-         /* The wave-saving remat-only pass could not meet its estimated
-          * budget and spilled to scratch; finish under the full budget. */
-         max_possible_regs = full_budget;
-         remat = false;
-         spilling = true;
+      if (agx_is_g18g(&ctx->key->dev)) {
+         /* Rematerialization changes instruction lifetimes. Measure the
+          * actual result before deciding whether the optional wave-saving
+          * budget held.
+          */
          agx_compute_liveness(ctx);
-         if (agx_calc_register_demand(ctx, false) > max_possible_regs)
-            agx_spill(ctx, max_possible_regs, false);
-      }
+         effective_demand = agx_calc_register_demand(ctx, false);
 
-      /* After spilling, recalculate liveness and demand */
-      agx_compute_liveness(ctx);
-      effective_demand = agx_calc_register_demand(ctx, false);
+         if (remat && (ctx->remat_fallback_spilled ||
+                       effective_demand > max_possible_regs)) {
+            /* The reduced budget is only an occupancy optimization.
+             * Constants reintroduced at their uses can exceed that estimate
+             * even without a scratch spill. Retain the rematerialized
+             * program and allocate under the original hardware budget,
+             * spilling only if needed.
+             */
+            max_possible_regs = full_budget;
+            remat = false;
+            spilling = ctx->remat_fallback_spilled ||
+                       effective_demand > max_possible_regs;
+            if (effective_demand > max_possible_regs) {
+               agx_spill(ctx, max_possible_regs, false);
+               agx_compute_liveness(ctx);
+               effective_demand = agx_calc_register_demand(ctx, false);
+            }
+         }
+      } else {
+         if (remat && ctx->remat_fallback_spilled) {
+            /* The wave-saving remat-only pass could not meet its estimated
+             * budget and spilled to scratch; finish under the full budget. */
+            max_possible_regs = full_budget;
+            remat = false;
+            spilling = true;
+            agx_compute_liveness(ctx);
+            if (agx_calc_register_demand(ctx, false) > max_possible_regs)
+               agx_spill(ctx, max_possible_regs, false);
+         }
+
+         /* After spilling, recalculate liveness and demand */
+         agx_compute_liveness(ctx);
+         effective_demand = agx_calc_register_demand(ctx, false);
+      }
 
       /* The resulting program can now be assigned registers */
       assert(effective_demand <= max_possible_regs && "spiller post-condition");
@@ -3234,6 +3313,16 @@ agx_ra_impl(agx_context *ctx, bool disable_remat)
          }
       }
 
+      /* G18G has its own direct-coordinate bound. Mark the SSA web so a
+       * low TEX destination cannot relocate its still-live coordinates
+       * into an unencodable high bank. Other operands keep their limits. */
+      if (agx_is_g18g(&ctx->key->dev) &&
+          (I->op == AGX_OPCODE_TEXTURE_SAMPLE ||
+           I->op == AGX_OPCODE_TEXTURE_LOAD ||
+           I->op == AGX_OPCODE_IMAGE_LOAD) &&
+          I->src[0].type == AGX_INDEX_NORMAL)
+         BITSET_SET(texture_gpr, I->src[0].value);
+
       /* Other sampled coordinates and CEM retain their low-bank source
        * constraints. Gradient scalars and shadow references also remain
        * within the existing qualified range. */
@@ -3270,6 +3359,20 @@ agx_ra_impl(agx_context *ctx, bool disable_remat)
          if (I->op == AGX_OPCODE_TEXTURE_SAMPLE && I->shadow &&
              I->src[5].type == AGX_INDEX_NORMAL)
             BITSET_SET(texture_gpr, I->src[5].value);
+
+         /* A cube sample's register level or bias is a seven-bit operand of
+          * the staging PACK_SMPIR (agx3_tex_stage_cube_lod). */
+         if (I->op == AGX_OPCODE_TEXTURE_SAMPLE &&
+             (I->dim == AGX_DIM_CUBE || I->dim == AGX_DIM_CUBE_ARRAY) &&
+             I->src[1].type == AGX_INDEX_NORMAL)
+            BITSET_SET(texture_gpr, I->src[1].value);
+
+         /* A cube array's own CEM scratch holds its face, a seven-bit operand
+          * of the staging PACK_SMPIR (agx3_tex_stage_cube_array_layer). */
+         if (I->op == AGX_OPCODE_TEXTURE_SAMPLE &&
+             I->dim == AGX_DIM_CUBE_ARRAY && I->nr_srcs == 7 &&
+             I->src[6].type == AGX_INDEX_NORMAL)
+            BITSET_SET(texture_gpr, I->src[6].value);
       }
 
       if (ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3C &&

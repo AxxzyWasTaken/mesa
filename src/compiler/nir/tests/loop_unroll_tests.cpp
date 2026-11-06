@@ -150,6 +150,71 @@ nir_loop_unroll_test::count_loops(void)
 }
 
 static void
+check_constant_fp64_initializer(const glsl_type *type, bool software,
+                                bool constant, bool expected,
+                                unsigned elements = 4, bool indexed_by_loop = true)
+{
+   nir_shader_compiler_options options = {};
+   options.max_unroll_iterations_fp64 = 32;
+   options.lower_doubles_options = software ? nir_lower_fp64_full_software
+                                            : (nir_lower_doubles_options)0;
+   nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_VERTEX, &options,
+                                                  "constant fp64 initializer");
+   nir_variable *array = nir_local_variable_create(
+      b.impl, glsl_array_type(type, elements, 0), "array");
+   unsigned bits = glsl_get_bit_size(type);
+   nir_def *value = constant ? nir_imm_intN_t(&b, 0, bits)
+                            : nir_load_ubo(&b, 1, bits, nir_imm_int(&b, 0),
+                                           nir_imm_int(&b, 0),
+                                           (gl_access_qualifier)0, 8, 0, 0, 8);
+   nir_def *zero = nir_imm_int(&b, 0);
+   nir_phi_instr *phi = nir_phi_instr_create(b.shader);
+   nir_def_init(&phi->instr, &phi->def, 1, 32);
+   nir_phi_instr_add_src(phi, nir_def_block(zero), zero);
+
+   nir_loop *loop = nir_push_loop(&b);
+   nir_block *head = nir_loop_first_block(loop);
+   nir_break_if(&b, nir_uge_imm(&b, &phi->def, elements));
+   nir_store_deref(&b, nir_build_deref_array(
+                     &b, nir_build_deref_var(&b, array),
+                     indexed_by_loop ? &phi->def : zero), value, 1);
+   nir_def *next = nir_iadd_imm(&b, &phi->def, 1);
+   nir_phi_instr_add_src(phi, nir_cursor_current_block(b.cursor), next);
+   nir_pop_loop(&b, loop);
+   b.cursor = nir_after_phis(head);
+   nir_builder_instr_insert(&b, &phi->instr);
+   nir_validate_shader(b.shader, "before initializer unrolling");
+
+   EXPECT_EQ(nir_opt_loop_unroll(b.shader), expected);
+   nir_validate_shader(b.shader, "after initializer unrolling");
+   unsigned stores = 0;
+   nir_foreach_block(block, b.impl) {
+      nir_foreach_instr(instr, block) {
+         stores += instr->type == nir_instr_type_intrinsic &&
+                   nir_instr_as_intrinsic(instr)->intrinsic ==
+                      nir_intrinsic_store_deref;
+      }
+   }
+   EXPECT_EQ(stores, expected ? elements : 1u);
+   ralloc_free(b.shader);
+}
+
+TEST_F(nir_loop_unroll_test, constant_software_fp64_initializer)
+{
+   check_constant_fp64_initializer(glsl_double_type(), true, true, true);
+}
+
+TEST_F(nir_loop_unroll_test, constant_software_fp64_initializer_controls)
+{
+   check_constant_fp64_initializer(glsl_double_type(), false, true, false);
+   check_constant_fp64_initializer(glsl_double_type(), true, false, false);
+   check_constant_fp64_initializer(glsl_uint64_t_type(), true, true, false);
+   check_constant_fp64_initializer(glsl_float_type(), true, true, false);
+   check_constant_fp64_initializer(glsl_double_type(), true, true, false, 64);
+   check_constant_fp64_initializer(glsl_double_type(), true, true, false, 4, false);
+}
+
+static void
 partial_unroll_oob_load_test_helper(nir_builder *bld, unsigned init_value,
                                     unsigned array_len, bool limit_minus_one)
 {

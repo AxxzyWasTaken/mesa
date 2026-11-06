@@ -118,6 +118,53 @@ end_timestamp(struct hk_cmd_buffer *cmd, uint32_t query)
    hk_sync_write_timestamp(cmd, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, req);
 }
 
+/* ResetQueryPool leaves a reusable compute stream. TOP_OF_PIPE must become
+ * its start stamp before a following dispatch reuses it; otherwise resolving
+ * the pending start at BOTTOM_OF_PIPE puts both stamps after the work.
+ */
+static void
+test_timestamp_reused_compute(void)
+{
+   for (unsigned exact = 0; exact < 2; ++exact) {
+      struct hk_cmd_buffer *cmd = timestamp_cmd(AGX_CHIP_G17P, exact);
+      cmd->sync.kind_override = HK_SYNC_ALL;
+      struct hk_cs *reset = add(cmd, true);
+      cmd->sync.kind_override = 0;
+      cmd->current_cs.cs = reset;
+      reset->g17p_timestamp_query = true;
+      reset->stats.cmds = 1;
+      hk_sync_after_stream(cmd, reset, HK_SYNC_ALL);
+
+      const struct agx_timestamp_req start = {
+         .handle = 1, .addr = 0x10000, .offset_B = 0};
+      hk_sync_write_timestamp(cmd, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, start);
+      T("top timestamp requests a check of the reused compute stream",
+        cmd->sync.cs_check_pending);
+
+      struct hk_cs *dispatch = hk_cmd_buffer_get_cs(cmd, true);
+      T("timed dispatch reuses the reset stream", dispatch == reset);
+      T("top timestamp is consumed before the reused dispatch",
+        !cmd->sync.pending_start_ts.handle &&
+        dispatch->timestamp.start.handle == start.handle &&
+        dispatch->timestamp.start.offset_B == start.offset_B &&
+        dispatch->timestamp.start.addr == start.addr);
+      /* A broken placement would need another payload-producing stream,
+       * outside this CPU fixture, when recording the end stamp. */
+      if (cmd->sync.pending_start_ts.handle)
+         continue;
+
+      dispatch->stats.cmds++;
+      end_timestamp(cmd, 1);
+      T("bottom timestamp ends the dispatch's command",
+        dispatch->timestamp.end.handle == 1 &&
+        dispatch->timestamp.end.offset_B == 8);
+      T("timestamp pair needs no extra compute command",
+        list_is_singular(&cmd->control_streams));
+      T("bottom timestamp closes the timed stream", !cmd->current_cs.cs);
+      T("timed reset and dispatch resolve", submit(new_queue(exact), cmd));
+   }
+}
+
 /* Exercise actual timestamp placement, barriers and the submission resolver.
  * Existing query-command scopes are not removed by the timestamp scope's
  * redundant same-engine execution edge. No command payload or GPU is needed.
@@ -223,7 +270,7 @@ test_timestamp_execution_scopes(void)
         timed->sync.prior[HK_SYNC_CDM] == 1);
    }
 }
-/* The fixture has no open compute stream. A request to close one is a bug. */
+/* Fixtures never queue immediate writes. Emitting one is a bug. */
 void
 hk_dispatch_imm_writes(struct hk_cmd_buffer *cmd, struct hk_cs *cs)
 {
@@ -240,7 +287,7 @@ hk_defer_oq_available(struct hk_cmd_buffer *cmd, struct hk_cs *cs)
    abort();
 }
 
-/* This fixture never records query resets. */
+/* Reset-stream fixtures model the ordering, without emitting reset payloads. */
 void
 hk_flush_query_resets(struct hk_cmd_buffer *cmd, struct hk_cs *cs)
 {
@@ -1281,6 +1328,7 @@ main(void)
    test_chain_first_skips_empty_buffers();
    test_rt_kernel_gate();
    test_timestamp_execution_scopes();
+   test_timestamp_reused_compute();
    /* Each matching destination retains the exact old source prefix, including
     * reuse of a recording and independent physical destinations on the queue. */
    struct hk_queue *q = new_queue(true);

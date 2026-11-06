@@ -339,6 +339,7 @@ struct hk_rt_compiler {
    /* Hit kind reported by the intersection shader of a committed generated
     * (procedural) hit; triangle hits derive theirs from the facing bit. */
    nir_variable *native_hit_kind;
+   nir_variable *native_hit_attribs;
 
    struct hash_table **functions;
    struct hash_table *function_depths;
@@ -888,6 +889,13 @@ struct hk_lower_isec_state {
    nir_shader *ahit;
 };
 
+static nir_deref_instr *
+hk_native_hit_attrib(nir_builder *b, struct hk_rt_compiler *compiler, unsigned word)
+{
+   return nir_build_deref_array_imm(
+      b, nir_build_deref_var(b, compiler->native_hit_attribs), word);
+}
+
 /*
  * reportIntersectionEXT inside an intersection shader.  The hit is accepted
  * only if it is inside the current [tmin, tmax] window and the ray has not
@@ -901,6 +909,16 @@ hk_native_commit_report(nir_builder *b, struct hk_rt_compiler *compiler,
    nir_def *q = &nir_build_deref_var(b, compiler->native_query)->def;
    nir_rq_generate_intersection(b, q, distance);
    nir_store_var(b, compiler->native_hit_kind, hit_kind, 1);
+
+   /* Later candidates overwrite the frame whether or not they are committed,
+    * so the committed hit keeps its own copy of the attributes. This runs in
+    * the intersection stage, whose scratch hk_lower_ray_tracing_instr() biases
+    * by the stack pointer, so the offsets are frame-relative. */
+   for (unsigned i = 0; i < HK_RAY_HIT_ATTRIBS_SIZE / 4; ++i) {
+      nir_store_deref(b, hk_native_hit_attrib(b, compiler, i),
+                      nir_load_scratch(b, 1, 32, nir_imm_int(b, 4 * i),
+                                       .align_mul = 4), 0x1);
+   }
 }
 
 static bool
@@ -1233,6 +1251,10 @@ hk_trace_ray_native(nir_builder *b, struct hk_rt_compiler *compiler,
       compiler->native_query->data.ray_query = true;
       compiler->native_hit_kind = nir_variable_create(b->shader,
          nir_var_shader_temp, glsl_uint_type(), "rt.procedural_hit_kind");
+      compiler->native_hit_attribs = nir_variable_create(b->shader,
+         nir_var_shader_temp,
+         glsl_array_type(glsl_uint_type(), HK_RAY_HIT_ATTRIBS_SIZE / 4, 0),
+         "rt.procedural_hit_attribs");
    }
    nir_variable *query = compiler->native_query;
    nir_def *q = &nir_build_deref_var(b, query)->def;
@@ -1314,6 +1336,12 @@ hk_trace_ray_native(nir_builder *b, struct hk_rt_compiler *compiler,
    hk_rt_native_load_hit_state(b, state, q, as, true);
    nir_push_if(b, nir_ieq_imm(b, type, 2));
    nir_store_var(b, state->hit_kind, nir_load_var(b, compiler->native_hit_kind), 1);
+   nir_def *frame = nir_load_var(b, state->stack_ptr);
+   for (unsigned i = 0; i < HK_RAY_HIT_ATTRIBS_SIZE / 4; ++i) {
+      nir_store_scratch(b, nir_load_deref(b, hk_native_hit_attrib(b, compiler, i)),
+                        nir_iadd_imm(b, frame, 4 * i), .align_mul = 4,
+                        .write_mask = 0x1);
+   }
    nir_pop_if(b, NULL);
    nir_pop_if(b, NULL);
 }
@@ -2045,7 +2073,6 @@ hk_hit_object_record_from_query(nir_builder *b, struct hk_rt_compiler *compiler,
    nir_def *q = intr->src[1].ssa;
    nir_def *sbt_index = intr->src[2].ssa;
    nir_def *hit_kind = intr->src[3].ssa;
-   const bool attributes = !nir_src_is_undef(intr->src[4]);
 
    nir_def *type = nir_rq_load(b, 1, 32, q, .committed = true,
                                .ray_query_value = nir_ray_query_value_intersection_type);
@@ -2072,22 +2099,32 @@ hk_hit_object_record_from_query(nir_builder *b, struct hk_rt_compiler *compiler,
       hk_hobj_store(b, hobj, HK_HOBJ_INSTANCE_ADDR, instance);
       hk_hobj_store(b, hobj, HK_HOBJ_PRIMITIVE_ID, primitive);
       hk_hobj_store(b, hobj, HK_HOBJ_GEOMETRY_ID_AND_FLAGS, geometry);
-      hk_hobj_store(b, hobj, HK_HOBJ_HIT_KIND, hit_kind);
       if (compiler->native_agx)
          hk_hobj_store(b, hobj, HK_HOBJ_PRIMITIVE_ADDR,
             agx_nir_gen1_vertex_position_address(b, instance, geometry, primitive));
-      if (attributes) {
-         nir_def *words = intr->src[4].ssa;
-         for (unsigned i = 0; i < words->num_components; ++i)
-            nir_store_deref(b, hk_hobj_attribute(b, hobj, i),
-                            nir_channel(b, words, i), 0x1);
-      } else {
+      /* The application's hit kind and attributes describe a generated hit.
+       * A triangle already has its own. */
+      nir_push_if(b, nir_ieq_imm(b, type, 1));
+      {
+         nir_def *front = nir_rq_load(b, 1, 1, q, .committed = true,
+            .ray_query_value = nir_ray_query_value_intersection_front_face);
+         hk_hobj_store(b, hobj, HK_HOBJ_HIT_KIND,
+            nir_bcsel(b, front, nir_imm_int(b, 0xfe), nir_imm_int(b, 0xff)));
          nir_def *bary = nir_rq_load(b, 2, 32, q, .committed = true,
             .ray_query_value = nir_ray_query_value_intersection_barycentrics);
          for (unsigned i = 0; i < 2; ++i)
             nir_store_deref(b, hk_hobj_attribute(b, hobj, i),
                             nir_channel(b, bary, i), 0x1);
       }
+      nir_push_else(b, NULL);
+      {
+         hk_hobj_store(b, hobj, HK_HOBJ_HIT_KIND, hit_kind);
+         nir_def *words = intr->src[4].ssa;
+         for (unsigned i = 0; i < words->num_components; ++i)
+            nir_store_deref(b, hk_hobj_attribute(b, hobj, i),
+                            nir_channel(b, words, i), 0x1);
+      }
+      nir_pop_if(b, NULL);
    }
    nir_push_else(b, NULL);
    {

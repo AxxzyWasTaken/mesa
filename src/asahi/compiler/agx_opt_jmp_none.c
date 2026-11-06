@@ -23,8 +23,13 @@
 /* Estimated cost of inserting a jmp_exec_none. This value is tuned to Dolphin
  * ubershaders. It needs to be retuned in lockstep with changes to the cost
  * estimation heuristic.
+ *
+ * On G17P a group with every lane off still spends a cycle per instruction, so
+ * TF3's short light paths pay for the jump: 5 is 4-6% faster than 19 there, and
+ * 10, 5 and 2 are alike.
  */
 #define COST_JMP (19)
+#define COST_JMP_G17P (5)
 
 static uint32_t
 cost_instr(agx_instr *I)
@@ -145,7 +150,9 @@ try_insert_jmp(agx_context *ctx, agx_block *from, agx_instr *from_I,
    uint32_t cost_instructions =
       cost_between(ctx, from, from_I, target, skip_to_end_of_target, &must_skip);
 
-   if (!must_skip && cost_instructions < COST_JMP * inverse_probability)
+   const uint32_t cost_jmp =
+      ctx->key->dev.chip == AGX_CHIP_G17P ? COST_JMP_G17P : COST_JMP;
+   if (!must_skip && cost_instructions < cost_jmp * inverse_probability)
       return;
 
    /* It looks like inserting a jump will be a win. Do so. */

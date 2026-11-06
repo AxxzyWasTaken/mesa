@@ -124,7 +124,7 @@ foreach d : [[with_gallium_kmsro, [
              [with_gallium_lima, ['lima']],
              [with_gallium_d3d12, ['d3d12']],
              [with_gallium_zink, ['zink']],
-             [with_gallium_asahi, ['asahi']]]
+             [with_gallium_asahi, ['aurora', 'asahi']]]
   if d[0]
     foreach name : d[1]
       dril_drivers += '@0@_dri.@1@'.format(name, libname_suffix)

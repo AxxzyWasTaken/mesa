@@ -61,6 +61,12 @@ extern "C" {
 #define AGX_IOTO_G17P_EOT_RESOURCE_SPEC            UINT64_C(0)
 #define AGX_IOTO_G17P_BG_RESOURCE_SPEC             UINT64_C(0x0007800000000040)
 #define AGX_IOTO_G17P_DIRECT_ADD3_PROGRAM_SIZE      196u
+#define AGX_IOTO_G17P_DIRECT_ADD3_WITNESS_SHADER_VA \
+   UINT64_C(0x100000003c0)
+
+#define AGX_IOTO_G17P_DIRECT_ADD3_WITNESS_PROGRAM_VA \
+   UINT64_C(0x100000a8000)
+
 #define AGX_IOTO_G17S_MINIMAL_COMPUTE_PROGRAM_SIZE 194u
 #define AGX_IOTO_G17S_MINIMAL_COMPUTE_WITNESS_ABSOLUTE_VA \
    UINT64_C(0x10000018020)
@@ -118,13 +124,99 @@ bool agx_ioto_straight_line_program_compose(
    const struct agx_ioto_profile_control *profile, void *output,
    size_t capacity, size_t *written);
 
+bool agx_ioto_g17p_direct_add3_program_compose(
+   uint64_t program_va, uint64_t shader_va, void *output, size_t capacity,
+   size_t *written);
+
+bool agx_ioto_g17p_no_resource_program_compose(
+   uint64_t program_va, const struct agx_ioto_state_tail_output *packed_tail,
+   void *output, size_t capacity, size_t *written);
+
 bool agx_ioto_g17p_no_resource_program_compose_trusted(
    uint64_t program_va, const struct agx_ioto_state_tail_output *packed_tail,
    void *output, size_t capacity, size_t *written);
 
+bool agx_ioto_g17p_fragment_no_resource_program_compose(
+   uint64_t program_va, const struct agx_ioto_state_tail_output *packed_tail,
+   unsigned colour_classes, void *output, size_t capacity, size_t *written);
+
 bool agx_ioto_g17p_fragment_no_resource_program_compose_trusted(
    uint64_t program_va, const struct agx_ioto_state_tail_output *packed_tail,
    unsigned colour_classes, void *output, size_t capacity, size_t *written);
+
+/* Native M5/G17G no-resource vertex and single-colour fragment programs.
+ * The type-0 packed state is validated with the M5 grammar; runtime SPECLM
+ * bits are retained because their semantic field mapping is not complete.
+ * M5 uses a 52-byte profile loader, with operand4 for fragment and operand8
+ * for vertex, followed by the stage-specific release/termination sequence.
+ * This does not admit resource loads, multisampling, MRT or a Mesa device.
+ * On failure, output and *written remain unchanged. */
+bool agx_ioto_g17g_no_resource_program_compose(
+   uint64_t program_va, const struct agx_ioto_state_tail_output *packed_tail,
+   bool fragment, void *output, size_t capacity, size_t *written);
+
+enum agx_ioto_g17g_program_stage {
+   AGX_IOTO_G17G_PROGRAM_VERTEX,
+   AGX_IOTO_G17G_PROGRAM_FRAGMENT,
+   /* A fragment that owns its coverage -- a punch-through pass, where the
+    * shader may discard and so decides the sample mask itself. It differs
+    * from the ordinary fragment in one bit of the pixel release record. */
+   AGX_IOTO_G17G_PROGRAM_COVERAGE_FRAGMENT,
+   AGX_IOTO_G17G_PROGRAM_EOT,
+   AGX_IOTO_G17G_PROGRAM_BACKGROUND,
+   AGX_IOTO_G17G_PROGRAM_COMPUTE,
+   AGX_IOTO_G17G_PROGRAM_MESH,
+   AGX_IOTO_G17G_PROGRAM_OBJECT,
+};
+
+/* Compose a validated GPU1 uniform-load body using the native M5 ordering:
+ * load rounds, shader state, HAL300 profile loader, final copies, terminal.
+ * Fragment uses the witnessed RT0 PIXREL; EOT uses the fragment profile
+ * without PIXREL. Background uses its own captured release mask and requires
+ * a shader with no preamble; background preamble/call protocols are not covered.
+ * Compute uses the captured operand4 loader without a pixel release.
+ * Output and written remain unchanged on failure; input/output may alias. */
+bool agx_ioto_g17g_resource_program_compose(
+   uint64_t program_va, const void *body, size_t body_size,
+   const struct agx_ioto_state_tail_output *packed_tail,
+   enum agx_ioto_g17g_program_stage stage,
+   void *output, size_t capacity, size_t *written);
+
+/* The two-target G18 capture releases colour class pairs 0 and 1 (mask 3).
+ * Other stages retain their own release protocol. */
+bool agx_ioto_g17g_resource_program_compose_classes(
+   uint64_t program_va, const void *body, size_t body_size,
+   const struct agx_ioto_state_tail_output *packed_tail,
+   enum agx_ioto_g17g_program_stage stage, unsigned colour_classes,
+   void *output, size_t capacity, size_t *written);
+
+/* Compose a G17P resource program around a body emitted by the HAL200 ESL
+ * scheduler. Resource loads and their drain padding precede the packed shader
+ * state. The default profile loader then copies those results into CProg and
+ * terminates. pre_copy_body and copies are validated as separate record spans;
+ * the latter may contain COPY records only. */
+enum agx_ioto_g17p_program_stage {
+   AGX_IOTO_G17P_PROGRAM_VERTEX_COMPUTE,
+   AGX_IOTO_G17P_PROGRAM_FRAGMENT,
+   AGX_IOTO_G17P_PROGRAM_COVERAGE_FRAGMENT,
+};
+
+/* Compose the native loader, including its terminal constant program. Empty
+ * resource spans are valid. A NULL preshader emits the ordinary absent form.
+ * Preshader bytes are staged before output is written, so they may alias it. */
+bool agx_ioto_g17p_program_compose_with_preshader(
+   uint64_t program_va, const void *pre_copy_body, size_t pre_copy_body_size,
+   const void *copies, size_t copies_size,
+   const struct agx_ioto_state_tail_output *packed_tail,
+   enum agx_ioto_g17p_program_stage stage, unsigned colour_classes,
+   const struct agx_ioto_preshader_desc *preshader, void *output,
+   size_t capacity, size_t *written);
+
+bool agx_ioto_g17p_resource_program_compose(
+   uint64_t program_va, const void *pre_copy_body, size_t pre_copy_body_size,
+   const void *copies, size_t copies_size,
+   const struct agx_ioto_state_tail_output *packed_tail, void *output,
+   size_t capacity, size_t *written);
 
 /* Fast forms for state tails and bodies produced transactionally by the
  * in-tree HAL200 scheduler/packers. They preserve destination, capacity,
@@ -137,7 +229,19 @@ bool agx_ioto_g17p_resource_program_compose_trusted(
    const struct agx_ioto_state_tail_output *packed_tail, void *output,
    size_t capacity, size_t *written);
 
+bool agx_ioto_g17p_fragment_resource_program_compose(
+   uint64_t program_va, const void *pre_copy_body, size_t pre_copy_body_size,
+   const void *copies, size_t copies_size,
+   const struct agx_ioto_state_tail_output *packed_tail,
+   unsigned colour_classes, void *output, size_t capacity, size_t *written);
+
 bool agx_ioto_g17p_fragment_resource_program_compose_trusted(
+   uint64_t program_va, const void *pre_copy_body, size_t pre_copy_body_size,
+   const void *copies, size_t copies_size,
+   const struct agx_ioto_state_tail_output *packed_tail,
+   unsigned colour_classes, void *output, size_t capacity, size_t *written);
+
+bool agx_ioto_g17p_coverage_fragment_program_compose(
    uint64_t program_va, const void *pre_copy_body, size_t pre_copy_body_size,
    const void *copies, size_t copies_size,
    const struct agx_ioto_state_tail_output *packed_tail,
@@ -158,6 +262,12 @@ bool agx_ioto_g17p_external_setup_launcher_compose(
    uint64_t program_va, const void *root_prefix, size_t root_prefix_size,
    const struct agx_ioto_state_tail_output *packed_tail, uint64_t setup_va,
    void *output, size_t capacity, size_t *written);
+
+bool agx_ioto_g17p_background_resource_program_compose(
+   uint64_t program_va, const void *pre_copy_body, size_t pre_copy_body_size,
+   const void *copies, size_t copies_size,
+   const struct agx_ioto_state_tail_output *packed_tail, void *output,
+   size_t capacity, size_t *written);
 
 bool agx_ioto_g17p_background_resource_program_compose_trusted(
    uint64_t program_va, const void *pre_copy_body, size_t pre_copy_body_size,
@@ -189,16 +299,14 @@ bool agx_ioto_g17s_minimal_compute_program_compose_resources(
    const struct agx_ioto_g17s_minimal_compute_resources *resources,
    void *output, size_t capacity, size_t *written);
 
-enum agx_ioto_g17g_program_stage {
-   AGX_IOTO_G17G_PROGRAM_VERTEX,
-   AGX_IOTO_G17G_PROGRAM_FRAGMENT,
-   AGX_IOTO_G17G_PROGRAM_COVERAGE_FRAGMENT,
-   AGX_IOTO_G17G_PROGRAM_EOT,
-   AGX_IOTO_G17G_PROGRAM_BACKGROUND,
-   AGX_IOTO_G17G_PROGRAM_COMPUTE,
-   AGX_IOTO_G17G_PROGRAM_MESH,
-   AGX_IOTO_G17G_PROGRAM_OBJECT,
-};
+bool agx_ioto_g17p_external_setup_suffix_compose(
+   const void *body, size_t body_size, bool fragment, bool coverage,
+   unsigned colour_classes, void *output, size_t capacity, size_t *written);
+
+bool agx_ioto_g17p_external_setup_launcher_compose_trusted(
+   uint64_t program_va, const void *root_prefix, size_t root_prefix_size,
+   const struct agx_ioto_state_tail_output *packed_tail, uint64_t setup_va,
+   void *output, size_t capacity, size_t *written);
 
 bool agx_ioto_program_copy_suffix_offset(enum agx_chip chip, const void *body,
                                         size_t body_size, size_t *offset);

@@ -8,15 +8,20 @@
 
 /*
  * One decoder per instruction encoding. AGX2 covers G13/G14 (M1/M2). AGX3 is a
- * different instruction set with two encodings, established by decoding a
+ * different instruction set with three encodings, established by decoding a
  * 274-kernel corpus with each of Apple's own encoder tables:
  *
  *   agx3b -- G15 (M3), G16 (M4) and G17P, all dies.
  *   agx3c -- G17 (M5), all dies.
+ *   agx3d -- G18G (M6), transcribed from the "g18g-encodings" variant of the
+ *            same tables. Every instruction of the 41 G18G witness programs
+ *            in src/asahi/compiler/test/native/g18g decodes to a known form
+ *            under it and each program ends in `end`; under agx3c the same
+ *            programs hit 128 unknown opcodes.
  *
- * The two AGX3 tables share no decode logic; a stream from one decodes as
- * valid-looking but wrong instructions under the other, so pick by chip via
- * agx_chip_isa_encoding() rather than by trying both.
+ * The AGX3 tables share no decode logic; a stream from one decodes as
+ * valid-looking but wrong instructions under another, so pick by chip via
+ * agx_chip_isa_encoding() rather than by trying each.
  */
 signed agx2_disassemble_instr(BITSET_WORD *code, FILE *fp, unsigned offset,
                               size_t available, bool verbose);
@@ -24,6 +29,23 @@ signed agx3b_disassemble_instr(BITSET_WORD *code, FILE *fp, unsigned offset,
                                size_t available, bool verbose);
 signed agx3c_disassemble_instr(BITSET_WORD *code, FILE *fp, unsigned offset,
                                size_t available, bool verbose);
+signed agx3d_disassemble_instr(BITSET_WORD *code, FILE *fp, unsigned offset,
+                               size_t available, bool verbose);
+
+/*
+ * Length in bytes of the instruction at code (at most `available` bytes), and
+ * its display name, which may carry trailing padding, by the same matching
+ * rule as the disassemblers above but without printing. -1 if nothing
+ * matches.
+ */
+signed agx2_instr_length(const uint8_t *code, size_t available,
+                         const char **display);
+signed agx3b_instr_length(const uint8_t *code, size_t available,
+                          const char **display);
+signed agx3c_instr_length(const uint8_t *code, size_t available,
+                          const char **display);
+signed agx3d_instr_length(const uint8_t *code, size_t available,
+                          const char **display);
 
 /*
  * Disassemble a whole shader, stopping at max_len.
@@ -71,3 +93,4 @@ signed agx3c_disassemble_instr(BITSET_WORD *code, FILE *fp, unsigned offset,
 AGX_DISASSEMBLE_LOOP(agx2, true)
 AGX_DISASSEMBLE_LOOP(agx3b, false)
 AGX_DISASSEMBLE_LOOP(agx3c, false)
+AGX_DISASSEMBLE_LOOP(agx3d, false)

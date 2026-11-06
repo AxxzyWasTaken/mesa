@@ -6,6 +6,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <string.h>
 #ifdef HAVE_LIBDRM
 #include <xf86drm.h>
 #endif
@@ -35,6 +36,20 @@ struct vdrm_device;
 struct asahi_ccmd_submit_res;
 #endif
 
+/* DRM name of the native kernel driver. Kernels before the Aurora rename
+ * report "asahi", so both are accepted and Mesa and the kernel can update in
+ * either order.
+ */
+#define AGX_DRM_DRIVER_NAME        "aurora"
+#define AGX_DRM_DRIVER_NAME_LEGACY "asahi"
+
+static inline bool
+agx_is_native_drm_driver(const char *name)
+{
+   return name && (!strcmp(name, AGX_DRM_DRIVER_NAME) ||
+                   !strcmp(name, AGX_DRM_DRIVER_NAME_LEGACY));
+}
+
 enum agx_dbg {
    AGX_DBG_TRACE = BITFIELD_BIT(0),
    AGX_DBG_BODUMP = BITFIELD_BIT(1),
@@ -61,6 +76,7 @@ enum agx_dbg {
    AGX_DBG_NOMERGE = BITFIELD_BIT(22),
    /* Track BOs without serializing submissions, then decode only a failed
     * submit while its command stream and referenced allocations are live. */
+   AGX_DBG_FAULTTRACE = BITFIELD_BIT(23),
    /* Decode every command stream at submit time without waiting for the GPU. */
    AGX_DBG_ASYNCTRACE = BITFIELD_BIT(24),
 };
@@ -163,6 +179,9 @@ struct agx_device {
 
    /* vdrm device */
    struct vdrm_device *vdrm;
+   /* virtio: the host's count of failed commands (asahi_shmem::async_error),
+    * NULL if the host doesn't publish it. */
+   const uint32_t *async_errors;
    uint32_t next_blob_id;
 
    /* Device handle */
@@ -299,7 +318,7 @@ agx_bo_sync_for_device(struct agx_bo *bo, size_t offset, size_t size)
  * for sparse_ro_offset.
  */
 static inline bool
-agx_addr_is_ro(struct agx_device *dev, uint64_t addr)
+agx_addr_is_ro(const struct agx_device *dev, uint64_t addr)
 {
    return (addr & dev->sparse_ro_offset);
 }
@@ -324,7 +343,7 @@ agx_fill_bind_flags(const struct agx_device *dev)
 }
 
 static inline uint64_t
-agx_rw_addr_to_ro(struct agx_device *dev, uint64_t addr)
+agx_rw_addr_to_ro(const struct agx_device *dev, uint64_t addr)
 {
    assert(!agx_addr_is_ro(dev, addr));
    return addr + dev->sparse_ro_offset;
@@ -415,7 +434,7 @@ agx_bo_unmap_owned(struct agx_bo *bo, void *map, size_t size)
 }
 
 static inline bool
-agx_has_soft_fault(struct agx_device *dev)
+agx_has_soft_fault(const struct agx_device *dev)
 {
    return (dev->params.features & DRM_ASAHI_FEATURE_SOFT_FAULTS) &&
           !(dev->debug & AGX_DBG_NOSOFT);
@@ -526,6 +545,15 @@ agx_is_m4_pro(const struct agx_device *dev)
 {
    return dev->chip == AGX_CHIP_G17P && dev->params.chip_id == 0x6040 &&
           dev->params.gpu_generation == 16 && dev->params.gpu_variant == 'S';
+}
+
+/* Product capability rollout must not follow the shared G17P architecture
+ * profile: T6040 also uses that profile. Device admission checked USC/HAL. */
+static inline bool
+agx_is_a18_pro(const struct agx_device *dev)
+{
+   return dev->chip == AGX_CHIP_G17P && dev->params.chip_id == 0x8140 &&
+          dev->params.gpu_generation == 17 && dev->params.gpu_variant == 'P';
 }
 
 struct agx_va *agx_va_alloc(struct agx_device *dev, uint64_t size_B,

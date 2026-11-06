@@ -32,6 +32,10 @@ struct agx3_ioto_uniform_program_desc {
    uint64_t program_va;
    const struct agx3_ioto_uniform_range *ranges;
    size_t range_count;
+   /* Optional known preamble inputs. G17P default allocator only; every
+    * selected half must be uploaded exactly once by ranges. Ordinary uniform
+    * uploads remain complete. This does not enable preamble execution. */
+   const struct agx_ioto_cprog_inputs *preshader_inputs;
 
    uint8_t initial_gpr_dwords;
    bool fast_path_enabled;
@@ -86,6 +90,13 @@ bool agx3_ioto_uniform_program_desc_body_bound(
    enum agx_chip chip, const struct agx3_ioto_uniform_program_desc *desc,
    size_t *bytes, size_t *chunks);
 
+/* Also bounds the selected packed TPS input copies and validates their
+ * coverage. NULL inputs preserves the ordinary body bound. */
+bool agx3_ioto_uniform_program_body_bound_with_inputs(
+   enum agx_chip chip, const struct agx3_ioto_uniform_range *ranges,
+   size_t range_count, const struct agx_ioto_cprog_inputs *inputs,
+   size_t *bytes, size_t *chunks);
+
 /* Build only the scheduled resource-load body. copy_offset marks the first
  * trailing COPY record emitted by finishRound(), so a target-specific program
  * container can place its shader state and profile-loader prefix before those
@@ -94,6 +105,11 @@ bool agx3_ioto_uniform_program_body_generate(
    enum agx_chip chip, const struct agx3_ioto_uniform_program_desc *desc,
    struct agx3_ioto_uniform_program_workspace workspace, size_t *written,
    size_t *copy_offset);
+
+bool agx3_ioto_uniform_program_generate(
+   enum agx_chip chip, const struct agx3_ioto_uniform_program_desc *desc,
+   struct agx3_ioto_uniform_program_workspace workspace, void *output,
+   size_t capacity, size_t *written);
 
 #ifdef __cplusplus
 }

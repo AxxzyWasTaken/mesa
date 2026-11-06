@@ -721,13 +721,17 @@ zink_init_compute_caps(struct zink_screen *screen)
    caps->max_subgroups = screen->info.props13.maxComputeWorkgroupSubgroups;
 }
 
-/* The A18 Pro (0x8140) and the M4 Pro (0x6040) run Honeykrisp's G17P path. */
+/* The A18 Pro (0x8140), M4 Pro (0x6040) and M4 Max (0x6041) run the
+ * Borealis G17P path.
+ * Upstream Honeykrisp has no G17P path, so only the Borealis ID matches.
+ */
 static bool
-zink_honeykrisp_g17p(const struct zink_screen *screen)
+zink_borealis_g17p(const struct zink_screen *screen)
 {
-   return zink_driverid(screen) == VK_DRIVER_ID_MESA_HONEYKRISP &&
+   return zink_driverid(screen) == VK_DRIVER_ID_AURORA_BOREALIS &&
           (screen->info.props.deviceID == 0x8140 ||
-           screen->info.props.deviceID == 0x6040);
+           screen->info.props.deviceID == 0x6040 ||
+           screen->info.props.deviceID == 0x6041);
 }
 
 static void
@@ -1152,12 +1156,12 @@ zink_init_screen_caps(struct zink_screen *screen)
       MIN2(get_smallest_buffer_heap(screen), screen->info.props.limits.maxStorageBufferRange);
 
    /* GLSL std140 rounds the block extent to its base alignment (up to
-    * 32 bytes for double vectors). G17P Honeykrisp advertises INT32_MAX,
+    * 32 bytes for double vectors). G17P Borealis advertises INT32_MAX,
     * so an otherwise valid member near the limit can round the block past
     * the limit and overflow its signed size. Expose complete alignment
-    * units on G17P, leaving the other Honeykrisp paths unchanged.
+    * units on G17P, leaving the other Borealis paths unchanged.
     */
-   if (zink_honeykrisp_g17p(screen))
+   if (zink_borealis_g17p(screen))
       caps->max_shader_buffer_size &= ~31u;
 
    caps->fs_coord_origin_upper_left = true;
@@ -1648,6 +1652,9 @@ zink_destroy_screen(struct pipe_screen *pscreen)
 
    hash_table_foreach(&screen->dts, entry)
       zink_kopper_deinit_displaytarget(screen, entry->data);
+
+   if (screen->wl_drawables.table)
+      _mesa_hash_table_fini(&screen->wl_drawables, NULL);
 
    if (screen->copy_context)
       screen->copy_context->base.destroy(&screen->copy_context->base);
@@ -2814,7 +2821,7 @@ zink_get_sparse_texture_virtual_page_size(struct pipe_screen *pscreen,
                                  VK_IMAGE_USAGE_STORAGE_BIT;
    use_flags |= is_zs ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
    VkImageUsageFlags flags = zink_get_format_props(screen, pformat)->optimalTilingFeatures & use_flags;
-   if (zink_honeykrisp_g17p(screen)) {
+   if (zink_borealis_g17p(screen)) {
       /* Admit sparse textures per target/format. A missing page size is
        * represented by NUM_VIRTUAL_PAGE_SIZES = 0, without disabling sparse
        * textures for the other targets. Format feature bits and image usage
@@ -3196,6 +3203,7 @@ init_driver_workarounds(struct zink_screen *screen)
    case VK_DRIVER_ID_BROADCOM_PROPRIETARY:
    case VK_DRIVER_ID_ARM_PROPRIETARY:
    case VK_DRIVER_ID_MESA_HONEYKRISP:
+   case VK_DRIVER_ID_AURORA_BOREALIS:
    case VK_DRIVER_ID_MESA_KOSMICKRISP:
       screen->driver_workarounds.track_renderpasses = true; //screen->info.primgen_feats.primitivesGeneratedQueryWithRasterizerDiscard
       break;
@@ -3289,7 +3297,7 @@ init_driver_workarounds(struct zink_screen *screen)
    if (zink_debug & ZINK_DEBUG_NOGENERAL)
       screen->driver_workarounds.general_layout = false;
 
-   /* Honeykrisp decides lossless compression once, at image creation, and
+   /* Borealis decides lossless compression once, at image creation, and
     * refuses it for colour images with ATTACHMENT_FEEDBACK_LOOP usage: a
     * compressed tile being stored can be read torn by a draw that samples
     * other texels of it. Adding that usage to every render target therefore
@@ -3299,11 +3307,11 @@ init_driver_workarounds(struct zink_screen *screen)
     * it and recreate an image with it before a draw or copy first reads the
     * image while writing it (zink_update_lazy_feedback_loops()).
     *
-    * Only G17P compresses on this rule; other Honeykrisp parts keep the
+    * Only G17P compresses on this rule; other Borealis parts keep the
     * usage on every render target.
     */
    screen->driver_workarounds.lazy_feedback_loop_usage =
-      zink_honeykrisp_g17p(screen) &&
+      zink_borealis_g17p(screen) &&
       screen->driver_workarounds.general_layout &&
       screen->info.have_EXT_attachment_feedback_loop_layout;
 
@@ -3559,10 +3567,15 @@ zink_internal_create_screen(const struct pipe_screen_config *config, int64_t dev
    if (config) {
       driParseConfigFiles(config->options, config->options_info,
                           &(driConfigFileParseParams) { .driverName = "zink" });
-      screen->driconf.dual_color_blend_by_location = driQueryOptionb(config->options, "dual_color_blend_by_location");
+      /* Software loader frontends may provide only the common DRI options.
+       * Keep the declared false defaults for unregistered Zink options. */
+      if (driCheckOption(config->options, "dual_color_blend_by_location", DRI_BOOL))
+         screen->driconf.dual_color_blend_by_location = driQueryOptionb(config->options, "dual_color_blend_by_location");
       //screen->driconf.inline_uniforms = driQueryOptionb(config->options, "radeonsi_inline_uniforms");
-      screen->driconf.emulate_point_smooth = driQueryOptionb(config->options, "zink_emulate_point_smooth");
-      screen->driconf.zink_shader_object_enable = driQueryOptionb(config->options, "zink_shader_object_enable");
+      if (driCheckOption(config->options, "zink_emulate_point_smooth", DRI_BOOL))
+         screen->driconf.emulate_point_smooth = driQueryOptionb(config->options, "zink_emulate_point_smooth");
+      if (driCheckOption(config->options, "zink_shader_object_enable", DRI_BOOL))
+         screen->driconf.zink_shader_object_enable = driQueryOptionb(config->options, "zink_shader_object_enable");
    }
 
    simple_mtx_lock(&instance_lock);

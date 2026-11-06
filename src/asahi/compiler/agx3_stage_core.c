@@ -160,7 +160,7 @@ append_stage_dest(struct agx3_field_kv *ov, unsigned n, uint16_t dest,
  * This is exactly agx3_tex_stage_copy; it is re-exported here so the writeout
  * path does not have to include the texture header to reach a general encoder.
  */
-static bool
+bool
 agx3_stage_copy(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
                 uint8_t slot, uint16_t wait_mask,
                 uint8_t out[AGX3_STAGE_MAX_LENGTH], uint8_t *len)
@@ -184,7 +184,7 @@ agx3_stage_copy_liveness(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
                           uint16_t wait_mask,
                           uint8_t out[AGX3_STAGE_MAX_LENGTH], uint8_t *len)
 {
-   const unsigned slots = enc == AGX_ISA_ENCODING_AGX3C ? 8 : 6;
+   const unsigned slots = agx_encoding_is_g17_class(enc) ? 8 : 6;
    if (!out || !len ||
        (enc != AGX_ISA_ENCODING_AGX3B && enc != AGX_ISA_ENCODING_AGX3C) ||
        (stage_kill && enc != AGX_ISA_ENCODING_AGX3B) ||
@@ -267,6 +267,8 @@ clr_common(enum agx_isa_encoding enc, const struct agx3_field_kv *ov,
       KV(10, 2), KV(14, 3), KV(15, 25),
    };
    const bool m5 = enc == AGX_ISA_ENCODING_AGX3C;
+   /* Native G17G pressure loops clear high registers with ep1. G18G
+    * carries the same destination and selectors in its own CLR form. */
    for (unsigned ep = 0; ep <= (m5 ? 1 : 0); ++ep) {
       if (agx3_bind_compose(enc, "clr", ep, m5 ? m5_base : base,
                            m5 ? 3 : 1, ov, n, out, len))
@@ -296,5 +298,56 @@ agx3_clr(enum agx_isa_encoding enc, uint16_t dest, bool half, bool hint,
    ov[n++] = (struct agx3_field_kv)KV(2, dest);
    ov[n++] = (struct agx3_field_kv)KV(11, hint ? 1 : 0);
    ov[n++] = (struct agx3_field_kv)KV(10, half ? 1 : 2);
+   return clr_common(enc, ov, n, out, len);
+}
+
+bool
+agx3_stage_ldimm(enum agx_isa_encoding enc, uint16_t dest, uint32_t imm,
+                 bool kill, uint8_t slot, uint16_t wait_mask,
+                 uint8_t out[AGX3_STAGE_MAX_LENGTH], uint8_t *len)
+{
+   if (out == NULL || len == NULL)
+      return false;
+   memset(out, 0, AGX3_STAGE_MAX_LENGTH);
+   *len = 0;
+
+   /* Only the AGX3b form is witnessed; AGX3c's ep2 is a different layout. */
+   if (!b_only(enc) || (dest & 1) || dest >= 256)
+      return false;
+   if (slot < 1 || slot > 6 || (wait_mask & ~(uint16_t)0x3f))
+      return false;
+
+   /* 32-bit immediate write; f10 = 2 is the width, as in every witness. */
+   const struct agx3_field_kv base[] = {KV(10, 2)};
+
+   struct agx3_field_kv ov[14];
+   unsigned n = append_stage_dest(ov, 0, dest, kill, slot);
+   ov[n++] = (struct agx3_field_kv)KV(14, imm);
+   for (unsigned i = 0; i < 6; ++i)
+      if (wait_mask & (1u << i))
+         ov[n++] = (struct agx3_field_kv)KV(17 + i, 1);
+
+   if (agx3_bind_compose(enc, "ldimm", 2, base, 1, ov, n, out, len))
+      return true;
+
+   memset(out, 0, AGX3_STAGE_MAX_LENGTH);
+   *len = 0;
+   return false;
+}
+
+bool
+agx3_stage_clr(enum agx_isa_encoding enc, uint16_t dest, bool kill,
+               uint8_t slot, uint8_t out[AGX3_STAGE_MAX_LENGTH], uint8_t *len)
+{
+   if (out == NULL || len == NULL)
+      return false;
+   memset(out, 0, AGX3_STAGE_MAX_LENGTH);
+   *len = 0;
+
+   if (!b_only(enc) || (dest & 1) || dest >= 256 || slot < 1 || slot > 6)
+      return false;
+
+   struct agx3_field_kv ov[6];
+   const unsigned n = append_stage_dest(ov, 0, dest, kill, slot);
    return clr_common(enc, ov, n, out, len);
 }

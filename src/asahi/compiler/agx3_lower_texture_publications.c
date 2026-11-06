@@ -310,6 +310,14 @@ agx3_split_texture_coordinates(agx_context *ctx)
    if (ctx->key->dev.encoding != AGX_ISA_ENCODING_AGX3C || ctx->is_preamble)
       return false;
 
+   /* G18G re-encodes the vector-coordinate fetch/sample forms. Its emitter
+    * publishes components from consecutive registers and does not consume
+    * the eight-source split-coordinate representation used by M5. Keep the
+    * collect so register allocation preserves that input layout.
+    */
+   if (agx_is_g18g(&ctx->key->dev))
+      return false;
+
    /* Every M5 stage stages its fetch and sample coordinates
     * (agx3_pack_binary.c). */
    switch (ctx->stage) {
@@ -388,6 +396,51 @@ agx3_split_texture_coordinates(agx_context *ctx)
       }
 
       agx_builder_insert(&b.cursor, split);
+      agx_remove_instruction(I);
+      progress = true;
+   }
+   return progress;
+}
+
+/* The packer computed every cube sample's CEM in one shared scratch above
+ * the allocation, eight halves the file had to leave free. A cube array
+ * stages CEM's face in a seven-bit PACK_SMPIR field
+ * (agx3_tex_stage_cube_array_layer), so for cube arrays that scratch had to
+ * sit below half 128 and capped the whole register file at 112 halves.
+ *
+ * Give each cube sample its own scratch instead: an undefined four-word
+ * vector the sample reads, which RA places clear of every value live at the
+ * sample, below half 128 for a cube array (texture_gpr). Its definition
+ * emits no code. Run right before RA, so the scratch lives for this one
+ * instruction. A bias with minimum also packs a word above the allocation
+ * and keeps the shared scratch, as do scalar-coordinate cube samples. */
+bool
+agx3_reserve_cube_scratch(agx_context *ctx)
+{
+   if (ctx->key->dev.encoding != AGX_ISA_ENCODING_AGX3B)
+      return false;
+
+   bool progress = false;
+   agx_foreach_instr_global_safe(ctx, I) {
+      if (I->op != AGX_OPCODE_TEXTURE_SAMPLE ||
+          (I->dim != AGX_DIM_CUBE && I->dim != AGX_DIM_CUBE_ARRAY) ||
+          I->nr_srcs != 6 || I->nr_dests != 1 ||
+          I->lod_mode == AGX_LOD_MODE_AUTO_LOD_BIAS_MIN)
+         continue;
+
+      agx_builder b = agx_init_builder(ctx, agx_before_instr(I));
+      agx_index scratch = agx_vec_temp(ctx, AGX_SIZE_32, 4);
+      agx_instr *collect = agx_collect_to(&b, scratch, 4);
+      agx_foreach_src(collect, c)
+         collect->src[c] = agx_undef(AGX_SIZE_32);
+
+      agx_instr *sample = agx_alloc_instr(&b, I->op, 1, 7);
+      memcpy(&sample->op, &I->op, sizeof(*I) - offsetof(agx_instr, op));
+      sample->nr_srcs = 7;
+      sample->dest[0] = I->dest[0];
+      memcpy(sample->src, I->src, 6 * sizeof(agx_index));
+      sample->src[6] = scratch;
+      agx_builder_insert(&b.cursor, sample);
       agx_remove_instruction(I);
       progress = true;
    }

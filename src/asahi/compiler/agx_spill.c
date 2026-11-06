@@ -186,6 +186,13 @@ struct spill_ctx {
     */
    agx_instr **remat;
 
+   /* M5 instructions the spiller may repeat to reload a value (see
+    * can_repeat_alu and can_remat_load), indexed by the node holding their
+    * result or one component of it, and that component. NULL for other nodes.
+    */
+   agx_instr **repeat;
+   uint8_t *repeat_comp;
+
    /* Maximum register pressure allowed */
    unsigned k;
 
@@ -330,6 +337,188 @@ remat_to(agx_builder *b, agx_index dst, struct spill_ctx *ctx, unsigned node)
    }
 }
 
+/*
+ * On M5, a spilled value can often be computed again instead of filled from
+ * its spill slot: by repeating the device load that produced it, where one
+ * load replaces a fill per component, or the arithmetic instruction that did.
+ * Once no fill reads the slot, DCE removes the spill stores too.
+ *
+ * Repeating must yield the same value anywhere the value is live. Arithmetic
+ * qualifies if it reads nothing but its operands. A load qualifies if it reads
+ * memory that nothing writes (memory_can_reorder, from nir_opt_access, which
+ * allows rematerializing such reads). Register operands must be in the
+ * register file at the reload; the spiller's register file sets decide that,
+ * so the reload never extends a live range.
+ */
+static unsigned
+remat_load_elem_bytes(const agx_instr *L)
+{
+   switch (L->format) {
+   case AGX_FORMAT_I16:
+   case AGX_FORMAT_F16:
+      return 2;
+   case AGX_FORMAT_I32:
+      return 4;
+   default:
+      return 0;
+   }
+}
+
+static bool
+can_remat_load(const agx_context *ctx, const agx_instr *L)
+{
+   if (L->op != AGX_OPCODE_DEVICE_LOAD || !L->memory_can_reorder ||
+       L->memory_is_packed || ctx->is_preamble || L->nr_dests != 1 ||
+       L->dest[0].type != AGX_INDEX_NORMAL || L->dest[0].memory ||
+       L->mask != BITFIELD_MASK(agx_channels(L->dest[0])))
+      return false;
+
+   /* One memory element per register component */
+   if (remat_load_elem_bytes(L) != agx_size_align_16(L->dest[0].size) * 2)
+      return false;
+
+   agx_foreach_src(L, s) {
+      const agx_index src = L->src[s];
+
+      if (src.type == AGX_INDEX_UNIFORM) {
+         if (ctx->uniforms_written)
+            return false;
+      } else if (src.type == AGX_INDEX_NORMAL) {
+         if (src.memory)
+            return false;
+      } else if (src.type != AGX_INDEX_IMMEDIATE) {
+         return false;
+      }
+   }
+
+   return true;
+}
+
+static bool
+can_repeat_alu(const agx_context *ctx, const agx_instr *I)
+{
+   switch (I->op) {
+   case AGX_OPCODE_FADD:
+   case AGX_OPCODE_FMUL:
+   case AGX_OPCODE_FFMA:
+   case AGX_OPCODE_FCMPSEL:
+   case AGX_OPCODE_ICMPSEL:
+   case AGX_OPCODE_IADD:
+   case AGX_OPCODE_IMAD:
+   case AGX_OPCODE_ASR:
+   case AGX_OPCODE_BFEIL:
+   case AGX_OPCODE_BITOP:
+   case AGX_OPCODE_CONVERT:
+      break;
+   default:
+      return false;
+   }
+
+   /* A texture coordinate producer is paired with its sample */
+   if (ctx->key->dev.encoding != AGX_ISA_ENCODING_AGX3C || ctx->is_preamble ||
+       I->nr_dests != 1 || I->dest[0].type != AGX_INDEX_NORMAL ||
+       I->dest[0].memory || I->agx3_tex_coord_stage ||
+       I->agx3_tex_coord_component || I->agx3_tex_coord_start)
+      return false;
+
+   agx_foreach_src(I, s) {
+      const agx_index src = I->src[s];
+
+      if (src.type == AGX_INDEX_UNIFORM) {
+         if (ctx->uniforms_written)
+            return false;
+      } else if (src.type == AGX_INDEX_NORMAL) {
+         if (src.memory)
+            return false;
+      } else if (src.type != AGX_INDEX_IMMEDIATE &&
+                 src.type != AGX_INDEX_NULL) {
+         return false;
+      }
+   }
+
+   return true;
+}
+
+/* Byte offset of a load of `comp` onwards, if it is still encodable */
+static bool
+remat_load_offset(const agx_instr *L, unsigned comp, int16_t *offset)
+{
+   if (L->op != AGX_OPCODE_DEVICE_LOAD) {
+      *offset = 0;
+      return true;
+   }
+
+   const unsigned bytes = remat_load_elem_bytes(L);
+   const int32_t off = L->memory_byte_offset + (int32_t)(comp * bytes);
+
+   if (off > INT16_MAX)
+      return false;
+
+   /* An immediate index folds into the offset, which must then fit too */
+   if (comp && L->src[1].type == AGX_INDEX_IMMEDIATE) {
+      const unsigned shift = L->shift +
+         (L->memory_index_is_bytes ? 0 : util_logbase2(bytes));
+      const int64_t total = ((int64_t)L->src[1].value << shift) + off;
+
+      if (total < INT16_MIN || total > INT16_MAX)
+         return false;
+   }
+
+   *offset = off;
+   return true;
+}
+
+/* Whether node can be reloaded by repeating its instruction with the
+ * registers in regs
+ */
+static bool
+can_reload_by_repeat(struct spill_ctx *ctx, unsigned node,
+                     const BITSET_WORD *regs)
+{
+   agx_instr *L = ctx->repeat[node];
+   int16_t offset;
+
+   if (!L || !remat_load_offset(L, ctx->repeat_comp[node], &offset))
+      return false;
+
+   agx_foreach_ssa_src(L, s) {
+      if (!BITSET_TEST(regs, L->src[s].value))
+         return false;
+   }
+
+   return true;
+}
+
+static void
+reload_by_repeat(agx_builder *b, struct spill_ctx *ctx, unsigned node)
+{
+   const agx_instr *L = ctx->repeat[node];
+   const agx_index dst = reconstruct_index(ctx, node);
+   int16_t offset;
+   ASSERTED bool ok = remat_load_offset(L, ctx->repeat_comp[node], &offset);
+   assert(ok);
+
+   agx_instr *I = agx_alloc_instr(b, L->op, 1, L->nr_srcs);
+   agx_index *dest = I->dest, *src = I->src;
+   memcpy(I, L, sizeof(*I));
+   I->dest = dest;
+   I->src = src;
+   I->nr_dests = 1;
+   memcpy(src, L->src, sizeof(*src) * L->nr_srcs);
+
+   /* Sources are renamed to their reaching copies by SSA repair */
+   dest[0] = dst;
+   agx_builder_insert(&b->cursor, I);
+
+   if (L->op == AGX_OPCODE_DEVICE_LOAD) {
+      I->mask = BITFIELD_MASK(agx_channels(dst));
+      I->memory_byte_offset = offset;
+
+      /* Fragment loads at immediate indices may need reordering after RA */
+      ctx->shader->spilled_by_load = true;
+   }
+}
+
 static void
 record_spill(struct spill_ctx *ctx)
 {
@@ -358,7 +547,7 @@ insert_spill(agx_builder *b, struct spill_ctx *ctx, unsigned node)
 
 static void
 insert_reload(struct spill_ctx *ctx, agx_block *block, agx_cursor cursor,
-              unsigned node)
+              unsigned node, bool by_repeat)
 {
    agx_builder b = agx_init_builder(ctx->shader, cursor);
    agx_index idx = reconstruct_index(ctx, node);
@@ -366,6 +555,8 @@ insert_reload(struct spill_ctx *ctx, agx_block *block, agx_cursor cursor,
    /* Reloading breaks SSA, but agx_repair_ssa will repair */
    if (ctx->remat[node]) {
       remat_to(&b, idx, ctx, node);
+   } else if (by_repeat) {
+      reload_by_repeat(&b, ctx, node);
    } else {
       agx_mov_to(&b, idx, agx_index_as_mem(idx, ctx->spill_base));
    }
@@ -502,6 +693,20 @@ insert_coupling_code(struct spill_ctx *ctx, agx_block *pred, agx_block *succ)
    struct spill_block *sp = spill_block(ctx, pred);
    struct spill_block *ss = spill_block(ctx, succ);
 
+   /* Values in registers on both sides of the edge, where a reload may read
+    * them without extending their live ranges.
+    */
+   BITSET_WORD *edge_regs = ctx->W;
+   memset(edge_regs, 0, BITSET_BYTES(ctx->n));
+   for (unsigned i = 0; i < sp->nW_exit; ++i) {
+      for (unsigned j = 0; j < ss->nW_entry; ++j) {
+         if (sp->W_exit[i] == ss->W_entry[j]) {
+            BITSET_SET(edge_regs, sp->W_exit[i]);
+            break;
+         }
+      }
+   }
+
    agx_foreach_phi_in_block(succ, I) {
       if (!I->dest[0].memory)
          continue;
@@ -620,7 +825,8 @@ insert_coupling_code(struct spill_ctx *ctx, agx_block *pred, agx_block *succ)
 
       /* Otherwise, inserting a reload defines the variable along the edge */
       agx_block *reload_block = agx_edge_to_block(pred, succ);
-      insert_reload(ctx, reload_block, agx_along_edge(pred, succ), node);
+      insert_reload(ctx, reload_block, agx_along_edge(pred, succ), node,
+                    can_reload_by_repeat(ctx, node, edge_regs));
    }
 
    agx_foreach_phi_in_block(succ, I) {
@@ -653,7 +859,8 @@ insert_coupling_code(struct spill_ctx *ctx, agx_block *pred, agx_block *succ)
       if (!live) {
          agx_block *reload_block = agx_edge_to_block(pred, succ);
          insert_reload(ctx, reload_block, agx_along_edge(pred, succ),
-                       I->src[s].value);
+                       I->src[s].value,
+                       can_reload_by_repeat(ctx, I->src[s].value, edge_regs));
       }
 
       /* Leave as-is for the GPR version */
@@ -818,6 +1025,23 @@ min_algorithm(struct spill_ctx *ctx)
       /* Limit W to make space for the destinations. */
       limit(ctx, I, ctx->k - dest_size);
 
+      /* W now holds what is in registers at I. A repeated instruction may
+       * read anything there except another repeated reload, which it would
+       * have to follow.
+       */
+      bool by_repeat[AGX_MAX_NORMAL_SOURCES];
+      for (unsigned i = 0; i < nR; ++i)
+         by_repeat[i] = can_reload_by_repeat(ctx, R[i], ctx->W);
+
+      for (unsigned i = 0; i < nR; ++i) {
+         for (unsigned j = 0; j < nR && by_repeat[i]; ++j) {
+            agx_foreach_ssa_src(ctx->repeat[R[i]], s) {
+               if (by_repeat[j] && ctx->repeat[R[i]]->src[s].value == R[j])
+                  by_repeat[i] = false;
+            }
+         }
+      }
+
       /* Destinations are now in the register file */
       agx_foreach_ssa_dest(I, d) {
          insert_W(ctx, I->dest[d].value);
@@ -859,9 +1083,14 @@ min_algorithm(struct spill_ctx *ctx)
        * must be big enough for everything exported, so it must be big enough
        * for all the reloaded values right before the parallel exports.
        */
-      for (unsigned i = 0; i < nR; ++i) {
-         insert_reload(ctx, ctx->block, agx_before_instr_logical(ctx->block, I),
-                       R[i]);
+      for (unsigned pass = 0; pass < 2; ++pass) {
+         for (unsigned i = 0; i < nR; ++i) {
+            if (by_repeat[i] == (pass == 1)) {
+               insert_reload(ctx, ctx->block,
+                             agx_before_instr_logical(ctx->block, I), R[i],
+                             by_repeat[i]);
+            }
+         }
       }
 
       ctx->ip += instr_cycles(I);
@@ -1528,10 +1757,31 @@ agx_spill(agx_context *ctx, unsigned k, bool remat_only)
    dist_t *next_uses = rzalloc_array(memctx, dist_t, ctx->alloc);
    enum agx_size *sizes = rzalloc_array(memctx, enum agx_size, ctx->alloc);
    agx_instr **remat = rzalloc_array(memctx, agx_instr *, ctx->alloc);
+   agx_instr **repeat = rzalloc_array(memctx, agx_instr *, ctx->alloc);
+   uint8_t *repeat_comp = rzalloc_array(memctx, uint8_t, ctx->alloc);
 
    agx_foreach_instr_global(ctx, I) {
       if (can_remat(ctx, I))
          remat[I->dest[0].value] = I;
+
+      /* Definitions precede uses in block order, so a split of a load sees
+       * the load first.
+       */
+      if (can_remat_load(ctx, I) || can_repeat_alu(ctx, I)) {
+         repeat[I->dest[0].value] = I;
+      } else if (I->op == AGX_OPCODE_SPLIT &&
+                 I->src[0].type == AGX_INDEX_NORMAL && !I->src[0].memory &&
+                 repeat[I->src[0].value] &&
+                 repeat[I->src[0].value]->op == AGX_OPCODE_DEVICE_LOAD &&
+                 repeat[I->src[0].value]->dest[0].value == I->src[0].value) {
+         agx_foreach_ssa_dest(I, d) {
+            if (I->dest[d].size == I->src[0].size &&
+                agx_channels(I->dest[d]) == 1) {
+               repeat[I->dest[d].value] = repeat[I->src[0].value];
+               repeat_comp[I->dest[d].value] = d;
+            }
+         }
+      }
 
       /* Measure vectors */
       agx_foreach_ssa_dest(I, d) {
@@ -1568,6 +1818,8 @@ agx_spill(agx_context *ctx, unsigned k, bool remat_only)
          .channels = channels,
          .size = sizes,
          .remat = remat,
+         .repeat = repeat,
+         .repeat_comp = repeat_comp,
          .next_uses = next_uses,
          .block = block,
          .blocks = blocks,
@@ -1592,6 +1844,8 @@ agx_spill(agx_context *ctx, unsigned k, bool remat_only)
          .channels = channels,
          .size = sizes,
          .remat = remat,
+         .repeat = repeat,
+         .repeat_comp = repeat_comp,
          .block = block,
          .blocks = blocks,
          .k = k,
@@ -1616,4 +1870,27 @@ agx_spill(agx_context *ctx, unsigned k, bool remat_only)
 
    /* Remat can introduce dead code */
    agx_dce(ctx, false);
+
+   /* Spilled phi edges can materialize constants into memory without going
+    * through insert_spill(). Account for surviving memory values as well as
+    * ordinary spill stores: RA needs its parallel-copy scratch registers and
+    * must lower these copies to actual stack accesses after allocation.
+    * G18G only for now; candidate for all chips.
+    */
+   if (!ctx->key || !agx_is_g18g(&ctx->key->dev))
+      return;
+
+   bool memory = false;
+   agx_foreach_instr_global(ctx, I) {
+      agx_foreach_ssa_dest(I, d)
+         memory |= I->dest[d].memory;
+      agx_foreach_ssa_src(I, s)
+         memory |= I->src[s].memory;
+   }
+
+   if (memory) {
+      assert(ctx->key->has_scratch && "spilled phi needs scratch");
+      ctx->has_spill_pcopy_reserved = true;
+      ctx->remat_fallback_spilled |= remat_only;
+   }
 }

@@ -158,11 +158,31 @@ test_g17p_txf_sampler(void)
    CHECK(agx_gallium_pack_g17p_txf_sampler(AGX_CHIP_G15S, &sampler));
    CHECK(memcmp(&sampler, expected, sizeof(expected)) == 0);
 
+   /* G17G's native fragment fetches address the texture state table
+    * directly, so it also takes a texel-fetch sampler, in its Gen5 record. */
    memset(&sampler, 0xa5, sizeof(sampler));
-   CHECK(!agx_gallium_pack_g17p_txf_sampler(AGX_CHIP_G17G, &sampler));
+   CHECK(agx_gallium_pack_g17p_txf_sampler(AGX_CHIP_G17G, &sampler));
    CHECK(memcmp(&sampler,
                 &(struct agx_gallium_sampler_descriptor){0},
-                sizeof(sampler)) == 0);
+                sizeof(sampler)) != 0);
+
+   /* G18G packs the same fetch sampler as G17G's Gen5 record (the generation
+    * hk_pack_native_sampler emits there): the compare-mode selector is set
+    * even without a comparison. */
+   static const uint8_t expected_g18g[AGX_GALLIUM_SAMPLER_AGX3_SIZE] = {
+      0x00, 0x00, 0x0f, 0x68, 0x1b, 0x04, 0x00, 0x00,
+   };
+   memset(&sampler, 0xa5, sizeof(sampler));
+   CHECK(agx_gallium_pack_g17p_txf_sampler(AGX_CHIP_G18G, &sampler));
+   if (memcmp(&sampler, expected_g18g, sizeof(expected_g18g)) != 0) {
+      const uint8_t *b = (const uint8_t *)&sampler;
+      fprintf(stderr, "G18G txf sampler bytes:");
+      for (unsigned i = 0; i < sizeof(expected_g18g); ++i)
+         fprintf(stderr, " %02x", b[i]);
+      fprintf(stderr, "\n");
+   }
+   CHECK(memcmp(&sampler, expected_g18g, sizeof(expected_g18g)) == 0);
+   CHECK(!agx_gallium_pack_g17p_txf_sampler(AGX_CHIP_G18G, NULL));
    CHECK(!agx_gallium_pack_g17p_txf_sampler(AGX_CHIP_G17P, NULL));
 }
 
@@ -258,20 +278,42 @@ test_g17p_sampler_handles(void)
          AGX_CHIP_G15S, cases[i].api, &custom));
       CHECK(native == cases[i].native &&
             custom == AGX_GALLIUM_G17P_CUSTOM_BORDER_BASE + cases[i].api);
+
+      /* G18G shares the G17P sampler table layout: its API samplers follow
+       * the fetch sampler at slot 0 the same way. */
+      native = custom = UINT16_MAX;
+      CHECK(agx_gallium_g17p_sampler_handle(AGX_CHIP_G18G, cases[i].api,
+                                            &native));
+      CHECK(agx_gallium_g17p_custom_border_handle(
+         AGX_CHIP_G18G, cases[i].api, &custom));
+      CHECK(native == cases[i].native &&
+            custom == AGX_GALLIUM_G17P_CUSTOM_BORDER_BASE + cases[i].api);
    }
 
    uint16_t untouched = 0x5555;
    CHECK(!agx_gallium_g17p_sampler_handle(
       AGX_CHIP_G17P, AGX_GALLIUM_G17P_API_SAMPLERS, &untouched));
    CHECK(untouched == 0x5555);
-   CHECK(!agx_gallium_g17p_sampler_handle(AGX_CHIP_G17G, 0, &untouched));
+   untouched = 0x5555;
+   CHECK(agx_gallium_g17p_sampler_handle(AGX_CHIP_G17G, 0, &untouched));
+   CHECK(untouched == 1);
    CHECK(!agx_gallium_g17p_sampler_handle(AGX_CHIP_G17P, 0, NULL));
+   untouched = 0x5555;
    CHECK(!agx_gallium_g17p_custom_border_handle(
       AGX_CHIP_G17P, AGX_GALLIUM_G17P_API_SAMPLERS, &untouched));
    CHECK(untouched == 0x5555);
-   CHECK(!agx_gallium_g17p_custom_border_handle(AGX_CHIP_G17G, 0,
-                                                 &untouched));
+   untouched = 0x5555;
+   CHECK(agx_gallium_g17p_custom_border_handle(AGX_CHIP_G17G, 0,
+                                               &untouched));
+   CHECK(untouched == AGX_GALLIUM_G17P_CUSTOM_BORDER_BASE);
    CHECK(!agx_gallium_g17p_custom_border_handle(AGX_CHIP_G17P, 0, NULL));
+   CHECK(!agx_gallium_g17p_sampler_handle(
+      AGX_CHIP_G18G, AGX_GALLIUM_G17P_API_SAMPLERS, &untouched));
+   CHECK(!agx_gallium_g17p_custom_border_handle(
+      AGX_CHIP_G18G, AGX_GALLIUM_G17P_API_SAMPLERS, &untouched));
+   CHECK(untouched == 0x5555);
+   CHECK(!agx_gallium_g17p_sampler_handle(AGX_CHIP_G18G, 0, NULL));
+   CHECK(!agx_gallium_g17p_custom_border_handle(AGX_CHIP_G18G, 0, NULL));
 }
 
 static void
@@ -373,8 +415,12 @@ test_agx3_pbe(void)
       CHECK(agx_pbe_agx3_2d_multisample_pack(
          AGX_PBE_AGX3_GENERATION_9, &fields, samples, &expected));
       CHECK(memcmp(native.opaque, expected.bytes, sizeof(expected.bytes)) == 0);
-      CHECK(!agx_gallium_pack_native_pbe(AGX_DESCRIPTOR_GENERATION_10,
-                                          &native, &msaa));
+      CHECK(agx_gallium_pack_native_pbe(AGX_DESCRIPTOR_GENERATION_10,
+                                         &native, &msaa));
+      CHECK(agx_pbe_agx3_2d_multisample_pack(
+         AGX_PBE_AGX3_GENERATION_10, &fields, samples, &expected));
+      CHECK(memcmp(native.opaque, expected.bytes, sizeof(expected.bytes)) == 0);
+      CHECK(agx_gallium_pack_g18_native_pbe(&native, &msaa));
       msaa.levels = 2;
       CHECK(!agx_gallium_pack_native_pbe(AGX_DESCRIPTOR_GENERATION_9,
                                           &native, &msaa));
@@ -518,11 +564,16 @@ test_agx3_pbe(void)
    array.stride = (array.width * 4) - 4;
    CHECK(!agx_gallium_pack_native_pbe(AGX_DESCRIPTOR_GENERATION_9, &native,
                                       &array));
+   /* Gen10 adds the layered packets, base level only. */
    array = rt;
    array.dimension = AGX_TEXTURE_DIMENSION_2D_ARRAY;
    array.layers = 2;
-   CHECK(!agx_gallium_pack_native_pbe(AGX_DESCRIPTOR_GENERATION_10, &native,
-                                      &array));
+   CHECK(agx_gallium_pack_native_pbe(AGX_DESCRIPTOR_GENERATION_10, &native,
+                                     &array));
+   CHECK(agx_pbe_agx3_2d_array_mip_pack(AGX_PBE_AGX3_GENERATION_10, &fields,
+                                        2, 0, 1, &expected_array));
+   CHECK(memcmp(native.opaque, expected_array.bytes,
+                sizeof(expected_array.bytes)) == 0);
    /* A mipmapped array level and a 3D level take the Gen9 mip packets
     * Honeykrisp stores storage images with. */
    array.level = 1;

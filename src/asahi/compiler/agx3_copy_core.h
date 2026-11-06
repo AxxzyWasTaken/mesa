@@ -98,9 +98,23 @@ bool agx3_copy_encode_reg32(enum agx_isa_encoding encoding, uint16_t dest_half,
  */
 bool agx3_copy_encode_reg_to_uniform(enum agx_isa_encoding encoding,
                                      uint16_t uniform_half, uint16_t src_half,
-                                     bool kill,
+                                     bool kill, uint16_t wait_mask,
                                      uint8_t out[AGX3_COPY_MAX_LENGTH],
                                      uint8_t *len);
+
+/*
+ * G18G only (compiled with AGX_ISA_ENCODING_AGX3C, re-encoded as agx3d
+ * afterwards): the uniform write as the G18G layer emits it -- always the
+ * eight-byte ep1 with f42 set, carrying its own scoreboard wait in
+ * f30 + slot - 1. The other GPUs on the G17G-family encoding (agx3c) keep
+ * agx3_copy_encode_reg_to_uniform().
+ */
+bool agx3_copy_encode_reg_to_uniform_g18g(enum agx_isa_encoding encoding,
+                                          uint16_t uniform_half,
+                                          uint16_t src_half, bool kill,
+                                          uint16_t wait_mask,
+                                          uint8_t out[AGX3_COPY_MAX_LENGTH],
+                                          uint8_t *len);
 
 bool agx3_copy_encode_uniform_to_reg32(enum agx_isa_encoding encoding,
                                        uint16_t dest_half,

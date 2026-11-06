@@ -1,0 +1,1 @@
+{"pipelines":{"compute_pipelines":[{"compute_function":"m5_read_array_uniform"},{"compute_function":"m5_read_array_indexed"}]}}

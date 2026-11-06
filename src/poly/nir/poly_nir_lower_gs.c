@@ -740,7 +740,7 @@ create_gs_rast_shader(const nir_shader *gs, const struct lower_gs_state *state,
    }
 
    /* Optimize out pointless gl_PointSize outputs. Bizarrely, these occur. */
-   if (shader->info.gs.output_primitive != MESA_PRIM_POINTS)
+   if (gs->info.gs.output_primitive != MESA_PRIM_POINTS)
       shader->info.outputs_written &= ~VARYING_BIT_PSIZ;
 
    nir_builder b_ =
@@ -1297,6 +1297,29 @@ optimize_static_topology(struct poly_gs_info *info, nir_shader *gs)
    info->shape = POLY_GS_SHAPE_STATIC_INDEXED;
 }
 
+/* The API primitive ID of a geometry shader after tessellation is the patch
+ * the evaluation shader wrote with each vertex. Without tessellation no vertex
+ * carries one and the invocation's primitive index stands. */
+static bool
+gs_api_primitive_id(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+{
+   if (intr->intrinsic != nir_intrinsic_load_primitive_id)
+      return false;
+
+   b->cursor = nir_after_instr(&intr->instr);
+   nir_def *outputs =
+      poly_vertex_outputs(b, nir_load_vertex_param_buffer_poly(b));
+   nir_def *carried = nir_ine_imm(
+      b, nir_iand_imm(b, nir_u2u64(b, outputs), VARYING_BIT_PRIMITIVE_ID), 0);
+   nir_def *patch = nir_load_per_vertex_input(
+      b, 1, 32, nir_imm_int(b, 0), nir_imm_int(b, 0),
+      .io_semantics.location = VARYING_SLOT_PRIMITIVE_ID,
+      .io_semantics.num_slots = 1, .dest_type = nir_type_uint32);
+   nir_def *id = nir_bcsel(b, carried, patch, &intr->def);
+   nir_def_rewrite_uses_after(&intr->def, id);
+   return true;
+}
+
 bool
 poly_nir_lower_gs_with_options(nir_shader *gs, nir_shader **gs_count,
                                nir_shader **gs_copy, nir_shader **pre_gs,
@@ -1334,6 +1357,8 @@ poly_nir_lower_gs_with_options(nir_shader *gs, nir_shader **gs_count,
                                  nir_metadata_control_flow, nir_imm_int(&b, 0));
    }
 
+   NIR_PASS(_, gs, nir_shader_intrinsics_pass, gs_api_primitive_id,
+            nir_metadata_control_flow, NULL);
    NIR_PASS(_, gs, nir_shader_intrinsics_pass, lower_gs_inputs,
             nir_metadata_control_flow, NULL);
 

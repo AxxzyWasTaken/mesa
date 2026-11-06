@@ -9,8 +9,15 @@ Borealis
 Borealis is Aurora Silicon's Vulkan driver for Apple GPUs. It is derived from
 Honeykrisp, the Vulkan driver written by Asahi Linux, and keeps its code and
 credits. It reports ``Borealis`` as its driver name on every GPU it supports,
-from M1 to M5 and the A18 Pro. The driver ID is still
-``VK_DRIVER_ID_MESA_HONEYKRISP`` until Borealis has its own registered ID.
+from M1 to M5 and the A18 Pro, with the driver ID
+``VK_DRIVER_ID_AURORA_BOREALIS`` (35) that Khronos registered for Aurora
+Silicon. Borealis has not made a conformance submission under that ID yet, so
+it reports a ``conformanceVersion`` of 0.0.0.0.
+
+DXVK and vkd3d-proton pick their tiler handling by driver ID and do not know
+the Borealis ID yet, so Borealis reports ``VK_DRIVER_ID_MESA_HONEYKRISP`` to
+them. The ``hk_report_honeykrisp_driver_id`` driconf option does this, and can
+be set for other applications that need it.
 
 The sources stay in ``src/asahi/vulkan`` with the ``hk_`` prefix, and the
 library is still ``libvulkan_asahi.so``, so packaging and upstream syncs keep

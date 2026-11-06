@@ -67,6 +67,50 @@ TEST_F(G17PMSAAEpilog, M5SampleAlphaCoveragePrecedesAllColourStores)
    }
 }
 
+/* Two testing updates lose depth samples and can hang G17P, so an epilog must
+ * not update coverage again after a main part that applied alpha-to-coverage. */
+TEST_F(G17PMSAAEpilog, AlphaCoverageInMainLeavesNoUpdateInTheEpilog)
+{
+   for (bool a2c_in_main : {false, true}) {
+      SCOPED_TRACE(a2c_in_main);
+      agx_fs_epilog_key fs = {};
+      fs.nr_samples = 2;
+      fs.max_sample_size_B = 248;
+      fs.max_bytes_per_tile = 65536;
+      fs.max_samples_per_tile = 2048;
+      fs.link.loc_written = 1;
+      fs.link.size_32 = 1;
+      fs.link.colour_comps = 15;
+      fs.rt_formats[0] = PIPE_FORMAT_R8G8B8A8_UNORM;
+      fs.remap[0] = 0;
+      fs.blend.rt[0].colormask = 15;
+      fs.blend.rt[0].mode = agx_pack_blend_standard(
+         PIPE_BLEND_ADD, PIPE_BLENDFACTOR_ONE, PIPE_BLENDFACTOR_ZERO,
+         PIPE_BLEND_ADD, PIPE_BLENDFACTOR_ONE, PIPE_BLENDFACTOR_ZERO);
+      fs.blend.alpha_to_coverage = true;
+      fs.a2c_in_main = a2c_in_main;
+      agx_fs_epilog_apply_device_policy(AGX_CHIP_G17P, &fs);
+
+      nir_builder b = nir_builder_init_simple_shader(
+         MESA_SHADER_FRAGMENT, &agx_nir_options, "G17P alpha coverage");
+      agx_nir_fs_epilog_g17p(&b, &fs);
+      nir_validate_shader(b.shader, "G17P alpha coverage epilog");
+
+      unsigned updates = 0;
+      nir_foreach_block(block, b.impl) {
+         nir_foreach_instr(instr, block) {
+            updates += instr->type == nir_instr_type_intrinsic &&
+                       (nir_instr_as_intrinsic(instr)->intrinsic ==
+                           nir_intrinsic_sample_mask_agx ||
+                        nir_instr_as_intrinsic(instr)->intrinsic ==
+                           nir_intrinsic_demote_samples);
+         }
+      }
+      EXPECT_EQ(updates != 0, !a2c_in_main);
+      ralloc_free(b.shader);
+   }
+}
+
 TEST_F(G17PMSAAEpilog, ForceEarlyAppliesApiMaskBeforeSampleCounting)
 {
    for (enum agx_chip chip : {AGX_CHIP_G13G, AGX_CHIP_G17P, AGX_CHIP_G17S}) {
@@ -242,9 +286,11 @@ TEST_F(G17PMSAAEpilog, NativeSpillEpilogsCompile)
 {
    for (unsigned samples : {2u, 4u}) {
       for (unsigned targets : {4u, 8u}) {
-         for (bool blend : {false, true}) {
+         for (unsigned variant = 0; variant < 3; ++variant) {
+            const bool blend = variant == 1, a2c = variant == 2;
             agx_fs_epilog_key fs = {};
             fs.nr_samples = samples;
+            fs.blend.alpha_to_coverage = a2c;
             fs.max_sample_size_B = AGX_G17P_MAX_BYTES_PER_SAMPLE;
             fs.max_bytes_per_tile = 32768;
             fs.max_samples_per_tile = 2048;
@@ -274,7 +320,8 @@ TEST_F(G17PMSAAEpilog, NativeSpillEpilogsCompile)
             if (!agx_tilebuffer_spills(&tib))
                continue;
             SCOPED_TRACE(::testing::Message() << samples << " samples, "
-                         << targets << " targets, blend=" << blend);
+                         << targets << " targets, blend=" << blend
+                         << ", alpha-to-coverage=" << a2c);
             nir_builder b = nir_builder_init_simple_shader(
                MESA_SHADER_FRAGMENT, &agx_nir_options, "G17P spilled MRT epilog");
             agx_nir_fs_epilog_g17p(&b, &fs);

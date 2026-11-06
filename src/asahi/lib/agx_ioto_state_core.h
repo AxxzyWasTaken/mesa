@@ -68,6 +68,9 @@ struct agx_ioto_g17p_imageblock {
    uint16_t tile_size_px;
 };
 
+#define AGX_IOTO_G17P_IMAGEBLOCK_8B_1X_32X32                                \
+   { .sample_size_B = 8, .nr_samples = 1, .tile_size_px = 32 * 32 }
+
 /* Build the exact fragment SPECLM record emitted by HAL200's
  * LdShdrTransformFragment for the supplied physical imageblock.  Unlike the
  * generic anonymous-field packer, this retains the recovered dimension bits
@@ -133,11 +136,22 @@ bool agx_ioto_g17p_runtime_compute_tail_build_shared(
    uint32_t threadgroup_memory_size_B,
    struct agx_ioto_state_tail_output *output);
 
+bool agx_ioto_g17p_compiler_spectpr_build(
+   uint32_t spill_bytes, uint32_t d_value, struct agx_ioto_state *state);
+
 /* Pack those same compiler fields directly into the exact G17P SPECTPR
  * record. This is equivalent to build + generic pack without materializing a
  * 27-field semantic state. `output` is unchanged on failure. */
 bool agx_ioto_g17p_compiler_spectpr_pack(
    uint32_t spill_bytes, uint32_t d_value, void *output, size_t capacity);
+
+bool agx_ioto_state_pack_speclm(enum agx_chip chip,
+                                const struct agx_ioto_state *state,
+                                void *output, size_t capacity);
+
+bool agx_ioto_state_pack_ldshdr(enum agx_chip chip,
+                                const struct agx_ioto_state *state,
+                                void *output, size_t capacity);
 
 #ifdef __cplusplus
 }

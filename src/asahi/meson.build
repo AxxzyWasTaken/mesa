@@ -38,6 +38,22 @@ endif
 
 if with_tools.contains('drm-shim')
   subdir('drm-shim')
+
+  if with_asahi_vk and with_tests and meson.can_run_host_binaries()
+    dual_source_glslang = find_program('glslangValidator', required : false)
+    if dual_source_glslang.found()
+      test(
+        'hk_dual_source_gpl',
+        prog_python,
+        args : [
+          files('vulkan/tests/run-dual-source-gpl.py'),
+          hk_dual_source_gpl_test, libvulkan_asahi, libasahi_noop_drm_shim,
+          dual_source_glslang.full_path(),
+        ],
+        suite : ['asahi'],
+      )
+    endif
+  endif
 endif
 
 if with_tools.contains('drm-shim') and with_asahi_vk and with_tests

@@ -87,6 +87,9 @@ struct agx_ppp_hal300_depth_bias_scissor_bases {
  * impl+0x7a02 (0x21115e8d8 and 0x21119bd10), and G16G does likewise in
  * handleScissorUpdates/handleDepthBiasUpdates (0x214968560/0x214968284).
  *
+ * G18G is admitted too: every J873 native render points its VDM at this
+ * five-word block, e.g. 00000300 01000000 002d0000 0 0 in the colour mode.
+ *
  * Bases are 48-bit and four-byte aligned.  G15/G16 use header bit 8 followed
  * by one packed index word (depth bias in high 16, scissor in low 16); that
  * legacy form is intentionally not accepted here.  These codecs do not emit

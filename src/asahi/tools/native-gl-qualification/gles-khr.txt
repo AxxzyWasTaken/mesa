@@ -1,0 +1,5 @@
+KHR-GLES31.core.shader_atomic_counters.basic-glsl-built-in
+KHR-GLES31.core.shader_group_vote.all_invocations
+KHR-GLES31.core.shader_group_vote.all_invocations_equal
+KHR-GLES31.core.shader_group_vote.any_invocation
+KHR-GLES31.core.shader_group_vote.invocations_with_variables

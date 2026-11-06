@@ -14,10 +14,10 @@
  *
  *   - G13 (M1) and G14 (M2) are the AGX2 instruction set. That is what
  *     agx_pack.c emits and what src/asahi/isa/AGX2.xml describes.
- *   - G15 (M3), G16 (M4) and G17 (M5) are AGX3, a different instruction set.
- *     Apple's own compiler routes them through a separate LLVM target, and
- *     the community AGX2 decoder consumes 0% of their code.
- *   - AGX3 is not one encoding. Two binary encodings exist, and which one a
+ *   - G15 (M3), G16 (M4), G17 (M5) and G18 (M6) are AGX3, a different
+ *     instruction set. Apple's own compiler routes them through a separate
+ *     LLVM target, and the community AGX2 decoder consumes 0% of their code.
+ *   - AGX3 is not one encoding. Three binary encodings exist, and which one a
  *     part uses is now known for every chip this driver can enumerate.
  *
  * AGX3 now has separate decoders and encoders. Device support remains a
@@ -55,6 +55,10 @@ enum agx_chip {
    AGX_CHIP_G17S,
    AGX_CHIP_G17C,
 
+   /* The M6 base part (J873, T8152). Its command-stream records are the
+    * M5 HAL300 ones, but its shaders use a third AGX3 encoding. */
+   AGX_CHIP_G18G,
+
    AGX_CHIP_UNKNOWN,
 };
 
@@ -69,30 +73,54 @@ enum agx_isa {
 /*
  * Binary encoding.
  *
- * One instruction set, two encodings. Established by decoding a 274-kernel
- * corpus compiled for all ten AGX3 families with each of Apple's own encoder
- * tables, recovered from libapplegpu-nt.dylib. Every family decodes 100% under
- * exactly one table and 0-1.8% under any other -- no intermediate values:
+ * One instruction set, three encodings. The first two were established by
+ * decoding a 274-kernel corpus compiled for the ten AGX3 families known at the
+ * time with each of Apple's own encoder tables, recovered from
+ * libapplegpu-nt.dylib. Every family decodes 100% under exactly one table and
+ * 0-1.8% under any other -- no intermediate values:
  *
  *   agx3b (Apple variant 0): g15g, g15s, g15d, g16g, g16p, g16s, g17p
  *   agx3c (Apple variant 1): g17g, g17s, g18p
  *
- * An earlier partition by byte-identity read this as three groups, splitting
- * g15g off from the rest of variant 0. That was an artefact: g15g uses the same
+ * The third is the macOS 27 toolchain's "g18g-encodings" subtarget feature,
+ * next to "g17g-encodings":
+ *
+ *   agx3d (Apple variant 2): g18g, g18m, g19p
+ *
+ * Compiling one probe with metal-nt for every AGX3 arch gives byte-identical
+ * code within that row and code unlike either row above, and 41 of 41 G18G
+ * programs fail to decode under the agx3c, agx3b and AGX2 tables, where every
+ * G17G one decodes cleanly under agx3c. The instruction set underneath is
+ * still AGX3 (the applegpu_g18g Mach-O cpusubtype 0x1c3 has low nibble 3), and
+ * roughly a fifth of the instructions keep their agx3c bytes, but the common
+ * ALU, memory, control and texture forms are re-encoded with different
+ * lengths. Its table is recovered (agx3_compose/agx3d_tables.c and
+ * src/asahi/isa/AGX3d.xml, variant 2 of libapplegpu-nt.dylib), but only the
+ * instruction forms a core encoder has grounded against Apple's G18G output
+ * are emitted for it; see agx_chip_codegen_supported.
+ *
+ * An earlier partition by byte-identity read variant 0 as two groups,
+ * splitting g15g off from the rest. That was an artefact: g15g uses the same
  * encoder table, and differs only in that its scheduler pads with nops. See
  * agx_chip_needs_scheduling_stalls.
  *
- * The names match src/asahi/isa/AGX3b.xml and AGX3c.xml and the disassembler
- * entry points generated from them.
+ * The names match src/asahi/isa/AGX3b.xml, AGX3c.xml and AGX3d.xml and the
+ * disassembler entry points generated from them.
  */
 enum agx_isa_encoding {
    AGX_ISA_ENCODING_AGX2,
    AGX_ISA_ENCODING_AGX3B,
    AGX_ISA_ENCODING_AGX3C,
+   AGX_ISA_ENCODING_AGX3D,
    AGX_ISA_ENCODING_UNKNOWN,
 };
 
-/* Apple's independently-versioned command-stream/HAL axis. */
+/* Apple's independently-versioned command-stream/HAL axis.
+ *
+ * This names the layout of the records userspace writes -- VDM, PPP and CDM
+ * words -- and not the kernel HAL that consumes them. G18G is served by
+ * Apple's PI_400 kext, yet the records its Metal driver writes are the HAL300
+ * ones; see agx_chip_hal300_records. */
 enum agx_command_stream_generation {
    AGX_CS_GENERATION_AGX2,
    AGX_CS_GENERATION_G15,
@@ -112,7 +140,8 @@ enum agx_descriptor_generation {
 };
 
 /* Samplers keep the Gen4 class through M4, but HAL200 moves fields within the
- * word. Gen5 adds reduction mode and a wider LOD clamp on M5. */
+ * word. Gen5 adds reduction mode and a wider LOD clamp on M5, and G18G keeps
+ * it. */
 enum agx_sampler_generation {
    AGX_SAMPLER_GENERATION_GEN4,
    AGX_SAMPLER_GENERATION_GEN4_HAL200,
@@ -120,7 +149,8 @@ enum agx_sampler_generation {
    AGX_SAMPLER_GENERATION_UNKNOWN,
 };
 
-/* M4 Pro/Max and A18 Pro carry both queueing paths; M5 is SKSM-only. */
+/* M4 Pro/Max and A18 Pro carry both queueing paths; M5 and M6 are
+ * SKSM-only. */
 enum agx_submission_model {
    AGX_SUBMISSION_MODEL_CLASSIC,
    AGX_SUBMISSION_MODEL_DUAL,
@@ -134,6 +164,10 @@ enum agx_submission_model {
  * 65 bytes, with no memory store, and its background builtins clear them at
  * the same offsets. */
 #define AGX_G17P_MAX_BYTES_PER_SAMPLE (128)
+
+/* G17G tile budget: a full 32 KiB, at most 2048 samples per tile. */
+#define AGX_G17G_MAX_BYTES_PER_TILE   (32768)
+#define AGX_G17G_MAX_SAMPLES_PER_TILE (2048)
 
 /* On a G17P tile that no colour-writing geometry covered, the background
  * program -- clear or reload alike -- delivers only the low eight bytes of
@@ -186,6 +220,95 @@ agx_chip_record_family(enum agx_chip chip)
 }
 
 #ifndef __OPENCL_VERSION__
+#include <stdbool.h>
+#endif
+
+/*
+ * Whether native captures on this chip witness the HAL300 records Mesa's M5
+ * packers write: the VDM state, PPP state and Index List words, the nine PPP
+ * graphics records, the viewport, W-clamp/cull2, depth/stencil and
+ * depth-bias/scissor PPP records, the CDM launch and barrier, and the ZLS
+ * pixel dimensions.
+ *
+ * G17G (M5) is where these packers were grounded. G18G (M6) is served by
+ * Apple's PI_400 kext rather than a PI_300 one, but for the thirteen J873
+ * native modes (runs/mini-26A428/sessions-20260925-{a,b}: color, points,
+ * lines, discard, blend-add, depth-less, depth-always, stencil, msaa4, r32f,
+ * r8ui, texture-sample and compute-add) Apple's G18G records and Mesa's G17G
+ * packers agree byte for byte. The one layout difference is the direct
+ * non-indexed Index List, where G18G emits the tailed form; see
+ * agx_vdm_index_list_nonindexed_has_tail. Lines, which M5 never captured,
+ * are packed for G18G alone, and one stencil face bit is modelled for
+ * neither chip; see agx_ppp_hal300_graphics_core.h.
+ *
+ * This is a statement about the record layouts only. G17S/G17C also write
+ * HAL300 records but have no native graphics capture, so the codecs that
+ * accept them list them by name. It says nothing about the shader encoding
+ * or the kernel submission ABI.
+ */
+static inline bool
+agx_chip_hal300_records(enum agx_chip chip)
+{
+   return chip == AGX_CHIP_G17G || chip == AGX_CHIP_G18G;
+}
+
+/*
+ * Whether the Gallium driver takes its M5 paths on this chip: draw admission,
+ * native descriptors, the VDM/PPP streams and the M5 kernel contract. G18G
+ * does: its records and texture/PBE descriptors are byte-identical to M5's
+ * on every J873 native capture (agx_chip_hal300_records), its code is G17G
+ * code re-encoded (agx_device_key::emit_agx3d), and the chip-specific deltas
+ * (the tailed non-indexed Index List, the point-size rule) stay keyed on the
+ * chip inside the record packers.
+ */
+static inline bool
+agx_chip_m5_paths(enum agx_chip chip)
+{
+   return chip == AGX_CHIP_G17G || chip == AGX_CHIP_G18G;
+}
+
+/*
+ * Whether an encoding is one of the AGX3 tables (agx3b, agx3c or agx3d).
+ *
+ * For compiler decisions about the AGX3 instruction set as such -- which IR
+ * shapes the AGX3 packers can take at all -- that were written as
+ * "AGX3B || AGX3C" when those were the only AGX3 tables. It says nothing about
+ * which forms a table has grounded encoders for; those gates stay per
+ * encoding, and an ungrounded AGX3D form is refused by its core encoder.
+ */
+static inline bool
+agx_encoding_is_agx3(enum agx_isa_encoding encoding)
+{
+   return encoding == AGX_ISA_ENCODING_AGX3B ||
+          encoding == AGX_ISA_ENCODING_AGX3C ||
+          encoding == AGX_ISA_ENCODING_AGX3D;
+}
+
+/*
+ * Whether an encoding belongs to the G17-class machine: the M5 G17G/G17S/G17C
+ * parts (agx3c) and the M6 G18G (agx3d).
+ *
+ * Use this for machine behaviour -- scoreboard slot counts, register and
+ * uniform limits, the IR lowerings Apple's G17 compiler also performs -- and
+ * never for byte layout. agx3c and agx3d share Apple's anonymous field ids and
+ * operand semantics (the G18 scheduling-unit list in libapplegpu-nt.dylib is
+ * the G17 one, MXU included; __GPU_ARCH_LD_MD is identical for 41 of 41
+ * G17G/G18G metal-nt pairs; G17G field vectors composed with the variant-2
+ * table reproduce 1,111 of 1,547 aligned G18G instructions, the rest being
+ * compiler choices), but their encoding points, lengths and bit positions
+ * differ for about 80% of emitted instructions. So a gate that selects agx3c
+ * field ids, encoding points, lengths or hand-written bytes stays
+ * AGX_ISA_ENCODING_AGX3C, and agx3d bytes come only from agx3_compose with
+ * the agx3d table (agx3_bind_compose with AGX3_BIND_APPLE_ORDER).
+ */
+static inline bool
+agx_encoding_is_g17_class(enum agx_isa_encoding encoding)
+{
+   return encoding == AGX_ISA_ENCODING_AGX3C ||
+          encoding == AGX_ISA_ENCODING_AGX3D;
+}
+
+#ifndef __OPENCL_VERSION__
 
 #include <assert.h>
 #include <stdbool.h>
@@ -219,15 +342,27 @@ enum agx_isa agx_chip_isa(enum agx_chip chip);
  * enum; UNKNOWN only for AGX_CHIP_UNKNOWN. */
 enum agx_isa_encoding agx_chip_isa_encoding(enum agx_chip chip);
 
+enum agx_command_stream_generation
+agx_chip_command_stream_generation_reference(enum agx_chip chip);
+
+enum agx_descriptor_generation
+agx_chip_descriptor_generation_reference(enum agx_chip chip);
+
+enum agx_sampler_generation
+agx_chip_sampler_generation_reference(enum agx_chip chip);
+
+unsigned agx_chip_sampler_heap_element_size_reference(enum agx_chip chip);
+
 /* These are queried several times per recorded draw and dispatch. Answer them
  * with one bounded table load instead of an out-of-line call through a jump
  * table: an indirect branch per query is especially costly when the x86
  * driver build runs under FEX. */
 #define AGX_CHIP_TABLE(G13G, G13X, G14G, G14X, G15P, G15G, G15S, G15C, G15D,  \
-                       G16P, G16G, G16S, G16C, G17P, G17A, G17G, G17S, G17C)  \
+                       G16P, G16G, G16S, G16C, G17P, G17A, G17G, G17S, G17C,  \
+                       G18G)                                                   \
    {                                                                           \
       G13G, G13X, G14G, G14X, G15P, G15G, G15S, G15C, G15D, G16P, G16G, G16S,  \
-      G16C, G17P, G17A, G17G, G17S, G17C,                                      \
+      G16C, G17P, G17A, G17G, G17S, G17C, G18G,                                \
    }
 
 /* The table is positional (C++ translation units include this header and
@@ -240,7 +375,8 @@ static_assert(AGX_CHIP_G13G == 0 && AGX_CHIP_G13X == 1 && AGX_CHIP_G14G == 2 &&
                  AGX_CHIP_G16S == 11 && AGX_CHIP_G16C == 12 &&
                  AGX_CHIP_G17P == 13 && AGX_CHIP_G17A == 14 &&
                  AGX_CHIP_G17G == 15 && AGX_CHIP_G17S == 16 &&
-                 AGX_CHIP_G17C == 17 && AGX_CHIP_UNKNOWN == 18,
+                 AGX_CHIP_G17C == 17 && AGX_CHIP_G18G == 18 &&
+                 AGX_CHIP_UNKNOWN == 19,
               "AGX_CHIP_TABLE is ordered by enum agx_chip");
 
 static inline enum agx_command_stream_generation
@@ -257,7 +393,7 @@ agx_chip_command_stream_generation(enum agx_chip chip)
       AGX_CS_GENERATION_HAL200, AGX_CS_GENERATION_HAL200,
       AGX_CS_GENERATION_HAL200, AGX_CS_GENERATION_HAL200,
       AGX_CS_GENERATION_HAL300, AGX_CS_GENERATION_HAL300,
-      AGX_CS_GENERATION_HAL300);
+      AGX_CS_GENERATION_HAL300, AGX_CS_GENERATION_HAL300);
    return (unsigned)chip < AGX_CHIP_UNKNOWN
              ? (enum agx_command_stream_generation)table[chip]
              : AGX_CS_GENERATION_UNKNOWN;
@@ -276,7 +412,7 @@ agx_chip_descriptor_generation(enum agx_chip chip)
       AGX_DESCRIPTOR_GENERATION_9, AGX_DESCRIPTOR_GENERATION_9,
       AGX_DESCRIPTOR_GENERATION_9, AGX_DESCRIPTOR_GENERATION_9,
       AGX_DESCRIPTOR_GENERATION_10, AGX_DESCRIPTOR_GENERATION_10,
-      AGX_DESCRIPTOR_GENERATION_10);
+      AGX_DESCRIPTOR_GENERATION_10, AGX_DESCRIPTOR_GENERATION_10);
    return (unsigned)chip < AGX_CHIP_UNKNOWN
              ? (enum agx_descriptor_generation)table[chip]
              : AGX_DESCRIPTOR_GENERATION_UNKNOWN;
@@ -295,7 +431,7 @@ agx_chip_sampler_generation(enum agx_chip chip)
       AGX_SAMPLER_GENERATION_GEN4_HAL200, AGX_SAMPLER_GENERATION_GEN4_HAL200,
       AGX_SAMPLER_GENERATION_GEN4_HAL200, AGX_SAMPLER_GENERATION_GEN4_HAL200,
       AGX_SAMPLER_GENERATION_GEN5, AGX_SAMPLER_GENERATION_GEN5,
-      AGX_SAMPLER_GENERATION_GEN5);
+      AGX_SAMPLER_GENERATION_GEN5, AGX_SAMPLER_GENERATION_GEN5);
    return (unsigned)chip < AGX_CHIP_UNKNOWN
              ? (enum agx_sampler_generation)table[chip]
              : AGX_SAMPLER_GENERATION_UNKNOWN;
@@ -318,6 +454,9 @@ agx_chip_sampler_heap_element_size(enum agx_chip chip)
       return 0;
    }
 }
+
+enum agx_submission_model
+agx_chip_submission_model(enum agx_chip chip);
 
 /*
  * Whether the native path runs on Apple's G15 command-stream generation
@@ -411,6 +550,14 @@ static inline bool
 agx_chip_usc_base_page_fill_returns(enum agx_chip chip)
 {
    return chip == AGX_CHIP_G15C;
+}
+
+static inline bool
+agx_chip_usc_base_page_fill_returns_for(enum agx_chip chip,
+                                        unsigned num_clusters)
+{
+   return agx_chip_usc_base_page_fill_returns(chip) ||
+          (agx_chip_native_agx3(chip) && num_clusters > 2);
 }
 
 /* Robust image accesses on native chips need explicit Vulkan view bounds:
@@ -516,9 +663,12 @@ agx_chip_query_ti_spill(enum agx_chip chip)
 /*
  * Whether this driver can generate code for a chip.
  *
- * True for every known encoding: AGX2 through agx_pack.c, AGX3b/AGX3c through
- * agx3_pack_binary.c. False only for an unrecognised part, where no packer can
- * be chosen at all.
+ * True for every encoding that has a packer: AGX2 through agx_pack.c,
+ * AGX3b/AGX3c through agx3_pack_binary.c. False for AGX3d, whose table is
+ * recovered and whose core encoders ground only a first instruction
+ * catalogue, but for which agx3_pack_binary still refuses every shader (the
+ * program-level pieces are not grounded), and for an unrecognised part, where
+ * no packer can be chosen at all.
  *
  * This is a statement about the compiler, not about the driver. It says a
  * shader compiled for this chip is encoded by the right packer, and that an
@@ -539,6 +689,19 @@ bool agx_chip_driver_supported(enum agx_chip chip);
 bool agx_params_driver_supported(
    const struct drm_asahi_params_global *params);
 
+/* Exact M6 (G18G) kernel contract for explicitly opted-in driver
+ * integration; agx_params_m5_bringup_supported below is the M5 one. This is
+ * not a declaration of a complete or conformant device path. */
+bool agx_params_g18g_bringup_supported(
+   const struct drm_asahi_params_global *params);
+
+/* Exact M5 (T8142, G17G) kernel contract the driver admits. This is not a
+ * declaration of a complete or conformant device path. */
+bool agx_params_m5_supported(
+   const struct drm_asahi_params_global *params);
+
+bool agx_params_fixup_upstream_uapi(struct drm_asahi_params_global *params);
+
 /* Exact product name when the chip identity maps to one unambiguous SoC.
  * Variant letters are not marketing tiers: notably, G17P is A18 Pro rather
  * than an M5 variant. Returns NULL when one chip identity spans products. */
@@ -552,11 +715,16 @@ bool agx_params_m5_bringup_supported(
 
 bool agx_chip_uses_legacy_precompiled_programs(enum agx_chip chip);
 
+bool agx_chip_has_hardware_ray_tracing(enum agx_chip chip);
+
+bool agx_chip_needs_scheduling_stalls(enum agx_chip chip);
+
 /* M5 variants sharing the AGX3C instruction and HAL300 command formats. */
 static inline bool
 agx_chip_g17_m5(enum agx_chip chip)
 {
-   return chip == AGX_CHIP_G17G || chip == AGX_CHIP_G17S;
+   return chip == AGX_CHIP_G17G || chip == AGX_CHIP_G17S ||
+          chip == AGX_CHIP_G17C;
 }
 
 /* Stable name for diagnostics, e.g. "G15X". Never NULL. */
@@ -564,6 +732,8 @@ const char *agx_chip_name(enum agx_chip chip);
 
 /* Stable name for the instruction set, e.g. "AGX3". Never NULL. */
 const char *agx_isa_name(enum agx_isa isa);
+
+const char *agx_isa_encoding_name(enum agx_isa_encoding encoding);
 
 const char *agx_command_stream_generation_name(
    enum agx_command_stream_generation generation);

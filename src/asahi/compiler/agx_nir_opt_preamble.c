@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "asahi/lib/agx_abi.h"
 #include "compiler/nir/nir_builder.h"
+#include "util/format/u_format.h"
 #include "util/macros.h"
 #include "util/u_debug.h"
 #include "agx_compiler.h"
@@ -66,6 +68,19 @@ def_size_g17p(nir_def *def, unsigned *size, unsigned *align,
  * widens scalar half preamble results the same way), and no half-width
  * copy-to-uniform form is witnessed. Give a scalar 16-bit value its own
  * aligned pair so the export never lands on an odd half. */
+/* A half result takes a whole word, see widen_half_exports(). */
+static void
+def_size_agx3b(nir_def *def, unsigned *size, unsigned *align,
+               nir_preamble_class *class)
+{
+   def_size_g17p(def, size, align, class);
+   if (*class == nir_preamble_class_general && def->num_components == 1 &&
+       def->bit_size <= 16) {
+      *size = 2;
+      *align = 2;
+   }
+}
+
 static void
 def_size_agx3c(nir_def *def, unsigned *size, unsigned *align,
                nir_preamble_class *class)
@@ -649,6 +664,154 @@ agx_nir_export_select_flags_as_halves(nir_shader *nir)
    return true;
 }
 
+/*
+ * A constant read of a buffer under non-uniform control flow would serve the
+ * constant program as well as any other, but hoisting it makes the read happen
+ * for fragments that never take the branch. Without soft faults that needs
+ * care: a binding may be smaller than the block, as long as the branch that
+ * reads past it never runs, and reading past the end of the allocation faults.
+ *
+ * The descriptor says how much is bound, so read the zero page instead when the
+ * load would leave the binding. That costs nothing on a path that really runs,
+ * and it is added only to the loads that do move: a load left in the main
+ * program stays under its branch, as it was.
+ */
+static nir_intrinsic_instr *
+speculative_descriptor(const nir_intrinsic_instr *load, unsigned *end)
+{
+   if ((load->intrinsic != nir_intrinsic_load_agx &&
+        load->intrinsic != nir_intrinsic_load_constant_agx) ||
+       !(nir_intrinsic_access(load) & ACCESS_CAN_REORDER) ||
+       !nir_src_is_const(load->src[1]) || load->def.bit_size != 32 ||
+       nir_intrinsic_format(load) != PIPE_FORMAT_R32_UINT)
+      return NULL;
+
+   nir_alu_instr *pack = nir_def_as_alu_or_null(load->src[0].ssa);
+   if (!pack || pack->op != nir_op_pack_64_2x32_split ||
+       pack->src[0].src.ssa != pack->src[1].src.ssa ||
+       pack->src[0].swizzle[0] != 0 || pack->src[1].swizzle[0] != 1)
+      return NULL;
+
+   nir_intrinsic_instr *desc = nir_def_as_intrinsic_or_null(pack->src[0].src.ssa);
+   if (!desc || desc->intrinsic != nir_intrinsic_load_constant_agx ||
+       desc->def.num_components != 4 ||
+       !(nir_intrinsic_access(desc) & ACCESS_BUFFER_DESCRIPTOR_AGX))
+      return NULL;
+
+   uint64_t index = nir_src_as_uint(load->src[1]);
+   uint64_t bytes = (index * 4 << nir_intrinsic_base(load)) +
+                    load->def.num_components * 4;
+   *end = bytes;
+   return bytes <= AGX_ZERO_PAGE_SIZE ? desc : NULL;
+}
+
+/* A load that moves takes its pointer with it, so one that then finds no slot
+ * leaves the main program rebuilding that pointer from the descriptor. Allow
+ * only what fits in the storage left free by everything that moves anyway.
+ */
+static bool
+allow_speculative_load(nir_builder *b, nir_intrinsic_instr *load, void *data)
+{
+   unsigned *free_halves = data;
+   const unsigned halves = load->def.num_components * 2;
+   unsigned end;
+   if (load->instr.block->cf_node.parent->type == nir_cf_node_function ||
+       !speculative_descriptor(load, &end) || halves > *free_halves)
+      return false;
+
+   *free_halves -= halves;
+   nir_intrinsic_set_access(
+      load, nir_intrinsic_access(load) | ACCESS_CAN_SPECULATE);
+   return true;
+}
+
+static unsigned
+free_preamble_halves(const nir_shader *nir,
+                     const nir_opt_preamble_options *options,
+                     const unsigned *sizes)
+{
+   unsigned used[nir_preamble_num_classes];
+   memcpy(used, sizes, sizeof(used));
+
+   nir_shader *clone = nir_shader_clone(NULL, nir);
+   nir_opt_preamble(clone, options, used);
+   ralloc_free(clone);
+
+   const unsigned total =
+      options->preamble_storage_size[nir_preamble_class_general];
+   return used[nir_preamble_class_general] < total
+             ? total - used[nir_preamble_class_general]
+             : 0;
+}
+
+/* What stayed in the main program must not be flattened past its branch now. */
+static bool
+disallow_speculative_load(nir_builder *b, nir_intrinsic_instr *load, void *data)
+{
+   if ((load->intrinsic != nir_intrinsic_load_agx &&
+        load->intrinsic != nir_intrinsic_load_constant_agx) ||
+       !(nir_intrinsic_access(load) & ACCESS_CAN_REORDER))
+      return false;
+
+   nir_intrinsic_set_access(
+      load, nir_intrinsic_access(load) & ~ACCESS_CAN_SPECULATE);
+   return true;
+}
+
+static bool
+guard_speculative_load(nir_builder *b, nir_intrinsic_instr *load, void *data)
+{
+   unsigned end;
+   nir_intrinsic_instr *desc = speculative_descriptor(load, &end);
+   if (!desc || !(nir_intrinsic_access(load) & ACCESS_CAN_SPECULATE))
+      return false;
+
+   b->cursor = nir_before_instr(&load->instr);
+   nir_def *bound = nir_channel(b, &desc->def, 2);
+   nir_src_rewrite(&load->src[0],
+                   nir_bcsel(b, nir_uge_imm(b, bound, end), load->src[0].ssa,
+                             nir_imm_int64(b, AGX_ZERO_PAGE_ADDRESS)));
+   return true;
+}
+
+/* A G17P constant program writes uniforms a word at a time, from an aligned
+ * register pair. A half exported from the top of a pair, or into the top of a
+ * word, cannot be packed, and that refusal costs the shader its whole constant
+ * program. So export every half result as a word with zeroes on top, in the
+ * slot def_size_agx3b() reserved; the main program still reads the low half.
+ */
+static bool
+widen_half_exports(nir_shader *nir)
+{
+   nir_function_impl *pre = nir_shader_get_preamble(nir);
+   bool progress = false;
+
+   nir_foreach_block(block, pre) {
+      nir_foreach_instr(instr, block) {
+         if (instr->type != nir_instr_type_intrinsic)
+            continue;
+         nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+         if (intr->intrinsic != nir_intrinsic_store_preamble ||
+             nir_intrinsic_preamble_class(intr) != nir_preamble_class_general)
+            continue;
+         nir_def *value = intr->src[0].ssa;
+         if (value->num_components != 1 || value->bit_size > 16)
+            continue;
+         nir_builder b = nir_builder_at(nir_before_instr(instr));
+         nir_src_rewrite(&intr->src[0],
+                         value->bit_size == 1
+                            ? nir_bcsel(&b, value, nir_imm_int(&b, 1),
+                                        nir_imm_int(&b, 0))
+                            : nir_u2u32(&b, value));
+         progress = true;
+      }
+   }
+
+   nir_foreach_function_impl(impl, nir)
+      nir_progress(impl == pre && progress, impl, nir_metadata_control_flow);
+   return progress;
+}
+
 bool
 agx_nir_opt_preamble(nir_shader *nir, unsigned *sizes, bool g17p,
                      bool agx3c)
@@ -662,13 +825,34 @@ agx_nir_opt_preamble(nir_shader *nir, unsigned *sizes, bool g17p,
    if (g17p) {
       /* The G17P uniform fabs cost is not an M5 witness; keep the
        * generic instruction cost there. */
-      options.def_size = agx3c ? def_size_agx3c : def_size_g17p;
+      options.def_size = agx3c ? def_size_agx3c : def_size_agx3b;
       options.instr_cost_cb = agx3c ? instr_cost : instr_cost_g17p;
       options.rewrite_cost_cb = agx3c ? rewrite_cost_agx3c : rewrite_cost_g17p;
    }
+   bool speculative = false;
+   if (g17p && !agx3c && nir->info.stage == MESA_SHADER_FRAGMENT) {
+      unsigned free_halves = free_preamble_halves(nir, &options, sizes);
+      NIR_PASS(speculative, nir, nir_shader_intrinsics_pass,
+               allow_speculative_load, nir_metadata_all, &free_halves);
+   }
+
    NIR_PASS(progress, nir, nir_opt_preamble, &options, sizes);
+
+   if (speculative) {
+      nir_function_intrinsics_pass(nir_shader_get_entrypoint(nir),
+                                   disallow_speculative_load, nir_metadata_all,
+                                   NULL);
+      if (progress) {
+         nir_function_intrinsics_pass(nir_shader_get_preamble(nir),
+                                      guard_speculative_load,
+                                      nir_metadata_control_flow, NULL);
+      }
+   }
+
    if (progress && g17p)
       NIR_PASS(_, nir, agx_nir_export_select_flags_as_halves);
+   if (progress && g17p && !agx3c)
+      NIR_PASS(_, nir, widen_half_exports);
 
    struct preamble_image heap[512];
    memset(heap, ~0, sizeof(heap));
@@ -893,11 +1077,12 @@ if_depth(const nir_instr *instr)
    return depth;
 }
 
-/* If this 64-bit value is a sample's texture or sampler handle, the least
- * if-nesting depth of those samples; otherwise UINT_MAX.
+/* If this 64-bit value is a sample's texture or sampler handle, or with
+ * load_bases a load's base address, the least if-nesting depth of those uses;
+ * otherwise UINT_MAX.
  */
 static unsigned
-sample_handle_depth(const nir_def *def)
+sample_handle_depth(const nir_def *def, bool load_bases)
 {
    unsigned depth = UINT_MAX;
    if (def->bit_size != 64 || def->num_components != 1)
@@ -905,6 +1090,14 @@ sample_handle_depth(const nir_def *def)
 
    nir_foreach_use(use, def) {
       nir_instr *parent = nir_src_use_instr(use);
+      if (parent->type == nir_instr_type_intrinsic) {
+         nir_intrinsic_instr *intr = nir_instr_as_intrinsic(parent);
+         if (load_bases && use == &intr->src[0] &&
+             (intr->intrinsic == nir_intrinsic_load_constant_agx ||
+              intr->intrinsic == nir_intrinsic_load_agx))
+            depth = MIN2(depth, if_depth(parent));
+         continue;
+      }
       if (parent->type != nir_instr_type_tex)
          continue;
       nir_tex_instr *tex = nir_instr_as_tex(parent);
@@ -944,16 +1137,18 @@ find_slot(struct preamble_slot *slots, unsigned n, unsigned half)
  * nir_opt_preamble lays general exports out by benefit, so bindless texture
  * and sampler handles of a shader with many exports can land above the range
  * a sample reads directly, and each sample then copies its handles into
- * registers first. Move every export that is used as a handle to the bottom of
- * the general range [reserved, exports_end), keeping the others in order
- * behind them. Uniforms from exports_end to the allocated size, if any, are
- * copied in by the launch and stay where they are. Updates the allocated size
- * when alignment grows the layout.
+ * registers first. With load_bases, G17P device loads count too: they read
+ * their base from the same range, and a base above it costs two copies per
+ * load. Move every export that is used as a handle to the bottom of the general
+ * range [reserved, exports_end), keeping the others in order behind them.
+ * Uniforms from exports_end to the allocated size, if any, are copied in by the
+ * launch and stay where they are. Updates the allocated size when alignment
+ * grows the layout.
  */
 bool
 agx_nir_place_preamble_handles_low(nir_shader *nir, unsigned reserved,
                                    unsigned exports_end,
-                                   unsigned *allocated_inout)
+                                   unsigned *allocated_inout, bool load_bases)
 {
    const unsigned allocated = *allocated_inout;
    if (!nir_shader_get_entrypoint(nir)->preamble || allocated > 512 ||
@@ -1015,7 +1210,7 @@ agx_nir_place_preamble_handles_low(nir_shader *nir, unsigned reserved,
                    nir_preamble_class_general) {
                base = nir_intrinsic_base(intr);
                size = MAX2(intr->def.bit_size, 16) * intr->def.num_components / 16;
-               depth = sample_handle_depth(&intr->def);
+               depth = sample_handle_depth(&intr->def, load_bases);
             } else if (intr->intrinsic == nir_intrinsic_bindless_image_agx ||
                        intr->intrinsic == nir_intrinsic_bindless_sampler_agx) {
                base = nir_intrinsic_desc_set(intr);

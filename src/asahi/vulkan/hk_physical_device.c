@@ -14,6 +14,7 @@
 #include "util/disk_cache.h"
 #include "util/hex.h"
 #include "util/mesa-blake3.h"
+#include "util/u_process.h"
 #include "util/os_misc.h"
 #include "git_sha1.h"
 #include "hk_buffer.h"
@@ -934,7 +935,12 @@ hk_get_device_features(
       const bool sparse = dev->chip == AGX_CHIP_G17P;
       features->shaderResourceResidency = sparse;
       features->sparseBinding = sparse;
-      features->sparseResidencyAliased = false;
+      /* A memory range may back several sparse VAs, including several
+       * locations within one resource. The common binder preserves the BO
+       * offset for each mapping and its RO shadow; G17P's transactional
+       * VM_BIND path retains each mapping independently. Residency metadata
+       * is per resource VA, not per backing allocation. */
+      features->sparseResidencyAliased = agx_is_a18_pro(dev);
       features->sparseResidencyImage2D = sparse;
       /* The sparse binder and SSTT use the same slice layout for 3D images
        * as for 2D arrays. Report the nonstandard, one-slice block shape rather
@@ -958,10 +964,11 @@ hk_get_device_features(
        * layer/viewport UVS scalar.  The public bit is backed by the exact
        * two-instance/two-layer image qualification. */
       features->shaderOutputLayer = true;
-      /* VK_KHR_shader_quad_control permits quad operations and derivatives
-       * inside divergent control flow.  The ordinary subgroup quad shuffles
-       * exposed below do not establish that stronger execution guarantee. */
-      features->shaderQuadControl = false;
+      /* G17P uses the common reconvergence and subgroup lowering with AGX3
+       * quad encodings. The execution modes also select helper-capable
+       * fragment entry and prevent merging triangles across derivative quads.
+       */
+      features->shaderQuadControl = agx_is_a18_pro(dev);
 
       /* Qualified on A18 Pro only. */
       if (dev->chip == AGX_CHIP_G17P) {
@@ -972,7 +979,7 @@ hk_get_device_features(
    }
 
    /* Compute derivatives are NIR quad-swap lowering plus explicit-gradient
-    * samples, both available on M5; quad control stays off as on G17P. */
+    * samples, both available on M5; quad control remains restricted to G17P. */
    if (agx_chip_g17_m5(dev->chip)) {
       features->computeDerivativeGroupQuads = true;
       features->computeDerivativeGroupLinear = true;
@@ -1034,8 +1041,11 @@ hk_get_device_properties(const struct agx_device *dev,
 
    /* Note: update nir_shader_compiler_options.max_samples when changing this. */
    const VkSampleCountFlagBits sample_counts =
-      VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_2_BIT | VK_SAMPLE_COUNT_4_BIT |
-      (agx_chip_g17_m5(dev->chip) ? VK_SAMPLE_COUNT_8_BIT : 0);
+      dev->chip == AGX_CHIP_G18G
+         ? VK_SAMPLE_COUNT_1_BIT
+         : (VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_2_BIT |
+            VK_SAMPLE_COUNT_4_BIT |
+            (agx_chip_g17_m5(dev->chip) ? VK_SAMPLE_COUNT_8_BIT : 0));
 
    /* Integer colour attachments and sampled multisample images use the same
     * native tile store/reload and texel-fetch paths as other colour formats.
@@ -1339,15 +1349,14 @@ hk_get_device_properties(const struct agx_device *dev,
                                       VK_RESOLVE_MODE_MAX_BIT,
       .independentResolveNone = true,
       .independentResolve = true,
-      .driverID = VK_DRIVER_ID_MESA_HONEYKRISP,
-      /* The M4 ports have not completed a conformance submission. Keep the
-       * implemented API/features available without claiming a passed CTS version.
-       * T6040 uses the G17P driver path, so check its physical identity too.
+      .driverID = instance->drirc.misc.report_honeykrisp_driver_id
+                     ? VK_DRIVER_ID_MESA_HONEYKRISP
+                     : VK_DRIVER_ID_AURORA_BOREALIS,
+      /* Conformance is submitted per driver ID. Borealis has not made a
+       * submission under its own ID yet, so it claims no CTS version on any
+       * chip, including the ones Honeykrisp is conformant on.
        */
-      .conformanceVersion = (dev->chip == AGX_CHIP_G16G ||
-                             dev->params.chip_id == 0x6040)
-                               ? (VkConformanceVersion){0, 0, 0, 0}
-                               : (VkConformanceVersion){1, 4, 6, 2},
+      .conformanceVersion = (VkConformanceVersion){0, 0, 0, 0},
       .denormBehaviorIndependence = VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
       .roundingModeIndependence = VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
       .shaderSignedZeroInfNanPreserveFloat16 = true,
@@ -1557,6 +1566,11 @@ hk_get_device_properties(const struct agx_device *dev,
       .advancedBlendAllOperations = true,
    };
 
+   /* Strict residency on M5 relies on soft faults; see
+    * hk_sparse_buffer_unmapped(). */
+   if (agx_chip_g17_m5(dev->chip))
+      properties->sparseResidencyNonResidentStrict = agx_has_soft_fault(dev);
+
    if (agx_chip_native_agx3(dev->chip)) {
       /* Measured per operation under the G17P drm-shim:
        *
@@ -1570,10 +1584,10 @@ hk_get_device_properties(const struct agx_device *dev,
        *   QUAD              g08_subgroup_quad           encodes
        *   ROTATE/CLUSTERED  g24_subgroup_rotate         encodes
        *
-       * Quad broadcasts and swaps are now grounded for the compute and
-       * fragment stages.  Keep subgroupQuadOperationsInAllStages false until
-       * every other advertised graphics stage is independently witnessed. */
-      properties->subgroupQuadOperationsInAllStages = false;
+       * G17P uses the same lane instructions in native vertex/fragment
+       * programs and the compute programs implementing tessellation and
+       * geometry. Other AGX3 targets retain their stage restriction. */
+      properties->subgroupQuadOperationsInAllStages = agx_is_a18_pro(dev);
       properties->sparseResidencyNonResidentStrict = false;
    }
 
@@ -1697,6 +1711,63 @@ hk_codegen_env_hash(void)
    return h;
 }
 
+/* Whether a program's shaders emulate custom border colours is decided at
+ * the first sampler that needs it (hk_sampler.c), which lands at a different
+ * point among the shaders compiled on worker threads each time the program
+ * runs. Shaders compiled before it leave the emulation out and need an
+ * emulating twin, built on the draw that binds them, and the shader cache key
+ * carries the setting, so a run that met the sampler at another point missed
+ * the cache. Remember in the disk cache that this program needed it, so its
+ * next run emulates from the start. The emulation is a branch on the bound
+ * sampler, correct with or without a custom border. */
+static bool
+hk_border_emulation_key(struct hk_physical_device *pdev, cache_key key)
+{
+#ifdef ENABLE_SHADER_CACHE
+   if (!pdev->vk.disk_cache)
+      return false;
+   static const char tag[] = "hk border emulation";
+   const char *process = util_get_process_name();
+   struct mesa_blake3 ctx;
+   blake3_hash hash;
+   _mesa_blake3_init(&ctx);
+   _mesa_blake3_update(&ctx, tag, sizeof(tag));
+   if (process)
+      _mesa_blake3_update(&ctx, process, strlen(process));
+   _mesa_blake3_final(&ctx, hash);
+   disk_cache_compute_key(pdev->vk.disk_cache, hash, sizeof(hash), key);
+   return true;
+#else
+   return false;
+#endif
+}
+
+void
+hk_border_emulation_recall(struct hk_physical_device *pdev)
+{
+#ifdef ENABLE_SHADER_CACHE
+   cache_key key;
+   size_t size;
+   if (!hk_border_emulation_key(pdev, key))
+      return;
+   void *seen = disk_cache_get(pdev->vk.disk_cache, key, &size);
+   if (seen)
+      p_atomic_set(&pdev->border_emulation, 1);
+   free(seen);
+#endif
+}
+
+void
+hk_border_emulation_remember(struct hk_physical_device *pdev)
+{
+#ifdef ENABLE_SHADER_CACHE
+   static const uint8_t seen = 1;
+   cache_key key;
+   if (hk_border_emulation_key(pdev, key))
+      disk_cache_put(pdev->vk.disk_cache, key, &seen, sizeof(seen), NULL);
+#endif
+}
+
 static void
 hk_physical_device_init_pipeline_cache(struct hk_physical_device *pdev)
 {
@@ -1743,6 +1814,7 @@ hk_physical_device_init_pipeline_cache(struct hk_physical_device *pdev)
    pdev->vk.disk_cache = disk_cache_create(renderer, timestamp, driver_flags ^
       (env_hash * UINT64_C(0xff51afd7ed558ccd)));
    if (pdev->vk.disk_cache != NULL) {
+      hk_border_emulation_recall(pdev);
       pdev->vk.properties.pipelineBinaryInternalCache = true;
       pdev->vk.properties.pipelineBinaryInternalCacheControl = true;
       pdev->vk.properties.pipelineBinaryPrefersInternalCache = true;
@@ -1869,7 +1941,7 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
       goto fail_fd;
    }
 
-   bool is_asahi = (strcmp(version->name, "asahi") == 0);
+   bool is_asahi = agx_is_native_drm_driver(version->name);
    is_asahi |= strcmp(version->name, "virtio_gpu") == 0;
    drmFreeVersion(version);
 
@@ -1944,7 +2016,9 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
          debug_get_bool_option("ASAHI_M5_NATIVE_RT", false);
       supported_extensions.KHR_ray_tracing_pipeline = native_rt;
       supported_extensions.KHR_ray_tracing_maintenance1 = native_rt;
-      supported_extensions.KHR_pipeline_library = native_rt;
+      /* Graphics pipeline libraries need VK_KHR_pipeline_library whether or
+       * not ray tracing pipelines are exposed. */
+      supported_extensions.KHR_pipeline_library |= native_rt;
    }
    supported_extensions.KHR_cooperative_matrix =
       agx_chip_g17_m5(pdev->dev.chip) &&
@@ -1967,9 +2041,8 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
       agx_chip_sampler_generation(pdev->dev.chip) == AGX_SAMPLER_GENERATION_GEN5;
 
    if (agx_native_graphics(&pdev->dev)) {
-      /* This extension controls divergent quad derivatives, not the standard
-       * subgroup quad shuffle operations exposed above. */
-      supported_extensions.KHR_shader_quad_control = false;
+      supported_extensions.KHR_shader_quad_control =
+         agx_is_a18_pro(&pdev->dev);
    }
 
    /* VK_KHR_shader_fma makes shaderFmaFloat32 mandatory. */

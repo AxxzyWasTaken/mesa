@@ -273,7 +273,7 @@ void
 agx_bo_cache_start_idle_trim(struct agx_device *dev)
 {
 #ifdef HAVE_LIBDRM
-   if (dev->ops.bo_free != agx_drm_bo_close)
+   if (dev->ops.bo_free != agx_drm_bo_close && !dev->is_virtio)
       return;
    if (mtx_init(&dev->bo_cache.idle_lock, mtx_plain) != thrd_success)
       return;

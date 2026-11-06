@@ -67,7 +67,13 @@ agx_chip_from_params(const struct drm_asahi_params_global *params)
              params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_200)
             return AGX_CHIP_G17P;
          return AGX_CHIP_G16S;
-      case 'C': return AGX_CHIP_G16C;
+      case 'C':
+      case 'X':
+         if (params->chip_id == 0x6041 &&
+             params->usc_generation == AGX_ISA_AGX3 &&
+             params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_200)
+            return AGX_CHIP_G17P;
+         return params->gpu_variant == 'C' ? AGX_CHIP_G16C : AGX_CHIP_UNKNOWN;
       default: return AGX_CHIP_UNKNOWN;
       }
    case 17:
@@ -77,6 +83,13 @@ agx_chip_from_params(const struct drm_asahi_params_global *params)
       case 'G': return AGX_CHIP_G17G;
       case 'S': return AGX_CHIP_G17S;
       case 'C': return AGX_CHIP_G17C;
+      default: return AGX_CHIP_UNKNOWN;
+      }
+   case 18:
+      /* Only the M6 base part has been observed. G18M and G19P share its
+       * shader encoding but nothing else about them is known. */
+      switch (params->gpu_variant) {
+      case 'G': return AGX_CHIP_G18G;
       default: return AGX_CHIP_UNKNOWN;
       }
    default:
@@ -108,6 +121,7 @@ agx_chip_isa(enum agx_chip chip)
    case AGX_CHIP_G17G:
    case AGX_CHIP_G17S:
    case AGX_CHIP_G17C:
+   case AGX_CHIP_G18G:
       return AGX_ISA_AGX3;
 
    case AGX_CHIP_UNKNOWN:
@@ -154,13 +168,159 @@ agx_chip_isa_encoding(enum agx_chip chip)
    case AGX_CHIP_G17C:
       return AGX_ISA_ENCODING_AGX3C;
 
+   /* Apple's "g18g-encodings" table, shared with G18M and G19P. */
+   case AGX_CHIP_G18G:
+      return AGX_ISA_ENCODING_AGX3D;
+
    case AGX_CHIP_UNKNOWN:
    default:
       return AGX_ISA_ENCODING_UNKNOWN;
    }
 }
 
-static enum agx_submission_model
+enum agx_command_stream_generation
+agx_chip_command_stream_generation_reference(enum agx_chip chip)
+{
+   switch (chip) {
+   case AGX_CHIP_G13G:
+   case AGX_CHIP_G13X:
+   case AGX_CHIP_G14G:
+   case AGX_CHIP_G14X:
+      return AGX_CS_GENERATION_AGX2;
+
+   case AGX_CHIP_G15G:
+   case AGX_CHIP_G15S:
+   case AGX_CHIP_G15C:
+   case AGX_CHIP_G15D:
+      return AGX_CS_GENERATION_G15;
+
+   case AGX_CHIP_G16P:
+   case AGX_CHIP_G16G:
+   case AGX_CHIP_G16S:
+   case AGX_CHIP_G16C:
+   case AGX_CHIP_G17P:
+   case AGX_CHIP_G17A:
+      return AGX_CS_GENERATION_HAL200;
+
+   case AGX_CHIP_G17G:
+   case AGX_CHIP_G17S:
+   case AGX_CHIP_G17C:
+      return AGX_CS_GENERATION_HAL300;
+
+   /* The record format, not the kernel HAL: the J873 native captures decode
+    * and repack under the HAL300 codecs. See agx_chip_hal300_records. */
+   case AGX_CHIP_G18G:
+      return AGX_CS_GENERATION_HAL300;
+
+   /* The A16 compiler target is known to be AGX2, but its command-stream
+    * class was not present in the Mac driver corpus. Do not infer it. */
+   case AGX_CHIP_G15P:
+   case AGX_CHIP_UNKNOWN:
+   default:
+      return AGX_CS_GENERATION_UNKNOWN;
+   }
+}
+
+enum agx_descriptor_generation
+agx_chip_descriptor_generation_reference(enum agx_chip chip)
+{
+   switch (chip) {
+   case AGX_CHIP_G13G:
+   case AGX_CHIP_G13X:
+      return AGX_DESCRIPTOR_GENERATION_7;
+   case AGX_CHIP_G14G:
+   case AGX_CHIP_G14X:
+      return AGX_DESCRIPTOR_GENERATION_8;
+
+   case AGX_CHIP_G15G:
+   case AGX_CHIP_G15S:
+   case AGX_CHIP_G15C:
+   case AGX_CHIP_G15D:
+   case AGX_CHIP_G16P:
+   case AGX_CHIP_G16G:
+   case AGX_CHIP_G16S:
+   case AGX_CHIP_G16C:
+   case AGX_CHIP_G17P:
+   case AGX_CHIP_G17A:
+      return AGX_DESCRIPTOR_GENERATION_9;
+
+   case AGX_CHIP_G17G:
+   case AGX_CHIP_G17S:
+   case AGX_CHIP_G17C:
+      return AGX_DESCRIPTOR_GENERATION_10;
+
+   /* The J873 colour render's PBE descriptor (ffe40a02 00007f80 00005800
+    * 0003f010) and its texture descriptor (f6880a02 0007f80f 00005800
+    * 000fc010) unpack as Gen10 and repack byte-identically. */
+   case AGX_CHIP_G18G:
+      return AGX_DESCRIPTOR_GENERATION_10;
+
+   case AGX_CHIP_G15P:
+   case AGX_CHIP_UNKNOWN:
+   default:
+      return AGX_DESCRIPTOR_GENERATION_UNKNOWN;
+   }
+}
+
+enum agx_sampler_generation
+agx_chip_sampler_generation_reference(enum agx_chip chip)
+{
+   switch (chip) {
+   case AGX_CHIP_G13G:
+   case AGX_CHIP_G13X:
+   case AGX_CHIP_G14G:
+   case AGX_CHIP_G14X:
+   case AGX_CHIP_G15G:
+   case AGX_CHIP_G15S:
+   case AGX_CHIP_G15C:
+   case AGX_CHIP_G15D:
+      return AGX_SAMPLER_GENERATION_GEN4;
+
+   case AGX_CHIP_G16P:
+   case AGX_CHIP_G16G:
+   case AGX_CHIP_G16S:
+   case AGX_CHIP_G16C:
+   case AGX_CHIP_G17P:
+   case AGX_CHIP_G17A:
+      return AGX_SAMPLER_GENERATION_GEN4_HAL200;
+
+   case AGX_CHIP_G17G:
+   case AGX_CHIP_G17S:
+   case AGX_CHIP_G17C:
+      return AGX_SAMPLER_GENERATION_GEN5;
+
+   /* The J873 texture-sample render's sampler (Metal's default descriptor
+    * with nearest filters and clamp-to-edge) is 000f0000 00000780 at
+    * element 2 of a 32-byte heap. It repacks byte-identically as Gen5 and
+    * not as either Gen4 layout, whose maximum-LOD clamp of 14.0 turns the
+    * 15.0 there into 000e0000. */
+   case AGX_CHIP_G18G:
+      return AGX_SAMPLER_GENERATION_GEN5;
+
+   case AGX_CHIP_G15P:
+   case AGX_CHIP_UNKNOWN:
+   default:
+      return AGX_SAMPLER_GENERATION_UNKNOWN;
+   }
+}
+
+unsigned
+agx_chip_sampler_heap_element_size_reference(enum agx_chip chip)
+{
+   switch (agx_chip_command_stream_generation_reference(chip)) {
+   case AGX_CS_GENERATION_AGX2:
+      return 8;
+   case AGX_CS_GENERATION_G15:
+   case AGX_CS_GENERATION_HAL200:
+   case AGX_CS_GENERATION_HAL300:
+      return 32;
+   case AGX_CS_GENERATION_UNKNOWN:
+   default:
+      return 0;
+   }
+}
+
+enum agx_submission_model
 agx_chip_submission_model(enum agx_chip chip)
 {
    switch (chip) {
@@ -183,6 +343,12 @@ agx_chip_submission_model(enum agx_chip chip)
    case AGX_CHIP_G17G:
    case AGX_CHIP_G17S:
    case AGX_CHIP_G17C:
+      return AGX_SUBMISSION_MODEL_SKSM;
+
+   /* The only channel classes of the 26A428 mac18g kernelcache's
+    * AGX::PI_400::G::A0 accelerator are 3DChannelSKSM, TAChannelSKSM and
+    * CLChannelSKSM; there is no classic queue. */
+   case AGX_CHIP_G18G:
       return AGX_SUBMISSION_MODEL_SKSM;
 
    /* No corresponding accelerator class was present in the Mac corpus. */
@@ -294,7 +460,9 @@ agx_params_driver_supported(const struct drm_asahi_params_global *params)
       /* M4 Pro: two clusters (a binned part keeps two). */
       const bool m4_pro =
          params->chip_id == 0x6040 && params->num_clusters_total == 2;
-      return (a18_pro || m4_pro) && params->num_dies == 1 &&
+      const bool m4_max =
+         params->chip_id == 0x6041 && params->num_clusters_total == 4;
+      return (a18_pro || m4_pro || m4_max) && params->num_dies == 1 &&
              params->usc_generation == AGX_ISA_AGX3 &&
              params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_200;
    }
@@ -323,6 +491,23 @@ agx_params_driver_supported(const struct drm_asahi_params_global *params)
    }
 }
 
+bool
+agx_params_fixup_upstream_uapi(struct drm_asahi_params_global *params)
+{
+   if (!params || params->usc_generation != 0)
+      return false;
+
+   params->features &= DRM_ASAHI_FEATURE_SOFT_FAULTS;
+
+   if (params->chip_id == 0x6041 && params->gpu_generation == 16 &&
+       params->gpu_hal_generation == 0) {
+      params->usc_generation = AGX_ISA_AGX3;
+      params->gpu_hal_generation = DRM_ASAHI_GPU_HAL_200;
+   }
+
+   return true;
+}
+
 const char *
 agx_chip_exact_product_name(enum agx_chip chip)
 {
@@ -332,6 +517,16 @@ agx_chip_exact_product_name(enum agx_chip chip)
    default:
       return NULL;
    }
+}
+
+bool
+agx_params_m5_supported(const struct drm_asahi_params_global *params)
+{
+   return params && agx_chip_from_params(params) == AGX_CHIP_G17G &&
+          params->chip_id == 0x8142 && params->num_dies == 1 &&
+          params->num_clusters_total == 1 &&
+          params->usc_generation == AGX_ISA_AGX3 &&
+          params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_300;
 }
 
 bool
@@ -345,8 +540,26 @@ agx_params_m5_bringup_supported(const struct drm_asahi_params_global *params)
    const enum agx_chip chip = agx_chip_from_params(params);
    return (chip == AGX_CHIP_G17G && params->chip_id == 0x8142 &&
            params->num_clusters_total == 1) ||
-          (chip == AGX_CHIP_G17S && params->chip_id == 0x6050);
+          (chip == AGX_CHIP_G17S && params->chip_id == 0x6050) ||
+          /* T6050 M5 Max (J716c): G17C, one die, four clusters. */
+          (chip == AGX_CHIP_G17C && params->chip_id == 0x6050 &&
+           params->num_clusters_total == 4);
 
+}
+
+/*
+ * The M6 bring-up contract: the J873's G18G (chip 0x8152, one die, USC 3).
+ * The shim's G18G profile and the J873 G18G kernel driver both publish HAL
+ * 300 until the uAPI has a PI_400 value. Like the M5 contract above, it is
+ * honoured only with ASAHI_G18G_BRINGUP set; see agx_open_device.
+ */
+bool
+agx_params_g18g_bringup_supported(const struct drm_asahi_params_global *params)
+{
+   return params && agx_chip_from_params(params) == AGX_CHIP_G18G &&
+          params->chip_id == 0x8152 && params->num_dies == 1 &&
+          params->usc_generation == AGX_ISA_AGX3 &&
+          params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_300;
 }
 
 bool
@@ -369,7 +582,13 @@ agx_chip_uses_legacy_precompiled_programs(enum agx_chip chip)
  * codegen obligation, so it is only meaningful for a chip this driver can
  * generate code for.
  */
-static bool
+bool
+agx_chip_has_hardware_ray_tracing(enum agx_chip chip)
+{
+   return agx_chip_isa(chip) == AGX_ISA_AGX3;
+}
+
+bool
 agx_chip_needs_scheduling_stalls(enum agx_chip chip)
 {
    /* The M3 base part alone. Not a property of its encoding: G15G shares the
@@ -400,7 +619,21 @@ agx_chip_name(enum agx_chip chip)
    case AGX_CHIP_G17G: return "G17G";
    case AGX_CHIP_G17S: return "G17S";
    case AGX_CHIP_G17C: return "G17C";
+   case AGX_CHIP_G18G: return "G18G";
    case AGX_CHIP_UNKNOWN:
+   default: return "unknown";
+   }
+}
+
+const char *
+agx_isa_encoding_name(enum agx_isa_encoding encoding)
+{
+   switch (encoding) {
+   case AGX_ISA_ENCODING_AGX2: return "agx2";
+   case AGX_ISA_ENCODING_AGX3B: return "agx3b";
+   case AGX_ISA_ENCODING_AGX3C: return "agx3c";
+   case AGX_ISA_ENCODING_AGX3D: return "agx3d";
+   case AGX_ISA_ENCODING_UNKNOWN:
    default: return "unknown";
    }
 }

@@ -446,12 +446,16 @@ agx_read_registers(const agx_context *ctx, const agx_instr *I, unsigned s)
                    agx_channels(I->src[s]) == 1);
             return 2;
          }
+         /* AGX3's integer-level PACK_SMPIR reads a 32-bit GPR on both
+          * encodings: generation 9 and 10 texture lowering restore txf's
+          * level to 32 bits (agx_nir_lower_texture.c), as does
+          * agx_emit_image_load() for a register image level. */
          if ((I->op == AGX_OPCODE_TEXTURE_LOAD ||
               I->op == AGX_OPCODE_IMAGE_LOAD) &&
-             ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3B &&
+             agx_isa_is_agx3(ctx->key->dev.encoding) &&
              I->lod_mode == AGX_LOD_MODE_LOD_MIN &&
              I->src[s].type != AGX_INDEX_IMMEDIATE)
-             return 2;
+            return 2;
 
          if (I->lod_mode == AGX_LOD_MODE_LOD_GRAD ||
              I->lod_mode == AGX_LOD_MODE_LOD_GRAD_MIN) {
@@ -488,6 +492,11 @@ agx_read_registers(const agx_context *ctx, const agx_instr *I, unsigned s)
           * its existing compare/offset collect. */
          return agx_is_null(I->src[s]) ? 0
                                       : 2 * agx_channels(I->src[s]);
+      } else if (s == 6 && I->op == AGX_OPCODE_TEXTURE_SAMPLE &&
+                 I->nr_srcs == 7) {
+         /* A cube sample's own CEM scratch (agx3_reserve_cube_scratch): the
+          * four words the packer computes CEM in. */
+         return 8;
       } else {
          return size;
       }

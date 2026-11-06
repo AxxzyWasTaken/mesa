@@ -10,6 +10,56 @@
 #include <stdlib.h>
 #include <string.h>
 
+static unsigned
+cprog_popcount(uint64_t bits)
+{
+   unsigned count = 0;
+   while (bits) {
+      bits &= bits - 1;
+      ++count;
+   }
+   return count;
+}
+
+bool
+agx_ioto_cprog_input_offset(enum agx_chip chip,
+                            const struct agx_ioto_cprog_inputs *inputs,
+                            uint16_t source_half, uint16_t *offset_bytes)
+{
+   if (chip != AGX_CHIP_G17P || inputs == NULL || !inputs->known ||
+       offset_bytes == NULL || source_half >= AGX_IOTO_CPROG_UNIFORM_HALFS)
+      return false;
+
+   const unsigned word = source_half / 64, bit = source_half % 64;
+   if (!(inputs->uniform_halfs[word] & (UINT64_C(1) << bit)))
+      return false;
+
+   unsigned preceding = 0;
+   for (unsigned i = 0; i < word; ++i)
+      preceding += cprog_popcount(inputs->uniform_halfs[i]);
+   preceding += cprog_popcount(inputs->uniform_halfs[word] &
+                               ((UINT64_C(1) << bit) - 1));
+   *offset_bytes = 2 * preceding;
+   return true;
+}
+
+bool
+agx_ioto_cprog_input_frame(enum agx_chip chip,
+                           const struct agx_ioto_cprog_inputs *inputs,
+                           uint16_t *input_halfs, uint16_t *frame_bytes)
+{
+   if (chip != AGX_CHIP_G17P || inputs == NULL || !inputs->known ||
+       input_halfs == NULL || frame_bytes == NULL || input_halfs == frame_bytes)
+      return false;
+
+   unsigned count = 0;
+   for (unsigned i = 0; i < AGX_IOTO_CPROG_UNIFORM_WORDS; ++i)
+      count += cprog_popcount(inputs->uniform_halfs[i]);
+   *input_halfs = count;
+   *frame_bytes = count ? (16u + 2u * count + 15u) & ~15u : 0;
+   return true;
+}
+
 static uint16_t
 load_u16(const uint8_t *bytes)
 {
@@ -43,6 +93,13 @@ agx_ioto_load_target_encoding(enum agx_chip chip)
    default:
       return AGX_IOTO_LOAD_ENCODING_UNSUPPORTED;
    }
+}
+
+bool
+agx_ioto_load_production_ready(enum agx_chip chip)
+{
+   (void)chip;
+   return false;
 }
 
 static uint8_t
@@ -167,7 +224,7 @@ full_fast_mask(uint8_t dwords, uint32_t *mask)
 }
 
 /* Pure allocator step.  NEEDS_ROUND and INVALID leave core unchanged. */
-static enum agx_ioto_load_alloc_result
+enum agx_ioto_load_alloc_result
 agx_ioto_load_allocator_reserve(struct agx_ioto_load_core *core,
                                 uint8_t requested_dwords,
                                 uint16_t cprog_dest_half, uint32_t lane_mask,
@@ -246,7 +303,7 @@ compare_register(const struct agx_ioto_load_register *a,
 }
 
 /* Exact Apple comparator: {key(base), key(data)}. */
-static int
+int
 agx_ioto_load_compare(const struct agx_ioto_inflight_load *a,
                       const struct agx_ioto_inflight_load *b)
 {
@@ -278,7 +335,7 @@ add_size(size_t *total, size_t add)
 }
 
 /* Maximum bytes a finish call may append for the current pending set. */
-static bool
+bool
 agx_ioto_load_finish_worst_case_size(const struct agx_ioto_load_core *core,
                                      bool complete_round, size_t *required)
 {
@@ -318,6 +375,41 @@ agx_ioto_load_finish_worst_case_size(const struct agx_ioto_load_core *core,
    if (complete_round && core->gpu0_round_nops &&
        !add_size(&total, AGX_IOTO_LOAD_GPU0_ROUND_NOP_SIZE))
       return false;
+   *required = total;
+   return true;
+}
+
+bool
+agx_ioto_load_finish_worst_case_size_with_ops(
+   const struct agx_ioto_load_core *core, bool complete_round,
+   const struct agx_ioto_load_emit_ops *ops, size_t *required)
+{
+   size_t total;
+   if (required != NULL)
+      *required = 0;
+   if (required == NULL ||
+       !agx_ioto_load_finish_worst_case_size(core, complete_round, &total))
+      return false;
+
+   if (ops != NULL &&
+       ((ops->extra_copy_bound == NULL) != (ops->pack_extra_copies == NULL)))
+      return false;
+   if (ops != NULL && ops->pack_extra_copies != NULL) {
+      if (core->chip != AGX_CHIP_G17P || core->fast_path_enabled ||
+          !core->gpu0_round_nops)
+         return false;
+      if (complete_round) {
+         for (size_t i = 0; i < core->load_count; ++i) {
+            size_t extra;
+            if (!ops->extra_copy_bound(ops->context, core->chip, &core->loads[i],
+                                       &extra) ||
+                extra > 2u * core->loads[i].count_dwords *
+                           AGX_IOTO_LOAD_GPU0_COPY_MAX_SIZE ||
+                !add_size(&total, extra))
+               return false;
+         }
+      }
+   }
    *required = total;
    return true;
 }
@@ -440,7 +532,8 @@ agx_ioto_load_finish_round(struct agx_ioto_load_core *core, bool complete_round,
       return false;
 
    size_t required;
-   if (!agx_ioto_load_finish_worst_case_size(core, complete_round, &required) ||
+   if (!agx_ioto_load_finish_worst_case_size_with_ops(core, complete_round, ops,
+                                                    &required) ||
        required > core->sink.capacity - core->sink.length)
       return false;
 
@@ -523,6 +616,18 @@ agx_ioto_load_finish_round(struct agx_ioto_load_core *core, bool complete_round,
                for (unsigned e = 0; e < count; ++e) {
                   if (!raw_record_valid(core, &extra[e], false,
                                          ops->trusted_records) ||
+                      !append_bytes(core, extra[e].bytes, extra[e].length))
+                     goto fail;
+               }
+            }
+            if (ops->pack_extra_copies != NULL) {
+               struct agx_ioto_load_raw_record extra[2] = {0};
+               uint8_t count = 0;
+               if (!ops->pack_extra_copies(ops->context, core->chip, load,
+                                           dword, extra, &count) || count > 2)
+                  goto fail;
+               for (unsigned e = 0; e < count; ++e) {
+                  if (!raw_record_valid(core, &extra[e], false, ops->trusted_records) ||
                       !append_bytes(core, extra[e].bytes, extra[e].length))
                      goto fail;
                }
@@ -739,7 +844,7 @@ agx_ioto_load_absolute(struct agx_ioto_load_core *core,
 
    size_t finish_size = 0;
    if (needs_round &&
-       (!agx_ioto_load_finish_worst_case_size(core, true, &finish_size) ||
+       (!agx_ioto_load_finish_worst_case_size_with_ops(core, true, ops, &finish_size) ||
         workspace.capacity < core->load_count || ops == NULL))
       return false;
    size_t append_size = finish_size;
@@ -820,4 +925,157 @@ rollback:
    core->current_gpr_dwords = old_current;
    core->next_sequence = old_next_sequence;
    return false;
+}
+
+static bool
+abi_buffer_base_half(enum agx_ioto_abi_buffer_slot source, uint16_t *half)
+{
+   switch (source) {
+   case AGX_IOTO_ABI_BUFFER_SLOT_2:
+   case AGX_IOTO_ABI_BUFFER_SLOT_4:
+   case AGX_IOTO_ABI_BUFFER_SLOT_6:
+   case AGX_IOTO_ABI_BUFFER_SLOT_8:
+   case AGX_IOTO_ABI_BUFFER_SLOT_50:
+   case AGX_IOTO_ABI_BUFFER_SLOT_52:
+   case AGX_IOTO_ABI_BUFFER_SLOT_54:
+      *half = (uint16_t)(2u * (unsigned)source);
+      return true;
+   default:
+      return false;
+   }
+}
+
+static bool
+load_from_fixed(struct agx_ioto_load_core *core,
+                const struct agx_ioto_load_from_fixed *load, uint16_t base_half,
+                bool is_scs, enum agx_ioto_abi_buffer_slot abi_source,
+                const struct agx_ioto_load_emit_ops *ops,
+                struct agx_ioto_load_workspace workspace,
+                struct agx_ioto_load_allocation *allocation)
+{
+   if (allocation != NULL)
+      memset(allocation, 0, sizeof(*allocation));
+   if (core == NULL || load == NULL || allocation == NULL ||
+       load->count_dwords == 0 || load->count_dwords > 4 ||
+       load->native_slot > UINT16_MAX / 2 || load->lane_mask == 0 ||
+       core->next_sequence == UINT32_MAX)
+      return false;
+
+   /* half-register 8 is both Apple's lazily materialized SCS base and ABI
+    * buffer selector 4.  The native builder only flips its cache byte; it
+    * neither flushes a queued ABI4 load before LDIMM nor restores ABI4 after
+    * LDIMM.  Keep both caller-ordering hazards closed until that contract is
+    * grounded at a live producer. */
+   if ((is_scs && core->abi4_load_pending) ||
+       (!is_scs && abi_source == AGX_IOTO_ABI_BUFFER_SLOT_4 &&
+        core->scs_base_ever_loaded))
+      return false;
+
+   const uint8_t n = load->count_dwords > 2 ? load->count_dwords : 2;
+   const uint8_t valid_lane_bits = (uint8_t)((1u << (2u * n)) - 1u);
+   if ((load->lane_mask & ~valid_lane_bits) != 0)
+      return false;
+
+   struct agx_ioto_load_core predicted_core = *core;
+   enum agx_ioto_load_alloc_result result = agx_ioto_load_allocator_reserve(
+      &predicted_core, load->count_dwords, load->cprog_dest_half,
+      load->lane_mask, allocation);
+   if (result == AGX_IOTO_LOAD_ALLOC_INVALID)
+      return false;
+
+   const bool needs_round = result == AGX_IOTO_LOAD_ALLOC_NEEDS_ROUND;
+   if (needs_round) {
+      predicted_core.current_gpr_dwords = core->initial_gpr_dwords;
+      result = agx_ioto_load_allocator_reserve(
+         &predicted_core, load->count_dwords, load->cprog_dest_half,
+         load->lane_mask, allocation);
+      if (result != AGX_IOTO_LOAD_ALLOC_OK)
+         return false;
+   }
+
+   uint8_t scs_base[AGX_IOTO_LOAD_LDIMM_MAX_SIZE];
+   uint8_t scs_base_length = 0;
+   if (is_scs && !core->scs_base_loaded &&
+       !agx_ioto_load_pack_ldimm(core->chip, AGX_IOTO_LOAD_SCS_BASE_HALF,
+                                 AGX_IOTO_LOAD_SCS_BASE, scs_base,
+                                 &scs_base_length))
+      return false;
+
+   size_t finish_size = 0;
+   if (needs_round &&
+       (!agx_ioto_load_finish_worst_case_size_with_ops(core, true, ops, &finish_size) ||
+        workspace.capacity < core->load_count || ops == NULL))
+      return false;
+   size_t append_size = finish_size;
+   if (!add_size(&append_size, scs_base_length) ||
+       append_size > core->sink.capacity - core->sink.length ||
+       (needs_round ? 1 : core->load_count + 1) > core->load_capacity)
+      return false;
+
+   const struct agx_ioto_load_core before = *core;
+   if (needs_round && !agx_ioto_load_finish_round(core, true, ops, workspace))
+      return false;
+
+   core->current_gpr_dwords = predicted_core.current_gpr_dwords;
+   if (scs_base_length != 0 && !append_bytes(core, scs_base, scs_base_length))
+      goto rollback;
+
+   struct agx_ioto_inflight_load *queued = &core->loads[core->load_count++];
+   memset(queued, 0, sizeof(*queued));
+   queued->data.half = allocation->temp_half;
+   queued->data.type = 3;
+   queued->data.value = 1;
+   queued->base.half = base_half;
+   queued->base.type = 4;
+   queued->base.value = 8;
+   queued->byte_offset = load->byte_offset;
+   queued->count_dwords = load->count_dwords;
+   queued->native_slot_half = (uint16_t)(2u * load->native_slot);
+   queued->lane_mask = load->lane_mask;
+   queued->cprog_dest_half = load->cprog_dest_half;
+   queued->sequence = core->next_sequence++;
+
+   if (is_scs) {
+      core->scs_base_loaded = true;
+      core->scs_base_ever_loaded = true;
+   } else if (abi_source == AGX_IOTO_ABI_BUFFER_SLOT_4) {
+      core->scs_base_loaded = false;
+      core->abi4_load_pending = true;
+   }
+   return true;
+
+rollback:
+   *core = before;
+   memset(allocation, 0, sizeof(*allocation));
+   return false;
+}
+
+bool
+agx_ioto_load_from_scs(struct agx_ioto_load_core *core,
+                       const struct agx_ioto_load_from_fixed *load,
+                       const struct agx_ioto_load_emit_ops *ops,
+                       struct agx_ioto_load_workspace workspace,
+                       struct agx_ioto_load_allocation *allocation)
+{
+   return load_from_fixed(core, load, AGX_IOTO_LOAD_SCS_BASE_HALF, true,
+                          (enum agx_ioto_abi_buffer_slot)0, ops, workspace,
+                          allocation);
+}
+
+bool
+agx_ioto_load_from_abi_buffer(struct agx_ioto_load_core *core,
+                              enum agx_ioto_abi_buffer_slot source,
+                              const struct agx_ioto_load_from_fixed *load,
+                              const struct agx_ioto_load_emit_ops *ops,
+                              struct agx_ioto_load_workspace workspace,
+                              struct agx_ioto_load_allocation *allocation)
+{
+   uint16_t base_half;
+   if (!abi_buffer_base_half(source, &base_half)) {
+      if (allocation != NULL)
+         memset(allocation, 0, sizeof(*allocation));
+      return false;
+   }
+   return load_from_fixed(core, load, base_half, false, source, ops, workspace,
+                          allocation);
 }

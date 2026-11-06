@@ -204,6 +204,14 @@ agx_virtio_bo_mmap(struct agx_device *dev, struct agx_bo *bo, void *fixed_addr,
    }
 }
 
+/* Unlike a bare GEM_CLOSE, vdrm_bo_close flushes the buffered ccmds first, so
+ * the host doesn't drop the object before a queued VM_BIND that names it. */
+static void
+agx_virtio_bo_free(struct agx_device *dev, uint32_t handle)
+{
+   vdrm_bo_close(dev->vdrm, handle);
+}
+
 static ssize_t
 agx_virtio_get_params(struct agx_device *dev, void *buf, size_t size)
 {
@@ -298,7 +306,7 @@ const agx_device_ops_t agx_virtio_device_ops = {
     */
    .simple_ioctl = asahi_simple_ioctl,
    .bo_munmap = agx_drm_bo_munmap,
-   .bo_free = agx_drm_bo_close,
+   .bo_free = agx_virtio_bo_free,
 };
 
 bool
@@ -314,5 +322,8 @@ agx_virtio_open_device(struct agx_device *dev)
 
    dev->vdrm = vdrm;
    dev->ops = agx_virtio_device_ops;
+   struct asahi_shmem *shmem = to_asahi_shmem(vdrm->shmem);
+   if (vdrm_shmem_has_field(shmem, async_error))
+      dev->async_errors = &shmem->async_error;
    return true;
 }

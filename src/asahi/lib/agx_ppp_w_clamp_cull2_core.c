@@ -26,6 +26,7 @@ agx_ppp_w_clamp_cull2_header(enum agx_chip chip, uint32_t *header)
    case AGX_CHIP_G17G:
    case AGX_CHIP_G17S:
    case AGX_CHIP_G17C:
+   case AGX_CHIP_G18G:
       *header = AGX_PPP_W_CLAMP_CULL2_GEN7_HEADER;
       return true;
 
@@ -33,6 +34,13 @@ agx_ppp_w_clamp_cull2_header(enum agx_chip chip, uint32_t *header)
       *header = 0;
       return false;
    }
+}
+
+bool
+agx_ppp_w_clamp_cull2_core_supported(enum agx_chip chip)
+{
+   uint32_t header;
+   return agx_ppp_w_clamp_cull2_header(chip, &header);
 }
 
 bool

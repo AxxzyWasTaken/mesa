@@ -28,6 +28,20 @@ struct agx_vdm_state_update_info {
    uint32_t raw_vertex_unknown;
 };
 
+struct agx_vdm_state_update_preamble_counts {
+   uint16_t ipr_dwords;
+   uint32_t spill_dwords;
+};
+
+/* Convert G17P ShaderInfo fields 37/31 (thread-invariant IPR/spill bytes)
+ * to the native 12/18-bit state-load counts. IPR allocation is rounded to an
+ * even dword count. Reject overflow instead of truncating either field, and
+ * clear the result on failure. This neither sets shader flags nor emits a
+ * state update. Other chips need their own producer qualification. */
+bool agx_vdm_state_update_encode_preamble_counts(
+   enum agx_chip chip, uint32_t ipr_bytes, uint32_t spill_bytes,
+   struct agx_vdm_state_update_preamble_counts *counts);
+
 struct agx_vdm_state_update {
    uint8_t bytes[AGX_VDM_STATE_UPDATE_LENGTH];
    uint8_t length;
@@ -135,6 +149,29 @@ struct agx_vdm_state_update_draw_info {
    struct agx_vdm_state_update_template_info template_info;
 };
 
+/*
+ * Pack/unpack the complete seven-word AGX3 VDM State Update emitted by the
+ * inspected Apple VDMEncoderGen5 and VDMEncoderGen6 paths:
+ *
+ *   word 0: exact 0x4000002e header
+ *   word 1: raw vertex-shader word 0
+ *   words 2..3: widened 48-bit vertex-pipeline pair
+ *   words 4..5: raw two-word vertex-output payload
+ *   word 6: raw vertex-unknown payload
+ *
+ * Only the pipeline field's 64-byte alignment and 48-bit address range are
+ * fully named.  The remaining payloads are preserved losslessly because their
+ * complete AGX3 bit semantics are not independently grounded.
+ *
+ * The target allowlist contains only identities directly served by the
+ * inspected Apple Metal plugins, plus G18G, whose J873 native renders emit
+ * the G17G HAL300 form byte for byte.  G16P and G17A remain closed despite
+ * sharing neighboring command-stream generations.  This helper does not emit
+ * a live command or enable lowering, scheduling, submission, or device
+ * admission.
+ */
+bool agx_vdm_state_update_supported(enum agx_chip chip);
+
 /* AGX2 USC pointers are stored relative to `shader_base`, while the AGX3
  * VertexProgramVariant pipeline pair carries an absolute 48-bit GPU VA.
  * Resolve that representation boundary explicitly so live producers cannot
@@ -151,9 +188,17 @@ bool agx_vdm_state_update_unpack(enum agx_chip chip, const void *bytes,
                                  size_t size,
                                  struct agx_vdm_state_update_info *info);
 
+bool agx_vdm_state_update_template_materialize(
+   enum agx_chip chip, const struct agx_vdm_state_update_template_info *info,
+   struct agx_vdm_state_update_info *raw);
+
 bool agx_vdm_state_update_template_pack(
    enum agx_chip chip, const struct agx_vdm_state_update_template_info *info,
    struct agx_vdm_state_update *out);
+
+bool agx_vdm_state_update_vertex_ti_resources(
+   enum agx_chip chip, uint32_t spill_bytes, uint32_t largest_ipr_bytes,
+   struct agx_vdm_state_update_template_info *info);
 
 /*
  * Select and pack the State Update prefix used by the four native draw paths.

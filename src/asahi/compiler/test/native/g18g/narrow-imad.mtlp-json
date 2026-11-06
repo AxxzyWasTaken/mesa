@@ -1,0 +1,1 @@
+{"pipelines":{"compute_pipelines":[{"compute_function":"mul_u16"},{"compute_function":"mul_u16_live"},{"compute_function":"mul_s16"},{"compute_function":"mul_s16_u16"},{"compute_function":"mad_u16"},{"compute_function":"mul_u32_u16"},{"compute_function":"mul_i32_i16"}]}}

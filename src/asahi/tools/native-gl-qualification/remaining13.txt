@@ -1,0 +1,13 @@
+KHR-GL46.sparse_buffer_tests.BufferStorageTest_case_j
+KHR-GL46.sparse_buffer_tests.BufferStorageTest_cases_a1-a2_1
+KHR-GL46.sparse_buffer_tests.BufferStorageTest_cases_a3-a4_2
+KHR-GL46.sparse_buffer_tests.BufferStorageTest_cases_a3-a4_3
+KHR-GL46.sparse_buffer_tests.BufferStorageTest_cases_a5-a6_4
+dEQP-GL45-ES31.functional.shaders.sample_variables.sample_mask.discard_half_per_sample.multisample_rbo_1
+dEQP-GL45-ES31.functional.shaders.sample_variables.sample_mask.discard_half_per_sample.multisample_rbo_2
+dEQP-GL45-ES31.functional.shaders.sample_variables.sample_mask.discard_half_per_sample.multisample_rbo_4
+dEQP-GL45-ES31.functional.shaders.sample_variables.sample_mask.discard_half_per_two_samples.multisample_rbo_4
+dEQP-GLES31.functional.shaders.sample_variables.sample_mask.discard_half_per_sample.multisample_rbo_1
+dEQP-GLES31.functional.shaders.sample_variables.sample_mask.discard_half_per_sample.multisample_rbo_2
+dEQP-GLES31.functional.shaders.sample_variables.sample_mask.discard_half_per_sample.multisample_rbo_4
+dEQP-GLES31.functional.shaders.sample_variables.sample_mask.discard_half_per_two_samples.multisample_rbo_4

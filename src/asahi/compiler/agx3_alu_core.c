@@ -8,6 +8,43 @@
 
 #include <string.h>
 
+/* Static G17G/G18G helpers, defined beside their encoders below. */
+static bool
+bit_reg_gpu1(const char *mnemonic, uint8_t ep, unsigned table, bool word,
+             uint16_t dest, bool dest_cache, uint16_t src0,
+             enum agx3_alu_hint hint0, uint16_t src1,
+             enum agx3_alu_hint hint1, uint16_t wait_mask,
+             uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len);
+static bool
+agx3_alu_asr_imm32_source(enum agx_isa_encoding enc, uint16_t dest,
+                   uint16_t source, bool source_half,
+                   unsigned shift, enum agx3_alu_hint hint, bool dest_cache,
+                   uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+                   uint8_t *length);
+static bool
+agx3_alu_fcmp_select_gpu1(uint16_t dest, const uint16_t src[4],
+                        bool compare_zero, const bool compare_abs[2],
+                        const bool immediate[2],
+                        const enum agx3_alu_hint hints[4], unsigned condition,
+                        bool dest_16, bool dest_cache, uint16_t wait_mask,
+                        uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len);
+static bool
+agx3_alu_m5_fsel_half(uint16_t dest, const uint16_t src[4],
+                         const enum agx3_alu_hint hints[4], unsigned condition,
+                         bool dest_cache, uint16_t wait_mask,
+                         uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len);
+static bool
+agx3_alu_m5_fminmax_half(uint16_t dest, const uint16_t src[4],
+                        const enum agx3_alu_hint hints[4], bool maximum,
+                        bool dest_cache, uint16_t wait_mask,
+                        uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len);
+static bool
+agx3_alu_fminmax32_gpu1(uint16_t dest, uint16_t src0, uint16_t src2,
+                       bool immediate, uint16_t src1, uint16_t src3,
+                       const enum agx3_alu_hint hints[4], bool maximum,
+                       bool dest_cache, uint16_t wait_mask,
+                       uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len);
+
 bool
 agx3_alu_bitrev_m5(uint16_t dest, uint16_t src, bool src_half,
                    enum agx3_alu_hint hint, bool dest_cache, uint16_t wait_mask,
@@ -82,6 +119,97 @@ agx3_alu_popcount(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
    return agx3_bind_compose(enc, "cbs", 0, base, m5 ? 6 : 4, fields, n, out, len);
 }
 
+/* G18G (M6), which compiles as agx3c: the G18G-witnessed cbs form. A live
+ * source is always cached and only the slot-1 and slot-8 waits are
+ * admitted, so the retire carrier takes the others. agx3_alu_popcount
+ * keeps the G17G-family (agx3c) form for every other GPU. */
+bool
+agx3_alu_popcount_g18g(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+                       bool half, enum agx3_alu_hint hint, bool dest_cache,
+                       uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+                       uint8_t *len)
+{
+   if (enc == AGX_ISA_ENCODING_AGX3C) {
+      /* G17G uint4/ushort4 popcount witnesses use cbs ep0. The separate
+       * live uint4 probe also witnesses cached sources and destinations.
+       * The wait bank starts at f31 as on G17P: a count of the slot-8 load
+       * waits in f38, and one of the slot-1 load in f31
+       * (test/native/g17g/m5-libagx-reference.metal popcnt_two_loads). Only
+       * those two slots are admitted; the caller retires other
+       * dependencies separately.
+       *
+       * A source that stays live is always cached by Apple, at either width
+       * and however far away its next read is: popcount(a) + a,
+       * popcount(a) with a * 3u stored next, and popcount(a) with a read
+       * only after six dependent fmas, for uint and ushort alike, all set
+       * f25 (applegpu_g18g/g17g, g18ref-out/probe/m6-alu-misc popc_live,
+       * popc_live2 and m6-alu-sel2 popc_far, popc16_far). No cbs without a
+       * lifetime hint was ever emitted, so a live source takes Apple's
+       * cached form rather than an unwitnessed hint-free one; the cache bit
+       * only asks for the value to be kept close and changes nothing that
+       * is read. */
+      if (hint == AGX3_ALU_HINT_NONE)
+         hint = AGX3_ALU_HINT_CACHE;
+      if (!out || !len || dest >= 256 || src >= 256 ||
+          (!half && ((dest | src) & 1)) || (wait_mask & ~129u) ||
+          (hint != AGX3_ALU_HINT_DISCARD && hint != AGX3_ALU_HINT_CACHE))
+         return false;
+
+      const struct agx3_field_kv fields[] = {
+         {9, 2}, {10, half ? 1 : 2}, {2, dest}, {11, dest_cache},
+         {23, 2}, {24, half ? 1 : 2}, {16, src},
+         {25, hint == AGX3_ALU_HINT_CACHE},
+         {27, hint == AGX3_ALU_HINT_DISCARD},
+         {29, 3}, {30, 23}, {31, wait_mask & 1}, {38, !!(wait_mask & 128)},
+      };
+      return agx3_bind_compose(enc, "cbs", 0, fields,
+                                 sizeof(fields) / sizeof(fields[0]),
+                                 NULL, 0, out, len);
+   }
+
+   /* Exact Apple G17P witnesses:
+    *   ushort: 27 05 56 02 02 04 50 04
+    *   uint:   27 05 56 00 02 00 5c 04
+    * byte3 is the destination half, byte5 is twice the source half, and the
+    * source descriptor distinguishes 16 from 32 bits. A fresh subgroup-count
+    * witness adds the live uint source form (descriptor 0x4e). Refuse every
+    * other unwitnessed cache/wait/lifetime combination. */
+   if (enc != AGX_ISA_ENCODING_AGX3B || !out || !len || dest >= 256 ||
+       src >= 256 || (!half && ((dest | src) & 1)) ||
+       (unsigned)hint > AGX3_ALU_HINT_CACHE || (wait_mask & ~0x3fu))
+      return false;
+
+   /* applegpu_g17p `popcount` is the eight-byte cbs point. f10/f24 are the
+    * result/source widths, f11 destination cache, f25/f27 source
+    * cache/discard, and f31..f36 the six scoreboard slots:
+    *   2705560202045004  h2 <- popcount(^h2), wait slot 6
+    *   2705540202045004  h2 <- popcount(^h2)
+    *   2725540402025004  h4 <- popcount(^h1), wait slot 2
+    *   2705560002024204  h0 <- popcount($h1), wait slot 6
+    *   2705560302044004  h3 <- popcount(h2), h2 stored later, slot 6
+    *   2705560402004c04  r2 <- popcount(r0), r0 stored later, slot 6
+    *   2715540202045c04  r1 <- popcount(^r1), wait slot 1
+    *   2705540403004e04  $r2 <- popcount($r0)
+    * and, with enough 64-bit values live that the source lands high:
+    *   2705548003005d04  $r64 <- popcount(^r64)
+    *   2705549803305d04  $r76 <- popcount(^r76)
+    *   2705549003005c04  $r72 <- popcount(^r0) */
+   const struct agx3_field_kv base[] = {
+      {9, 2}, {10, half ? 1 : 2}, {23, 2}, {24, half ? 1 : 2},
+   };
+   struct agx3_field_kv fields[11] = {
+      {2, dest}, {11, dest_cache}, {16, src},
+      {25, hint == AGX3_ALU_HINT_CACHE},
+      {27, hint == AGX3_ALU_HINT_DISCARD},
+   };
+   unsigned n = 5;
+   for (unsigned slot = 0; slot < 6; ++slot) {
+      if (wait_mask & (1u << slot))
+         fields[n++] = (struct agx3_field_kv){31 + slot, 1};
+   }
+   return agx3_bind_compose(enc, "cbs", 0, base, 4, fields, n, out, len);
+}
+
 bool
 agx3_alu_ft1_u32(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
                  enum agx3_alu_hint hint, bool dest_cache,
@@ -139,6 +267,239 @@ agx3_alu_ft1_u32(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
     * The full byte is the source field and every admitted register is even. */
    out[5] = (uint8_t)src;
    return true;
+}
+
+/* f10, f24 and f38 are the result's and the two operands' widths: 1 for a
+ * half, 2 for an aligned 32-bit pair. */
+static bool
+bit_reg_gpu1(const char *mnemonic, uint8_t ep, unsigned table, bool word,
+             uint16_t dest, bool dest_cache, uint16_t src0,
+             enum agx3_alu_hint hint0, uint16_t src1,
+             enum agx3_alu_hint hint1, uint16_t wait_mask,
+             uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   if (!out || !len || dest >= 256 || src0 >= 256 || src1 >= 256 ||
+       (word && ((dest | src0 | src1) & 1)) ||
+       (unsigned)hint0 > AGX3_ALU_HINT_CACHE ||
+       (unsigned)hint1 > AGX3_ALU_HINT_CACHE || wait_mask >= (1u << 8))
+      return false;
+   const unsigned width = word ? 2 : 1;
+   struct agx3_field_kv fields[24];
+   unsigned n = 0;
+   fields[n++] = (struct agx3_field_kv){9, 2};
+   fields[n++] = (struct agx3_field_kv){10, width};
+   fields[n++] = (struct agx3_field_kv){2, dest};
+   fields[n++] = (struct agx3_field_kv){11, dest_cache};
+   fields[n++] = (struct agx3_field_kv){23, 2};
+   fields[n++] = (struct agx3_field_kv){24, width};
+   fields[n++] = (struct agx3_field_kv){16, src0};
+   fields[n++] = (struct agx3_field_kv){25, hint0 == AGX3_ALU_HINT_CACHE};
+   fields[n++] = (struct agx3_field_kv){27, hint0 == AGX3_ALU_HINT_DISCARD};
+   fields[n++] = (struct agx3_field_kv){30, src1};
+   fields[n++] = (struct agx3_field_kv){37, 2};
+   fields[n++] = (struct agx3_field_kv){38, width};
+   fields[n++] = (struct agx3_field_kv){39, hint1 == AGX3_ALU_HINT_CACHE};
+   fields[n++] = (struct agx3_field_kv){41, hint1 == AGX3_ALU_HINT_DISCARD};
+   fields[n++] = (struct agx3_field_kv){42, 3};
+   fields[n++] = (struct agx3_field_kv){43, table};
+   for (unsigned i = 0; i < 8; ++i)
+      fields[n++] = (struct agx3_field_kv){44 + i, (wait_mask >> i) & 1};
+   return agx3_bind_compose(AGX_ISA_ENCODING_AGX3C, mnemonic, ep, fields, n,
+                            NULL, 0, out, len);
+}
+
+bool
+agx3_alu_bit_andc16_gpu1(uint16_t dest, bool dest_cache, uint16_t src0,
+                         enum agx3_alu_hint hint0, uint16_t src1,
+                         enum agx3_alu_hint hint1, uint16_t wait_mask,
+                         uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   /* Apple applegpu_g17g ctz: 33 03 06 01 3a 20 a2 02 84 00
+    *   bit_andc h3 (cached), h3 (dead), h2 (cached) */
+   return bit_reg_gpu1("bit_andc", 0, 11, false, dest, dest_cache, src0,
+                       hint0, src1, hint1, wait_mask, out, len);
+}
+
+bool
+agx3_alu_bit_andc32_gpu1(uint16_t dest, bool dest_cache, uint16_t src0,
+                         enum agx3_alu_hint hint0, uint16_t src1,
+                         enum agx3_alu_hint hint1, uint16_t wait_mask,
+                         uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   return bit_reg_gpu1("bit_andc", 0, 11, true, dest, dest_cache, src0,
+                       hint0, src1, hint1, wait_mask, out, len);
+}
+
+bool
+agx3_alu_bit_named_gpu1(unsigned truth_table, bool word, uint16_t dest,
+                        bool dest_cache, uint16_t src0,
+                        enum agx3_alu_hint hint0, uint16_t src1,
+                        enum agx3_alu_hint hint1, uint16_t wait_mask,
+                        uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   const char *mnemonic;
+   unsigned table;
+   switch (truth_table) {
+   case 0x1u: mnemonic = "bit_nor"; table = 14; break;
+   case 0x2u: mnemonic = "bit_andc"; table = 11; break;
+   case 0x7u: mnemonic = "bit_nand"; table = 12; break;
+   case 0x9u: mnemonic = "bit_xnor"; table = 18; break;
+   case 0xbu: mnemonic = "bit_orc"; table = 17; break;
+   default: return false;
+   }
+   for (uint8_t ep = 0; ep < 2; ++ep)
+      if (bit_reg_gpu1(mnemonic, ep, table, word, dest, dest_cache, src0,
+                       hint0, src1, hint1, wait_mask, out, len))
+         return true;
+   return false;
+}
+
+bool
+agx3_alu_bit_reg16_gpu1(enum agx3_alu_op op, uint16_t dest, bool dest_cache,
+                        uint16_t src0, enum agx3_alu_hint hint0,
+                        uint16_t src1, enum agx3_alu_hint hint1,
+                        uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+                        uint8_t *len)
+{
+   switch (op) {
+   case AGX3_ALU_BAND:
+      return bit_reg_gpu1("bit_and", 1, 10, false, dest, dest_cache, src0,
+                          hint0, src1, hint1, wait_mask, out, len);
+   case AGX3_ALU_BOR:
+      return bit_reg_gpu1("bit_or", 1, 16, false, dest, dest_cache, src0,
+                          hint0, src1, hint1, wait_mask, out, len);
+   case AGX3_ALU_BXOR:
+      return bit_reg_gpu1("bit_xor", 1, 19, false, dest, dest_cache, src0,
+                          hint0, src1, hint1, wait_mask, out, len);
+   default:
+      return false;
+   }
+}
+
+bool
+agx3_alu_ft1_gpu1(uint16_t dest, uint16_t src, bool half,
+                  enum agx3_alu_hint hint, bool dest_cache,
+                  uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+                  uint8_t *len)
+{
+   /* Apple applegpu_g17g clz kernels:
+    *   uint    2f 80 00 1a 2a 00 ab 0a 08 00   ft1 r2, r0 (cached), wait8
+    *   ushort  3f 83 00 18 2a 00 ab 02 00 00   ft1 h2, h3 (cached), wait8
+    * The same shape as G17G cbs with opcode f30=79 instead of 23. */
+   if (!out || !len || dest >= 256 || src >= 256 ||
+       (!half && ((dest | src) & 1)) || (wait_mask & ~128u) ||
+       (unsigned)hint > AGX3_ALU_HINT_CACHE)
+      return false;
+
+   const struct agx3_field_kv fields[] = {
+      {9, 2}, {10, half ? 1 : 2}, {2, dest}, {11, dest_cache},
+      {23, 2}, {24, half ? 1 : 2}, {16, src},
+      {25, hint == AGX3_ALU_HINT_CACHE},
+      {27, hint == AGX3_ALU_HINT_DISCARD},
+      {29, 3}, {30, 79}, {38, !!wait_mask},
+   };
+   return agx3_bind_compose(AGX_ISA_ENCODING_AGX3C, "ft1", 0, fields,
+                            sizeof(fields) / sizeof(fields[0]), NULL, 0, out,
+                            len);
+}
+
+bool
+agx3_alu_rev_gpu1(uint16_t dest, uint16_t src, enum agx3_alu_hint hint,
+                  bool dest_cache, uint16_t wait_mask,
+                  uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   /* Apple applegpu_g17g reverse_bits(uint)
+    * (test/native/g17g/m5-gl4-reference.metal rbit32_*):
+    *   27 00 00 1a 26 00 a9 02 08 00   rev r0, r0 (dead)
+    *   37 80 00 1a 2a 00 a9 02 08 00   rev r1 (cached), r0 (cached)
+    *   2f 00 00 1a 26 00 a9 02 08 00   rev r0, r0 (dead), wait8
+    * cbs's and ft1's shape with opcode f30=143. Only the slot-8 wait is
+    * witnessed. */
+   if (!out || !len || dest >= 256 || src >= 256 || ((dest | src) & 1) ||
+       (wait_mask & ~128u) || (unsigned)hint > AGX3_ALU_HINT_CACHE)
+      return false;
+
+   const struct agx3_field_kv fields[] = {
+      {9, 2}, {10, 2}, {2, dest}, {11, dest_cache},
+      {23, 2}, {24, 2}, {16, src},
+      {25, hint == AGX3_ALU_HINT_CACHE},
+      {27, hint == AGX3_ALU_HINT_DISCARD},
+      {29, 3}, {30, 143}, {38, !!wait_mask},
+   };
+   return agx3_bind_compose(AGX_ISA_ENCODING_AGX3C, "rev", 0, fields,
+                            sizeof(fields) / sizeof(fields[0]), NULL, 0, out,
+                            len);
+}
+
+bool
+agx3_alu_fcmp_bool16_gpu1(uint16_t dest, uint16_t src0,
+                          enum agx3_alu_hint src0_hint, bool src1_is_register,
+                          uint16_t src1, bool src1_kill, uint8_t if_true,
+                          uint8_t if_false, unsigned condition,
+                          uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+                          uint8_t *len)
+{
+   /* Apple applegpu_g17g, `out[id] = a[id] OP K ? T : F` into a ushort:
+    *   a < -1.0 ? 1 : 0   32 02 05 0a 23 00 a0 02 14 ac 4e 58 01 00 80 00
+    *   a >= 2.0 ? 1 : 0   32 02 05 0a 23 00 a0 02 14 90 4e 1c 01 00 80 00
+    *   a <  1.0 ? 3 : 7   32 02 05 0a 23 00 a0 02 14 8c 4e 58 27 02 80 00
+    *   a <  1.0 ? 0 : 1   32 02 05 0a 23 00 a0 02 14 8c 4a 58 05 00 80 00
+    *   a <  b   ? 1 : 0   32 02 05 0a 23 00 a0 02 14 01 65 58 01 00 80 00
+    *   a == 1.0 ? 1 : 0   32 02 05 0a 23 00 a0 02 14 8c 4e 18 01 00 80 00
+    *   a != 1.0 ? 1 : 0   32 02 05 0a 23 00 a0 02 14 8c 4a 18 05 00 80 00
+    *   a >  1.0 ? 1 : 0   32 02 45 0a 23 00 a0 02 14 8c 4e 18 01 00 80 00
+    *   a <= 1.0 ? 1 : 0   32 02 45 0a 23 00 a0 02 14 8c 4e 1c 01 00 80 00
+    * f32 is the minifloat, f33 the register, f49/f63 the two selected
+    * constants and f86 the condition in enum agx_fcond numbering (eq 0,
+    * lt 1, gt 2, ge 5, le 6; `!=` is eq with the constants exchanged, as
+    * agx_lower_pseudo spells an inverted compare); f85 is the slot-8 wait.
+    * The only 32-bit boolean Apple emits is this half followed by a clear
+    * of the upper half. */
+   if (!out || !len || dest >= 256 || src0 >= 256 || (src0 & 1) ||
+       (unsigned)src0_hint > AGX3_ALU_HINT_CACHE || if_true > 7 ||
+       if_false > 7 ||
+       (condition != 0 && condition != 1 && condition != 2 &&
+        condition != 5 && condition != 6) ||
+       (wait_mask & ~128u))
+      return false;
+   if (src1_is_register ? ((src1 & 1) || src1 >= 256)
+                        : (src1 > 255 || src1_kill))
+      return false;
+
+   struct agx3_field_kv fields[32];
+   unsigned n = 0;
+   fields[n++] = (struct agx3_field_kv){2, dest};
+   fields[n++] = (struct agx3_field_kv){9, 2};
+   fields[n++] = (struct agx3_field_kv){10, 1};
+   fields[n++] = (struct agx3_field_kv){16, src0};
+   fields[n++] = (struct agx3_field_kv){23, 2};
+   fields[n++] = (struct agx3_field_kv){24, 2};
+   fields[n++] = (struct agx3_field_kv){25, src0_hint == AGX3_ALU_HINT_CACHE};
+   fields[n++] = (struct agx3_field_kv){27, src0_hint == AGX3_ALU_HINT_DISCARD};
+   if (src1_is_register) {
+      fields[n++] = (struct agx3_field_kv){33, src1};
+      fields[n++] = (struct agx3_field_kv){40, 2};
+      fields[n++] = (struct agx3_field_kv){41, 2};
+      fields[n++] = (struct agx3_field_kv){44, src1_kill};
+   } else {
+      fields[n++] = (struct agx3_field_kv){32, src1};
+      fields[n++] = (struct agx3_field_kv){40, 1};
+      fields[n++] = (struct agx3_field_kv){41, 2};
+   }
+   fields[n++] = (struct agx3_field_kv){49, if_true};
+   fields[n++] = (struct agx3_field_kv){57, 1};
+   fields[n++] = (struct agx3_field_kv){58, 1};
+   fields[n++] = (struct agx3_field_kv){63, if_false};
+   fields[n++] = (struct agx3_field_kv){71, 1};
+   fields[n++] = (struct agx3_field_kv){72, 1};
+   fields[n++] = (struct agx3_field_kv){76, 3};
+   fields[n++] = (struct agx3_field_kv){77, 75};
+   fields[n++] = (struct agx3_field_kv){85, !!wait_mask};
+   fields[n++] = (struct agx3_field_kv){86, condition};
+   for (unsigned f = 90; f <= 94; ++f)
+      fields[n++] = (struct agx3_field_kv){f, 0};
+   return agx3_bind_compose(AGX_ISA_ENCODING_AGX3C, "fseli16", 8, fields, n,
+                            NULL, 0, out, len);
 }
 
 bool
@@ -404,6 +765,52 @@ agx3_alu_fadd_minifloat(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
    return agx3_bind_compose(enc, "f32add", 1, base, 6, fields, n, out, len);
 }
 
+/* G18G (M6), which compiles as agx3c: also the compact agx3c
+ * register+minifloat add (f50=3/f51=48). agx3_alu_fadd_minifloat keeps
+ * the G17G-family (agx3c) admission for every other GPU. */
+bool
+agx3_alu_fadd_minifloat_g18g(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+                            uint16_t immediate, bool dest_cache,
+                            enum agx3_alu_hint hint, uint16_t wait_mask,
+                            uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   const bool gpu1 = enc == AGX_ISA_ENCODING_AGX3C;
+   if (!out || !len || (!gpu1 && enc != AGX_ISA_ENCODING_AGX3B) || dest >= 256 ||
+       src >= 256 || ((dest | src) & 1) || immediate > 0xff ||
+       (unsigned)hint > AGX3_ALU_HINT_CACHE ||
+       (wait_mask & ~UINT16_C(0x3f)))
+      return false;
+
+   /* Apple add_half: 09a1140180c0 (f32 register + minifloat0x20, wait6).
+    * add_reuse: 09a1040380c0 keeps its half2 source for a later store.
+    * pair: 09a12c8580c0 independently retains its result and loaded source.
+    * Fragment position uses the same add without a wait. f25=1 selects the
+    * minifloat; f42=2 selects the GPR. The register is field35, not field18.
+    * AGX3c independently retains these compact operand/wait fields, adding
+    * the GPR dispatch selector f50=3 and opcode f51=48. Keep slots7/8 gated:
+    * this compact form's table only admits slots1..6 or the slots1+2 pair.
+    */
+   const struct agx3_field_kv base[] = {
+      {9, 2}, {10, 2}, {25, 1}, {26, 2}, {42, 2}, {43, 2},
+      {50, 3}, {51, 48},
+   };
+   /* Six operand/hint fields plus at most six independent wait fields. */
+   struct agx3_field_kv fields[12] = {
+      {2, dest}, {35, src}, {17, immediate}, {46, hint == AGX3_ALU_HINT_DISCARD},
+      {44, hint == AGX3_ALU_HINT_CACHE}, {11, dest_cache},
+   };
+   unsigned n = 6;
+   for (unsigned slot = 0; slot < 6; ++slot)
+      if (wait_mask & (1u << slot))
+         fields[n++] = (struct agx3_field_kv){52 + slot, 1};
+
+   /* This encoding point rejects unsupported wait combinations. Do not
+    * silently clear waits or switch to an unwitnessed long-form variant.
+    */
+   return agx3_bind_compose(enc, "f32add", 1, base, gpu1 ? 8 : 6,
+                           fields, n, out, len);
+}
+
 bool
 agx3_alu_fadd_minifloat_mod(enum agx_isa_encoding enc, uint16_t dest,
                            uint16_t src, uint16_t immediate, bool negate_src,
@@ -443,6 +850,52 @@ agx3_alu_fadd_minifloat_mod(enum agx_isa_encoding enc, uint16_t dest,
 
    return agx3_bind_compose(enc, "f32add", saturate ? 2 : 1,
                             base, 6, fields, n, out, len);
+}
+
+/* G18G (M6), which compiles as agx3c: also the agx3c modified
+ * register+minifloat add. agx3_alu_fadd_minifloat_mod keeps the
+ * G17G-family (agx3c) admission for every other GPU. */
+bool
+agx3_alu_fadd_minifloat_mod_g18g(enum agx_isa_encoding enc, uint16_t dest,
+                                uint16_t src, uint16_t immediate, bool negate_src,
+                                bool saturate, enum agx3_alu_hint hint,
+                                uint16_t wait_mask,
+                                uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   const bool gpu1 = enc == AGX_ISA_ENCODING_AGX3C;
+   if (!out || !len || (!gpu1 && enc != AGX_ISA_ENCODING_AGX3B) || dest >= 256 ||
+       src >= 256 || ((dest | src) & 1) || immediate > 0xff ||
+       (unsigned)hint > AGX3_ALU_HINT_CACHE ||
+       (wait_mask & ~UINT16_C(0x3f)))
+      return false;
+
+   /* Apple sat_only: 09011c8101020082, sat(r0 + -0), wait6.
+    * Native puts this -0 minifloat in field34 and its GPR in field18.
+    * Apple complement: 09b1140180c8, -r0 + 1, discard/wait6.
+    * sat_add and sat_neg retain that field35/field17 routing, extending
+    * the instruction to ep2 for saturation and independent wait bits.
+    * Commuting the add's two unmodified operands retains signed-zero
+    * semantics; do not commute a negation away from its source register.
+    */
+   const bool swap = saturate && immediate == 0x80 && !negate_src;
+   const struct agx3_field_kv base[] = {
+      {9, 2}, {10, 2}, {25, swap ? 2 : 1}, {26, 2},
+      {42, swap ? 1 : 2}, {43, 2},
+      {50, 3}, {51, 48},
+   };
+   struct agx3_field_kv fields[13] = {
+      {2, dest}, {swap ? 18 : 35, src}, {swap ? 34 : 17, immediate},
+      {swap ? 27 : 44, hint == AGX3_ALU_HINT_CACHE},
+      {swap ? 29 : 46, hint == AGX3_ALU_HINT_DISCARD},
+      {swap ? 31 : 48, negate_src}, {14, saturate},
+   };
+   unsigned n = 7;
+   for (unsigned slot = 0; slot < 6; ++slot)
+      if (wait_mask & (1u << slot))
+         fields[n++] = (struct agx3_field_kv){52 + slot, 1};
+
+   return agx3_bind_compose(enc, "f32add", saturate ? 2 : 1,
+                            base, gpu1 ? 8 : 6, fields, n, out, len);
 }
 
 bool
@@ -689,27 +1142,35 @@ agx3_alu_fma_minifloat_mod(enum agx_isa_encoding enc, uint16_t dest,
                            uint16_t wait_mask,
                            uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
 {
-   if (!out || !len || enc != AGX_ISA_ENCODING_AGX3B ||
+   const bool gpu1 = enc == AGX_ISA_ENCODING_AGX3C;
+   if (!out || !len || (!gpu1 && enc != AGX_ISA_ENCODING_AGX3B) ||
        dest >= 256 || src >= 256 || addend >= 256 ||
-       ((dest | src | addend) & 1) || (wait_mask & ~UINT16_C(0x3f)) ||
+       ((dest | src | addend) & 1) ||
+       (wait_mask & ~(gpu1 ? UINT16_C(0xff) : UINT16_C(0x3f))) ||
        (unsigned)src_hint > AGX3_ALU_HINT_CACHE ||
        (unsigned)addend_hint > AGX3_ALU_HINT_CACHE)
       return false;
    const struct agx3_field_kv base[] = {
       {9,2},{10,2},{25,2},{26,2},{42,1},{43,2},{59,2},{60,2},{77,2},{91,2},
-      {102,1},
+      {102,1}, {95,3}, {96,55},
    };
-   struct agx3_field_kv fields[17] = {
+   struct agx3_field_kv fields[19] = {
       {2,dest},{11,dest_cache},{18,src},{34,immediate},{52,addend},
       {27,src_hint==AGX3_ALU_HINT_CACHE},{29,src_hint==AGX3_ALU_HINT_DISCARD},
       {61,addend_hint==AGX3_ALU_HINT_CACHE},{63,addend_hint==AGX3_ALU_HINT_DISCARD},
       {65,negate_addend},{14,saturate},
    };
    unsigned n=11;
-   for(unsigned slot=0;slot<6;slot++)
-      if(wait_mask & (1u<<slot))fields[n++]=(struct agx3_field_kv){97+slot,1};
-   for(unsigned ep=2;ep<=4;ep++)
-      if(agx3_bind_compose(enc,"f32fma",ep,base,(negate_addend || saturate) ? 11 : 10,
+   /* Native G17G fma(x, 0.5, y), its two live-input variants and fma(x,
+    * 0.5, -y) preserve these operand fields. The long endpoint needs its
+    * own opcode fields and all eight dependency slots. Override f102 too:
+    * G17P's negative-addend template must not introduce a G17G slot-6 wait. */
+   for (unsigned slot = 0; slot < (gpu1 ? 8 : 6); slot++)
+      if (gpu1 || (wait_mask & (1u << slot)))
+         fields[n++] = (struct agx3_field_kv){97 + slot,
+                                             !!(wait_mask & (1u << slot))};
+   for (unsigned ep = 2; ep <= (gpu1 ? 7 : 4); ep++)
+      if(agx3_bind_compose(enc,"f32fma",ep,base,gpu1 ? 13 : ((negate_addend || saturate) ? 11 : 10),
                            fields,n,out,len))
          return true;
    return false;
@@ -720,9 +1181,16 @@ agx3_alu_int16_to_f32(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
                     enum agx3_alu_hint hint, bool is_signed, uint16_t wait_mask,
                     uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
 {
-   if (!out || !len || enc != AGX_ISA_ENCODING_AGX3B || dest >= 192 ||
-       (dest & 1) || src >= 192 || (unsigned)hint > AGX3_ALU_HINT_CACHE ||
-       (wait_mask & ~UINT16_C(0x3f)))
+   const bool gpu1 = enc == AGX_ISA_ENCODING_AGX3C;
+   /* AGX3c int2flt fields are 8-bit half indices (the checked-in form binds
+    * every even dest and any src through 254, like the sibling encodings
+    * above); the old >=128 cap failed vkCreateComputePipelines for G18G
+    * llama.cpp shaders. No live capture at half >=128 yet: a G18G capture
+    * or the hardware run confirms. */
+   if (!out || !len || (!gpu1 && enc != AGX_ISA_ENCODING_AGX3B) ||
+       dest >= (gpu1 ? 256 : 192) || src >= (gpu1 ? 256 : 192) ||
+       (dest & 1) || (unsigned)hint > AGX3_ALU_HINT_CACHE ||
+       (wait_mask & ~(gpu1 ? UINT16_C(0xff) : UINT16_C(0x3f))))
       return false;
 
    /* Apple ushort_cs: a70756000200a420 (r0f <- r0h, wait slot6).
@@ -733,19 +1201,24 @@ agx3_alu_int16_to_f32(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
     * ushort_reuse_cs has f29=0 with a later16-bit store of the same source.
     * Versus U32 int2flt only f26 changes2->1. The fresh short_float and
     * short_float_live witnesses establish signedness in f30.
+    * AGX3c independently retains source width f26, signedness f30 and the
+    * operand fields. Its GPR destination additionally requires f31=3 and
+    * opcode f32=91, as in the existing 32-bit conversion table; waits use
+    * all eight fields f33..40. Its bit layout is not the AGX3b byte layout.
     */
    const struct agx3_field_kv base[] = {
-      {9, 2}, {10, 2}, {25, 2}, {26, 1},
+      {9, 2}, {10, 2}, {25, 2}, {26, 1}, {31, 3}, {32, 91},
    };
-   struct agx3_field_kv fields[11] = {
+   struct agx3_field_kv fields[13] = {
       {2, dest}, {18, src}, {29, hint == AGX3_ALU_HINT_DISCARD},
       {27, hint == AGX3_ALU_HINT_CACHE}, {30, is_signed},
    };
    unsigned n = 5;
-   for (unsigned slot = 0; slot < 6; ++slot)
+   for (unsigned slot = 0; slot < (gpu1 ? 8 : 6); ++slot)
       if (wait_mask & (1u << slot))
          fields[n++] = (struct agx3_field_kv){33 + slot, 1};
-   return agx3_bind_compose(enc, "int2flt", 0, base, 4, fields, n, out, len);
+   return agx3_bind_compose(enc, "int2flt", 0, base, gpu1 ? 6 : 4,
+                           fields, n, out, len);
 }
 
 bool
@@ -932,6 +1405,31 @@ agx3_alu_mov16(enum agx_isa_encoding enc, uint16_t dest, uint32_t bits,
       return false;
    const struct agx3_field_kv fields[] = {{9, 2}, {10, 1}, {2, dest}, {14, bits}};
    return agx3_bind_compose(enc, "ldimm", 1, fields, 4, NULL, 0, out, len);
+}
+
+bool
+agx3_alu_mov16_gpu1(uint16_t dest, bool dest_cache, uint32_t bits,
+                    uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+                    uint8_t *len)
+{
+   /* Apple's depth/stencil fragments load the stencil word this way:
+    * ldimm r0h = 0xff00 / 0xff5a / 0xff01 are 04 80 26 00 1c 0c 07 00 with
+    * the constant moved. The form is the G17G ldimm row narrowed to a half. */
+   if (!out || !len || dest >= 256 || bits > 0xffff || wait_mask > 0xff)
+      return false;
+   const struct agx3_field_kv base[] = {
+      {9, 2}, {10, 1}, {15, 3}, {16, 105},
+   };
+   struct agx3_field_kv ov[12];
+   unsigned n = 0;
+   ov[n++] = (struct agx3_field_kv){2, dest};
+   ov[n++] = (struct agx3_field_kv){11, dest_cache ? 1 : 0};
+   ov[n++] = (struct agx3_field_kv){14, bits};
+   for (unsigned i = 0; i < 8; ++i)
+      if (wait_mask & (1u << i))
+         ov[n++] = (struct agx3_field_kv){17 + i, 1};
+   return agx3_bind_compose(AGX_ISA_ENCODING_AGX3C, "ldimm", 2, base, 4, ov, n,
+                            out, len);
 }
 
 bool
@@ -1160,7 +1658,7 @@ agx3_alu_fmul_mixed_half(enum agx_isa_encoding enc, uint16_t dest, uint16_t f32,
 
 /* Ops that alu_compose can carry a wait on (fmin/fmax's tied-operand fsel form
  * is not modeled here; the backend keeps those on the compact packer). */
-static bool
+bool
 agx3_alu_wait_supported(enum agx3_alu_op op)
 {
    /* fmin/fmax use a tied-operand fsel form whose duplicated compare fields
@@ -1204,8 +1702,8 @@ agx3_alu_compose_raw(enum agx_isa_encoding enc, const struct agx3_alu_form *F,
    for (unsigned i = 0; i < F->nwait; ++i)
       if (wait_mask & (1u << i)) { ov[n].field = F->wait[i]; ov[n].value = 1; n++; }
 
-   return agx3_bind_compose(enc, F->mnemonic, F->ep, base, nbase, ov, n, out,
-                            len);
+   return agx3_bind_compose(enc, F->mnemonic, agx3_bind_ep(enc, F->ep), base,
+                            nbase, ov, n, out, len);
 }
 
 static bool
@@ -1226,7 +1724,20 @@ agx3_alu_compose(enum agx_isa_encoding enc, enum agx3_alu_op op, uint16_t dest,
 {
    if (op >= AGX3_ALU_NUM)
       return false;
-   const unsigned ei = (enc == AGX_ISA_ENCODING_AGX3C) ? 1
+   /*
+    * G18G (agx3d) uses the agx3c column, but only for LDIMM so far: its row
+    * pins no specimen lifetime or wait, and the applegpu_g18g 32-bit GPR
+    * ldimm witnesses of the j813-linux gpu/m5-*-reference corpus carry
+    * exactly its fields (f9=2 f10=2 f15=3 f16=105, f2 destination, f14
+    * immediate: 41 03 00 08, 41 05 ff ff, 11 07 00 00 80 3f). The other rows
+    * pin their specimen's source lifetimes, which agx3d instead takes from
+    * the runtime encoders (agx3_falu_*_runtime). Its wait field is one slot
+    * code; the additivity check below refuses anything else.
+    */
+   const bool agx3d = enc == AGX_ISA_ENCODING_AGX3D;
+   if (agx3d && op != AGX3_ALU_LDIMM)
+      return false;
+   const unsigned ei = agx_encoding_is_g17_class(enc) ? 1
                        : (enc == AGX_ISA_ENCODING_AGX3B) ? 0
                                                          : 2;
    if (ei == 2)
@@ -1243,7 +1754,7 @@ agx3_alu_compose(enum agx_isa_encoding enc, enum agx3_alu_op op, uint16_t dest,
    if (F->nwait < 16 && (wait_mask >> F->nwait) != 0)
       return false;
 
-   if (!agx3_alu_compose_raw(enc, F, false, dest, src0, src1, src2, imm,
+   if (!agx3_alu_compose_raw(enc, F, agx3d, dest, src0, src1, src2, imm,
                              wait_mask, out, len))
       return false;
 
@@ -1305,8 +1816,8 @@ agx3_alu_compose(enum agx_isa_encoding enc, enum agx3_alu_op op, uint16_t dest,
 
    /* Requirement two: the form's pinned specimen wait, if it has one, is
     * additive with what the caller asked for rather than merging into a third
-    * value. */
-   if (!agx3_alu_form_pins_a_wait(F))
+    * value. agx3d never deposits the pinned wait. */
+   if (agx3d || !agx3_alu_form_pins_a_wait(F))
       return true;
    if (!agx3_alu_compose_raw(enc, F, false, dest, src0, src1, src2, imm, 0,
                              pinned, &pinned_len) ||
@@ -1401,6 +1912,40 @@ agx3_alu_form_ends_source(enum agx_isa_encoding enc, enum agx3_alu_op op,
    return false;
 }
 
+/* G18G (M6), which compiles as agx3c: also reports the agx3c RCP, I2F, U2F
+ * and F2I specimens that end a live source. agx3_alu_form_ends_source
+ * keeps the G17G-family (agx3c) answer for every other GPU. */
+bool
+agx3_alu_form_ends_source_g18g(enum agx_isa_encoding enc, enum agx3_alu_op op,
+                               unsigned i)
+{
+   if (op >= AGX3_ALU_NUM || i >= 3)
+      return false;
+
+   unsigned column;
+   if (enc == AGX_ISA_ENCODING_AGX3B) {
+      column = 0;
+   } else if (enc == AGX_ISA_ENCODING_AGX3C &&
+              (op == AGX3_ALU_RCP || op == AGX3_ALU_I2F ||
+               op == AGX3_ALU_U2F || op == AGX3_ALU_F2I)) {
+      /* G17G/G18G native live-input references establish the same unary
+       * source-discard fields. A wait-carrying specimen must not bypass
+       * the live-preserving compact path in agx3_select_core.c.
+       */
+      column = 1;
+   } else {
+      return false;
+   }
+
+   const uint8_t field = agx3_alu_source_last_use[op][i];
+   const struct agx3_alu_form *F = &agx3_alu_forms[op][column];
+   for (unsigned b = 0; field != 0 && b < F->nbase; ++b) {
+      if (F->base[b].f == field && F->base[b].v != 0)
+         return true;
+   }
+   return false;
+}
+
 bool
 agx3_alu_bit_reg(enum agx_isa_encoding enc, enum agx3_alu_op op,
                  uint16_t dest, const uint16_t src[2],
@@ -1478,6 +2023,24 @@ agx3_alu_band_identity_wait(enum agx_isa_encoding enc, uint16_t reg,
       (enc == AGX_ISA_ENCODING_AGX3C ? 7 : 5);
    return agx3_alu_bit_reg(enc, AGX3_ALU_BAND, reg, src, hints,
                            wait_mask | extra, out, len);
+}
+
+/*
+ * The AGX3c path above composes that same `bit_and r0, ^r0, r0` specimen, so on
+ * G17G, and on G18G through its re-encoder, the carrier ends the lifetime of a
+ * register that may still be live. Apple's G18G compiler never emits a
+ * register bitop without a lifetime hint: a live source is cached (f25, f39;
+ * applegpu_g18g andc32_live `23048083c0200000`), a dead one discarded. This is
+ * the live form on both sources. The specimen's own slot-8 wait (f51) stays
+ * with the carrier, so the slots it retires are unchanged.
+ */
+bool
+agx3_alu_band_identity_live_gpu1(uint16_t reg, uint16_t wait_mask,
+                                 uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   return bit_reg_gpu1("bit_and", 1, 10, !(reg & 1), reg, false, reg,
+                       AGX3_ALU_HINT_CACHE, reg, AGX3_ALU_HINT_CACHE,
+                       wait_mask | (UINT16_C(1) << 7), out, len);
 }
 
 bool
@@ -1811,6 +2374,22 @@ agx3_alu_bit_orc(enum agx_isa_encoding enc, uint16_t dest,
                              wait_mask, out, len);
 }
 
+/* Native iadd_live/isub_live retain both inputs, while their dead variants
+ * set f27/f42. Keep the same canonical opcode/register fields. G17G spells
+ * the same pair on iadd32/isub32 and the compose corpus holds Apple's own
+ * instructions with each combination of the two, which is what admits the
+ * G17G forms here rather than through the generic template whose baseline
+ * pins f27. */
+bool
+agx3_alu_integer_reg(enum agx_isa_encoding enc, enum agx3_alu_op op,
+                 uint16_t dest, const uint16_t src[2],
+                 const enum agx3_alu_hint hints[2], uint16_t wait_mask,
+                 uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   return agx3_alu_integer_reg_shift(enc, op, dest, src, hints, 0, wait_mask,
+                                     out, len);
+}
+
 /*
  * The same two forms with slot B shifted left first (f54).
  *
@@ -1831,7 +2410,7 @@ agx3_alu_bit_orc(enum agx_isa_encoding enc, uint16_t dest,
  * Apple stops emitting this form at N = 5, so the shift is capped at the four
  * witnessed non-zero amounts rather than extrapolated.
  */
-static bool
+bool
 agx3_alu_integer_reg_shift(enum agx_isa_encoding enc, enum agx3_alu_op op,
                  uint16_t dest, const uint16_t src[2],
                  const enum agx3_alu_hint hints[2], uint8_t shift,
@@ -1856,18 +2435,21 @@ agx3_alu_integer_reg_shift_cache(enum agx_isa_encoding enc,
                                  uint8_t out[AGX3_ALU_MAX_LENGTH],
                                  uint8_t *len)
 {
-   if(enc != AGX_ISA_ENCODING_AGX3B || !src || !hints || !out || !len ||
-      (op != AGX3_ALU_IADD && op != AGX3_ALU_ISUB) ||
-      dest >= 256 || (dest & 1) || (wait_mask & ~UINT16_C(0x3f)))
+   const bool gpu1 = enc == AGX_ISA_ENCODING_AGX3C;
+   if((enc != AGX_ISA_ENCODING_AGX3B && !gpu1) || !src || !hints || !out ||
+      !len || (op != AGX3_ALU_IADD && op != AGX3_ALU_ISUB) ||
+      dest >= 256 || (dest & 1) || (gpu1 && dest_cache) ||
+      (wait_mask & ~(uint16_t)(gpu1 ? 0xff : 0x3f)))
       return false;
    /* Only the subtract's shift is witnessed; the add reaches its shifted
-    * form through agx3_iadd_encode, which models it separately. */
-   if (shift != 0 && (op != AGX3_ALU_ISUB || shift > 4))
+    * form through agx3_iadd_encode, which models it separately. G17G's
+    * shifted subtract is not witnessed at all. */
+   if (shift != 0 && (gpu1 || op != AGX3_ALU_ISUB || shift > 4))
       return false;
    for(unsigned i=0;i<2;i++)
       if(src[i]>=256 || (src[i]&1) || (unsigned)hints[i]>AGX3_ALU_HINT_CACHE)
          return false;
-   const struct agx3_alu_form *f=&agx3_alu_forms[op][0];
+   const struct agx3_alu_form *f=&agx3_alu_forms[op][gpu1];
    struct agx3_field_kv base[20],ov[13];unsigned nb=0,n=0;
    for(unsigned i=0;i<f->nbase;i++){
       unsigned field=f->base[i].f;bool wait=false;
@@ -3111,6 +3693,51 @@ agx3_alu_shift_reg(const char *mnemonic, enum agx_isa_encoding enc,
    return agx3_bind_compose(enc, mnemonic, 0, base, nb, fields, n, out, len);
 }
 
+/* G18G (M6), which compiles as agx3c: the all-half register shift below
+ * half 128, with the shift count's cache hint (f40). Used by
+ * agx3_alu_sll_reg_g18g and agx3_alu_srl_reg_g18g. */
+static bool
+agx3_alu_shift_reg_g18g(const char *mnemonic, enum agx_isa_encoding enc,
+                        uint16_t dest, bool dest_16, bool dest_cache,
+                        const uint16_t src[2], const bool src_16[2],
+                        const enum agx3_alu_hint hints[2], uint16_t wait_mask,
+                        uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   const bool gpu1 = enc == AGX_ISA_ENCODING_AGX3C;
+   const unsigned limit = gpu1 ? 128 : 256;
+   if ((enc != AGX_ISA_ENCODING_AGX3B && !gpu1) || !src || !src_16 ||
+       !hints || !out || !len ||
+       (gpu1 && (!dest_16 || !src_16[0] || !src_16[1])) ||
+       (dest_16 ? dest >= limit : (dest >= limit || (dest & 1))) ||
+       (src_16[0] ? src[0] >= limit : (src[0] >= limit || (src[0] & 1))) ||
+       (src_16[1] ? src[1] >= limit : (src[1] >= limit || (src[1] & 1))) ||
+       (unsigned)hints[0] > AGX3_ALU_HINT_CACHE ||
+       (unsigned)hints[1] > (gpu1 ? AGX3_ALU_HINT_CACHE : AGX3_ALU_HINT_DISCARD) ||
+       (wait_mask & ~(gpu1 ? 0xffu : 0x3fu)))
+      return false;
+
+   /* Native905 pins the G17G/G18G all-half operand widths, both source
+    * lifetimes and producer waits. Other GPU1 width combinations stay closed. */
+   const struct agx3_field_kv base[] = {
+      {9, 2}, {10, dest_16 ? 1 : 2}, {23, 2}, {24, src_16[0] ? 1 : 2},
+      {38, 2}, {39, src_16[1] ? 1 : 2}, {52, 1}, {53, 2},
+      {58, 3}, {59, !strcmp(mnemonic, "sll") ? 162 : 183},
+   };
+   struct agx3_field_kv fields[16] = {
+      {2, dest}, {11, dest_cache}, {16, src[0]},
+      {25, hints[0] == AGX3_ALU_HINT_CACHE},
+      {27, hints[0] == AGX3_ALU_HINT_DISCARD}, {31, src[1]},
+      {40, gpu1 && hints[1] == AGX3_ALU_HINT_CACHE},
+      {42, hints[1] == AGX3_ALU_HINT_DISCARD},
+   };
+   unsigned n = 8;
+   for (unsigned i = 0; i < (gpu1 ? 8 : 6); ++i)
+      if (wait_mask & (1u << i))
+         fields[n++] = (struct agx3_field_kv){60 + i, 1};
+   return agx3_bind_compose(enc, mnemonic, 0, base, gpu1 ? 10 : 8,
+                            fields, n, out, len);
+}
+
 bool
 agx3_alu_sll_reg(enum agx_isa_encoding enc, uint16_t dest, bool dest_16,
                  bool dest_cache, const uint16_t src[2],
@@ -3120,6 +3747,17 @@ agx3_alu_sll_reg(enum agx_isa_encoding enc, uint16_t dest, bool dest_16,
 {
    return agx3_alu_shift_reg("sll", enc, dest, dest_16, dest_cache, src,
                              src_16, hints, wait_mask, out, len);
+}
+
+bool
+agx3_alu_sll_reg_g18g(enum agx_isa_encoding enc, uint16_t dest, bool dest_16,
+                      bool dest_cache, const uint16_t src[2],
+                      const bool src_16[2], const enum agx3_alu_hint hints[2],
+                      uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+                      uint8_t *len)
+{
+   return agx3_alu_shift_reg_g18g("sll", enc, dest, dest_16, dest_cache, src,
+                                  src_16, hints, wait_mask, out, len);
 }
 
 bool
@@ -3209,6 +3847,17 @@ agx3_alu_srl_reg(enum agx_isa_encoding enc, uint16_t dest, bool dest_16,
 {
    return agx3_alu_shift_reg("srl", enc, dest, dest_16, dest_cache, src,
                              src_16, hints, wait_mask, out, len);
+}
+
+bool
+agx3_alu_srl_reg_g18g(enum agx_isa_encoding enc, uint16_t dest, bool dest_16,
+                      bool dest_cache, const uint16_t src[2],
+                      const bool src_16[2], const enum agx3_alu_hint hints[2],
+                      uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+                      uint8_t *len)
+{
+   return agx3_alu_shift_reg_g18g("srl", enc, dest, dest_16, dest_cache, src,
+                                  src_16, hints, wait_mask, out, len);
 }
 
 bool
@@ -3321,7 +3970,10 @@ agx3_alu_srl_imm16(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
 
    /* applegpu_g17p emits this form when extracting [[sample_mask]] from
     * bits 4..7 of SR39. f30 is the immediate shift; f38/f39 select its
-    * implicit full-width boundary operand rather than a second GPR. */
+    * implicit full-width boundary operand rather than a second GPR.
+    * applegpu_g17g and applegpu_g18g emit the same field vector for their
+    * [[sample_mask]] (bits 8..15, srl #8), with the G17-class dispatch
+    * f58 = 3 and f59 = 183 added (m6-sample-mask-in). */
    const struct agx3_field_kv base[] = {
       {9, 2}, {10, 1}, {23, 2}, {24, 1},
       {38, 1}, {39, 2}, {52, 1}, {53, 2}, {58, 3}, {59, 183},
@@ -3377,6 +4029,39 @@ agx3_alu_extract_imm32(enum agx_isa_encoding enc, uint16_t dest,
       fields[10+i]=(struct agx3_field_kv){60+i,!!(wait_mask & (1u<<i))};
    return agx3_bind_compose(enc,"extract",0,base,gpu1 ? 10 : 8,
                            fields,gpu1 ? 18 : 16,out,length);
+}
+
+/* Native arithmetic right shift keeps signed fill without a second operation. */
+static bool
+agx3_alu_asr_imm32_source(enum agx_isa_encoding enc, uint16_t dest,
+                   uint16_t source, bool source_half,
+                   unsigned shift, enum agx3_alu_hint hint, bool dest_cache,
+                   uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+                   uint8_t *length)
+{
+   const bool gpu1 = enc == AGX_ISA_ENCODING_AGX3C;
+   if ((enc != AGX_ISA_ENCODING_AGX3B && !gpu1) || !out || !length ||
+       dest >= 192 || (dest & 1) ||
+       source >= (source_half ? 256 : 192) || (!source_half && (source & 1)) ||
+       (source_half && !gpu1) ||
+       shift < 1 || shift > (source_half ? 15 : 31) ||
+       (unsigned)hint > AGX3_ALU_HINT_CACHE ||
+       (wait_mask & ~0x3fu))
+      return false;
+   const struct agx3_field_kv base[] = {
+      {9,2},{10,2},{23,2},{24,source_half ? 1 : 2},{38,1},{39,2},
+      /* M5's native sra table requires the register-result selector and
+       * GPU1 operation tag; reusing AGX3b's zero defaults is invalid. */
+      {43,3},{44,167},
+   };
+   struct agx3_field_kv fields[13] = {
+      {2,dest},{11,dest_cache},{16,source},{30,shift},
+      {25,hint == AGX3_ALU_HINT_CACHE},{27,hint == AGX3_ALU_HINT_DISCARD},
+      {28,1},
+   };
+   for (unsigned i=0;i<6;i++)
+      fields[7+i]=(struct agx3_field_kv){45+i,!!(wait_mask & (1u<<i))};
+   return agx3_bind_compose(enc,"sra",0,base,gpu1 ? 8 : 6,fields,13,out,length);
 }
 
 /* Metal532: runtime int and short shifts. The full-word value uses a
@@ -3438,29 +4123,26 @@ agx3_alu_asr_imm_m5(uint16_t dest, uint16_t source, bool dest_16,
                            fields,15,out,length);
 }
 
-/* Native arithmetic right shift keeps signed fill without a second operation. */
 bool
 agx3_alu_asr_imm32(enum agx_isa_encoding enc, uint16_t dest, uint16_t source,
                    unsigned shift, enum agx3_alu_hint hint, bool dest_cache,
                    uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
                    uint8_t *length)
 {
-   if (enc != AGX_ISA_ENCODING_AGX3B || !out || !length ||
-       dest >= 192 || source >= 192 || ((dest | source) & 1) ||
-       shift < 1 || shift > 31 || (unsigned)hint > AGX3_ALU_HINT_CACHE ||
-       (wait_mask & ~0x3fu))
-      return false;
-   const struct agx3_field_kv base[] = {
-      {9,2},{10,2},{23,2},{24,2},{38,1},{39,2},
-   };
-   struct agx3_field_kv fields[13] = {
-      {2,dest},{11,dest_cache},{16,source},{30,shift},
-      {25,hint == AGX3_ALU_HINT_CACHE},{27,hint == AGX3_ALU_HINT_DISCARD},
-      {28,1},
-   };
-   for (unsigned i=0;i<6;i++)
-      fields[7+i]=(struct agx3_field_kv){45+i,!!(wait_mask & (1u<<i))};
-   return agx3_bind_compose(enc,"sra",0,base,6,fields,13,out,length);
+   return agx3_alu_asr_imm32_source(enc, dest, source, false, shift, hint,
+                                   dest_cache, wait_mask, out, length);
+}
+
+/* Native G17G/G18G short-to-int shifts (block46-native-447): f24=1 reads
+ * only the named half while f10=2 writes the sign-extended word result. */
+bool
+agx3_alu_asr_imm16_to32(enum agx_isa_encoding enc, uint16_t dest,
+                       uint16_t source, unsigned shift, enum agx3_alu_hint hint,
+                       bool dest_cache, uint16_t wait_mask,
+                       uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *length)
+{
+   return agx3_alu_asr_imm32_source(enc, dest, source, true, shift, hint,
+                                   dest_cache, wait_mask, out, length);
 }
 
 /* Native short arithmetic shift: f10/f24 select half destination/source. */
@@ -3470,12 +4152,14 @@ agx3_alu_asr_imm16(enum agx_isa_encoding enc, uint16_t dest, uint16_t source,
                    uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
                    uint8_t *length)
 {
-   if (enc != AGX_ISA_ENCODING_AGX3B || !out || !length ||
+   const bool gpu1 = enc == AGX_ISA_ENCODING_AGX3C;
+   if ((enc != AGX_ISA_ENCODING_AGX3B && !gpu1) || !out || !length ||
        dest >= 256 || source >= 256 || shift < 1 || shift > 15 ||
        (unsigned)hint > AGX3_ALU_HINT_CACHE || (wait_mask & ~0x3fu))
       return false;
    const struct agx3_field_kv base[] = {
       {9,2},{10,1},{23,2},{24,1},{38,1},{39,2},
+      {43,3},{44,167},
    };
    struct agx3_field_kv fields[13] = {
       {2,dest},{11,dest_cache},{16,source},{30,shift},
@@ -3484,7 +4168,7 @@ agx3_alu_asr_imm16(enum agx_isa_encoding enc, uint16_t dest, uint16_t source,
    };
    for (unsigned i=0;i<6;i++)
       fields[7+i]=(struct agx3_field_kv){45+i,!!(wait_mask & (1u<<i))};
-   return agx3_bind_compose(enc,"sra",0,base,6,fields,13,out,length);
+   return agx3_bind_compose(enc,"sra",0,base,gpu1 ? 8 : 6,fields,13,out,length);
 }
 
 bool agx3_alu_fcmp_select_reg_imm(enum agx_isa_encoding enc, uint16_t dest,
@@ -3496,8 +4180,18 @@ bool agx3_alu_fcmp_select_reg_imm(enum agx_isa_encoding enc, uint16_t dest,
                                   bool dest_16, bool dest_cache, uint16_t wait_mask,
                                   uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
 {
-   if (!src_in || !compare_abs_in || !compare_neg || !immediate || !hints_in)
+   if (!out || !len || !src_in || !compare_abs_in || !compare_neg ||
+       !immediate || !hints_in)
       return false;
+
+   /* Keep the independently qualified M5 form; G17P negate encodings
+    * below have not been established for AGX3c. */
+   if (enc == AGX_ISA_ENCODING_AGX3C) {
+      if (compare_neg[0] || compare_neg[1])
+         return false;
+      return agx3_alu_fcmp_select_gpu1(dest, src_in, compare_zero, compare_abs_in,
+         immediate, hints_in, condition, dest_16, dest_cache, wait_mask, out, len);
+   }
 
    /*
     * Normalise the comparison's negates before anything else looks at the
@@ -3987,12 +4681,90 @@ agx3_alu_fcmp_select_half(enum agx_isa_encoding enc, uint16_t dest,
 }
 
 static bool
+agx3_alu_m5_fsel_half(uint16_t dest, const uint16_t src[4],
+                         const enum agx3_alu_hint hints[4], unsigned condition,
+                         bool dest_cache, uint16_t wait_mask,
+                         uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   if (!src || !hints || !out || !len || dest >= 256 ||
+       (wait_mask & ~UINT16_C(0xff)) )
+      return false;
+   for (unsigned i = 0; i < 4; ++i) {
+      if (src[i] >= 256 || (unsigned)hints[i] > AGX3_ALU_HINT_CACHE)
+         return false;
+   }
+
+   /* Native G17G min/max uses fseli16, with half compare operands and
+    * half selected values. Conditions 3/7 preserve min/max NaN semantics;
+    * ordered less/greater comparisons instead use conditions 1/2.
+    * Live/dead half4 references pin the compact form and slot-8 endpoint. */
+   const struct agx3_field_kv base[] = {
+      {9, 2}, {10, 1}, {23, 2}, {24, 1}, {40, 2}, {41, 1},
+      {57, 2}, {58, 1}, {71, 2}, {72, 1},
+   };
+   struct agx3_field_kv fields[25] = {
+      {2, dest}, {11, dest_cache}, {16, src[0]}, {33, src[1]},
+      {50, src[2]}, {64, src[3]}, {86, condition},
+      {76, 3}, {77, 75},
+   };
+   const unsigned cache[] = {25, 42, 59, 73};
+   const unsigned discard[] = {27, 44, 61, 75};
+   unsigned n = 9;
+   for (unsigned i = 0; i < 4; ++i) {
+      fields[n++] = (struct agx3_field_kv){cache[i], hints[i] == AGX3_ALU_HINT_CACHE};
+      fields[n++] = (struct agx3_field_kv){discard[i], hints[i] == AGX3_ALU_HINT_DISCARD};
+   }
+   for (unsigned i = 0; i < 8; ++i)
+      fields[n++] = (struct agx3_field_kv){78 + i, !!(wait_mask & (1u << i))};
+   for (unsigned ep = 0; ep <= 8; ++ep) {
+      if (agx3_bind_compose(AGX_ISA_ENCODING_AGX3C, "fseli16", ep,
+                            base, 10, fields, n, out, len))
+         return true;
+   }
+   return false;
+}
+
+static bool
+agx3_alu_m5_fminmax_half(uint16_t dest, const uint16_t src[4],
+                        const enum agx3_alu_hint hints[4], bool maximum,
+                        bool dest_cache, uint16_t wait_mask,
+                        uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   if (!src || src[0] != src[2] || src[1] != src[3])
+      return false;
+   return agx3_alu_m5_fsel_half(dest,src,hints,maximum ? 7 : 3,
+                               dest_cache,wait_mask,out,len);
+}
+
+bool
+agx3_alu_fcmp_select_half_gpu1(uint16_t dest, const uint16_t src[4],
+                              const enum agx3_alu_hint hints[4],
+                              unsigned condition, bool invert,
+                              bool dest_cache, uint16_t wait_mask,
+                              uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   if (!src || !hints || (condition != 0 && condition != 1 && condition != 2 &&
+                         condition != 5 && condition != 6))
+      return false;
+   uint16_t s[4] = {src[0],src[1],src[2],src[3]};
+   enum agx3_alu_hint h[4] = {hints[0],hints[1],hints[2],hints[3]};
+   if (invert) {
+      s[2]=src[3];s[3]=src[2];h[2]=hints[3];h[3]=hints[2];
+   }
+   return agx3_alu_m5_fsel_half(dest,s,h,condition,dest_cache,wait_mask,out,len);
+}
+
+static bool
 agx3_alu_fminmax_half(enum agx_isa_encoding enc, uint16_t dest,
                       const uint16_t src[4],
                       const enum agx3_alu_hint hints[4], bool maximum,
                       bool dest_cache, uint16_t wait_mask,
                       uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
 {
+   if (enc == AGX_ISA_ENCODING_AGX3C)
+      return agx3_alu_m5_fminmax_half(dest, src, hints, maximum, dest_cache,
+                                      wait_mask, out, len);
+
    if (enc != AGX_ISA_ENCODING_AGX3B || !src || !hints || !out || !len ||
        dest >= 256 || (wait_mask & ~UINT16_C(0x3f)))
       return false;
@@ -4072,19 +4844,54 @@ agx3_alu_fmax_half(enum agx_isa_encoding enc, uint16_t dest,
  * this form, so a multi-slot wait must be retired separately.
  */
 static bool
+agx3_alu_fminmax32_gpu1(uint16_t dest, uint16_t src0, uint16_t src2,
+                       bool immediate, uint16_t src1, uint16_t src3,
+                       const enum agx3_alu_hint hints[4], bool maximum,
+                       bool dest_cache, uint16_t wait_mask,
+                       uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   /* M5 fseli32 compares floating values but selects 32-bit payloads. Zero
+    * has the same representation in both immediate domains; other minifloat
+    * constants need separately grounded result-immediate handling. */
+   if ((immediate && (src1 || src3 || hints[1] || hints[3])) ||
+       ((dest | src0 | src2 | (immediate ? 0 : src1 | src3)) & 1))
+      return false;
+   const struct agx3_field_kv base[] = {
+      {9,2},{10,2},{23,2},{24,2},{40,immediate ? 1 : 2},{41,2},
+      {57,2},{58,2},{71,immediate ? 1 : 2},{72,2},{76,3},{77,76},
+   };
+   struct agx3_field_kv fields[23] = {
+      {2,dest},{11,dest_cache},{16,src0},{immediate ? 32 : 33,src1},
+      {50,src2},{immediate ? 63 : 64,src3},{86,maximum ? 7 : 3},
+   };
+   unsigned n=7;
+   const uint16_t cache_fields[4] = {25,42,59,73};
+   const uint16_t discard_fields[4] = {27,44,61,75};
+   for (unsigned i=0;i<4;++i) {
+      fields[n++] = (struct agx3_field_kv){cache_fields[i],hints[i] == AGX3_ALU_HINT_CACHE};
+      fields[n++] = (struct agx3_field_kv){discard_fields[i],hints[i] == AGX3_ALU_HINT_DISCARD};
+   }
+   for (unsigned i=0;i<8;++i)
+      fields[n++] = (struct agx3_field_kv){78+i,!!(wait_mask & (1u<<i))};
+   return agx3_bind_compose(AGX_ISA_ENCODING_AGX3C,"fseli32",4,
+                            base,12,fields,n,out,len);
+}
+
+static bool
 agx3_alu_fminmax32(enum agx_isa_encoding enc, uint16_t dest, uint16_t src0,
                    uint16_t src2, bool src1_immediate, uint16_t src1,
                    uint16_t src3, const enum agx3_alu_hint hints[4],
                    bool maximum, bool dest_cache, uint16_t wait_mask,
                    uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
 {
-   if (enc != AGX_ISA_ENCODING_AGX3B || !hints || !out || !len || dest >= 256 ||
+   const bool gpu1 = enc == AGX_ISA_ENCODING_AGX3C;
+   if ((!gpu1 && enc != AGX_ISA_ENCODING_AGX3B) || !hints || !out || !len || dest >= 256 ||
        src0 >= 256 || src2 >= 256 || src1 >= 256 || src3 >= 256)
       return false;
-   if (wait_mask & ~UINT16_C(0x3f))
+   if (wait_mask & ~(gpu1 ? UINT16_C(0xff) : UINT16_C(0x3f)))
       return false;
    /* One scoreboard slot at a time: the selector is a three-bit code. */
-   if (wait_mask & (wait_mask - 1))
+   if (!gpu1 && (wait_mask & (wait_mask - 1)))
       return false;
    for (unsigned i = 0; i < 4; ++i) {
       if ((unsigned)hints[i] > AGX3_ALU_HINT_CACHE)
@@ -4092,6 +4899,9 @@ agx3_alu_fminmax32(enum agx_isa_encoding enc, uint16_t dest, uint16_t src0,
    }
    if (src1_immediate && (src1 > 255 || src3 > 255))
       return false;
+   if (gpu1)
+      return agx3_alu_fminmax32_gpu1(dest,src0,src2,src1_immediate,src1,src3,
+                                    hints,maximum,dest_cache,wait_mask,out,len);
 
    struct agx3_field_kv fields[24];
    unsigned n = 0;
@@ -4963,6 +5773,62 @@ agx3_alu_hadd_saturate(enum agx_isa_encoding enc, uint16_t dest,
 }
 
 bool
+agx3_alu_hadd_neg(enum agx_isa_encoding enc, uint16_t dest,
+                 const uint16_t src[2], const enum agx3_alu_hint hints[2],
+                 unsigned neg_mask, bool saturate, bool dest_cache,
+                 uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   if (enc != AGX_ISA_ENCODING_AGX3C || !src || !hints || neg_mask > 3)
+      return false;
+
+   /* Native G17G x-y, -x-y and saturate(x-y) vectors pin source negate
+    * fields 47/30, saturation and slot-8 dependencies. Canonicalize a
+    * single negation onto source 1, retaining each operand's lifetime. */
+   const bool swap = neg_mask == 1;
+   const uint16_t ordered_src[] = {src[swap], src[!swap]};
+   const enum agx3_alu_hint ordered_hints[] = {hints[swap], hints[!swap]};
+   const unsigned negate = swap ? 2 : neg_mask;
+   const bool src_abs[2] = {false, false};
+   const bool src_neg[2] = {negate & 1, negate & 2};
+   return agx3_alu_h_binop(enc, "f16add", 4, dest, ordered_src, ordered_hints,
+                          dest_cache, saturate, src_abs, src_neg, wait_mask,
+                          out, len);
+}
+
+bool
+agx3_alu_hadd_abs_negzero(
+   enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+   enum agx3_alu_hint hint, bool src_neg, bool dest_cache, uint16_t wait_mask,
+   uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   if (enc != AGX_ISA_ENCODING_AGX3C || !out || !len || dest >= 128 ||
+       src >= 128 || (unsigned)hint > AGX3_ALU_HINT_CACHE ||
+       (wait_mask & ~UINT16_C(0xff)))
+      return false;
+
+   /* Native910 abs/negabs keeps the half input and half result in f16add,
+    * with -0 in operand 1. Both lifetimes and slot0/slot7 waits are witnessed. */
+   const struct agx3_field_kv base[] = {
+      {9, 2}, {10, 1}, {24, 2}, {25, 1}, {41, 1}, {42, 1},
+      {49, 3}, {50, 41},
+   };
+   struct agx3_field_kv fields[16] = {
+      {2, dest}, {17, src}, {33, UINT8_C(0x80)}, {29, 1},
+      {30, src_neg}, {11, dest_cache},
+      {26, hint == AGX3_ALU_HINT_CACHE},
+      {28, hint == AGX3_ALU_HINT_DISCARD},
+   };
+   unsigned n = 8;
+   for (unsigned slot = 0; slot < 8; ++slot)
+      fields[n++] = (struct agx3_field_kv){51 + slot,
+                                           !!(wait_mask & (1u << slot))};
+   for (unsigned ep = 2; ep <= 3; ++ep)
+      if (agx3_bind_compose(enc,"f16add",ep,base,8,fields,n,out,len))
+         return true;
+   return false;
+}
+
+bool
 agx3_alu_half_add_negzero_m5(uint16_t dest, uint16_t src, bool src_abs,
                              bool src_neg, bool saturate, enum agx3_alu_hint hint,
                              bool dest_cache, uint16_t wait_mask,
@@ -5005,25 +5871,36 @@ agx3_alu_hadd_neg_negzero(
    enum agx3_alu_hint hint, bool dest_cache, uint16_t wait_mask,
    uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
 {
-   if (enc != AGX_ISA_ENCODING_AGX3B || !out || !len || dest >= 256 ||
-       src >= 256 || (unsigned)hint > AGX3_ALU_HINT_CACHE ||
-       (wait_mask & ~UINT16_C(0x3f)))
+   const bool g17g = enc == AGX_ISA_ENCODING_AGX3C;
+   if ((!g17g && enc != AGX_ISA_ENCODING_AGX3B) || !out || !len ||
+       dest >= (g17g ? 128 : 256) || src >= (g17g ? 128 : 256) ||
+       (unsigned)hint > AGX3_ALU_HINT_CACHE ||
+       (wait_mask & ~(g17g ? UINT16_C(0xff) : UINT16_C(0x3f))))
       return false;
 
    const struct agx3_field_kv base[] = {
       {9, 2}, {10, 1}, {24, 2}, {25, 1}, {41, 1}, {42, 1},
+      {49, 3}, {50, 41},
    };
-   struct agx3_field_kv fields[14] = {
+   struct agx3_field_kv fields[16] = {
       {2, dest}, {17, src}, {33, UINT8_C(0x80)}, {30, 1},
       {11, dest_cache},
       {26, hint == AGX3_ALU_HINT_CACHE},
       {28, hint == AGX3_ALU_HINT_DISCARD},
    };
    unsigned n = 7;
-   for (unsigned slot = 0; slot < 6; ++slot)
+   for (unsigned slot = 0; slot < (g17g ? 8 : 6); ++slot)
       fields[n++] = (struct agx3_field_kv){51 + slot,
                                            !!(wait_mask & (1u << slot))};
 
+   /* Native969: plain negation keeps the half source and -0 operand,
+    * clearing only the abs modifier relative to Native910. */
+   if (g17g) {
+      for (unsigned ep = 2; ep <= 3; ++ep)
+         if (agx3_bind_compose(enc, "f16add", ep, base, 8, fields, n, out, len))
+            return true;
+      return false;
+   }
    return agx3_bind_compose(enc, "f16add", 2, base, 6, fields, n, out, len);
 }
 
@@ -5033,20 +5910,24 @@ agx3_alu_hadd_saturate_negzero(
    enum agx3_alu_hint hint, bool dest_cache, uint16_t wait_mask,
    uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
 {
-   if (enc != AGX_ISA_ENCODING_AGX3B || !out || !len || dest >= 256 ||
+   const bool m5 = enc == AGX_ISA_ENCODING_AGX3C;
+   if ((!m5 && enc != AGX_ISA_ENCODING_AGX3B) || !out || !len || dest >= 256 ||
        src >= 256 || (unsigned)hint > AGX3_ALU_HINT_CACHE ||
-       (wait_mask & ~UINT16_C(0x3f)))
+       (wait_mask & ~(m5 ? UINT16_C(0xff) : UINT16_C(0x3f))))
       return false;
 
    /* applegpu_g17p lowers saturate(half) to f16add.ep2 with an exact
     * negative-zero minifloat in field33. The ordinary half-add witnesses
     * establish the shared register, lifetime, destination-retention and
     * six-slot wait axes; four texture-dependent saturation witnesses pin
-    * this endpoint, the saturation bit and slot-0 dependency exactly. */
+    * this endpoint, the saturation bit and slot-0 dependency exactly.
+    * applegpu_g17g preserves the short form and adds ep3 for eight-slot
+    * dependencies. Native live/dead half4 kernels pin its long selectors
+    * and slot-8 wait independently of the register lifetime hint. */
    const struct agx3_field_kv base[] = {
       {9, 2}, {10, 1}, {24, 2}, {25, 1}, {41, 1}, {42, 1},
    };
-   struct agx3_field_kv fields[13] = {
+   struct agx3_field_kv fields[17] = {
       {2, dest},
       {17, src},
       {33, UINT8_C(0x80)},
@@ -5056,11 +5937,19 @@ agx3_alu_hadd_saturate_negzero(
       {28, hint == AGX3_ALU_HINT_DISCARD},
    };
    unsigned n = 7;
-   for (unsigned slot = 0; slot < 6; ++slot)
+   if (m5) {
+      fields[n++] = (struct agx3_field_kv){49, 3};
+      fields[n++] = (struct agx3_field_kv){50, 41};
+   }
+   for (unsigned slot = 0; slot < (m5 ? 8 : 6); ++slot)
       fields[n++] = (struct agx3_field_kv){51 + slot,
                                            !!(wait_mask & (1u << slot))};
 
-   return agx3_bind_compose(enc, "f16add", 2, base, 6, fields, n, out, len);
+   for (unsigned ep = 2; ep <= (m5 ? 3 : 2); ++ep) {
+      if (agx3_bind_compose(enc, "f16add", ep, base, 6, fields, n, out, len))
+         return true;
+   }
+   return false;
 }
 
 bool
@@ -5069,33 +5958,8 @@ agx3_alu_hadd_one_neg(enum agx_isa_encoding enc, uint16_t dest,
                       bool dest_cache, uint16_t wait_mask,
                       uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
 {
-   if (enc != AGX_ISA_ENCODING_AGX3B || !out || !len || dest >= 256 ||
-       src >= 256 || (unsigned)hint > AGX3_ALU_HINT_CACHE ||
-       (wait_mask & ~UINT16_C(0x3f)))
-      return false;
-
-   /* applegpu_g17p commutes 1.0h - src so the minifloat occupies operand 0
-    * and the negated register occupies operand 1. Four component witnesses
-    * pin destination/source registers, discard and slot-0 wait; a fifth
-    * live-source witness pins the cache axis on this same ep1 form. */
-   const struct agx3_field_kv base[] = {
-      {9, 2}, {10, 1}, {24, 1}, {25, 1}, {41, 2}, {42, 1},
-   };
-   struct agx3_field_kv fields[14] = {
-      {2, dest},
-      {16, UINT8_C(0x30)},
-      {34, src},
-      {47, 1},
-      {11, dest_cache},
-      {43, hint == AGX3_ALU_HINT_CACHE},
-      {45, hint == AGX3_ALU_HINT_DISCARD},
-   };
-   unsigned n = 7;
-   for (unsigned slot = 0; slot < 6; ++slot)
-      fields[n++] = (struct agx3_field_kv){51 + slot,
-                                           !!(wait_mask & (1u << slot))};
-
-   return agx3_bind_compose(enc, "f16add", 1, base, 6, fields, n, out, len);
+   return agx3_alu_hadd_minifloat(enc, dest, src, UINT8_C(0x30), true, false,
+                                  hint, dest_cache, wait_mask, out, len);
 }
 
 /* Native scalar half FMA preserves the single-rounding f16 semantics. */
@@ -5279,6 +6143,152 @@ agx3_alu_widen_half(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
    return false;
 }
 
+bool
+agx3_alu_fcmp_select_imm(enum agx_isa_encoding enc, uint16_t dest,
+                        const uint16_t src[2], const enum agx3_alu_hint hints[2],
+                        unsigned condition, uint8_t if_true, uint8_t if_false,
+                        bool dest_16, bool dest_cache, uint16_t wait_mask,
+                        uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   const bool src_16[2] = {false, false};
+   return agx3_alu_fcmp_select_imm_width(enc, dest, src, src_16, hints, condition,
+      if_true, if_false, dest_16, dest_cache, wait_mask, out, len);
+}
+
+bool
+agx3_alu_fcmp_select_imm_width_neg_second(
+   enum agx_isa_encoding enc, uint16_t dest, const uint16_t src[2],
+   const bool src_16[2], const enum agx3_alu_hint hints[2],
+   unsigned condition, uint8_t if_true, uint8_t if_false, bool dest_16,
+   bool dest_cache, uint16_t wait_mask,
+   uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   return agx3_alu_fcmp_select_imm_width_internal(
+      enc, dest, src, src_16, hints, condition, if_true, if_false, dest_16,
+      dest_cache, wait_mask, true, (const bool[2]){false, false}, out, len);
+}
+
+bool
+agx3_alu_fma_minifloat(enum agx_isa_encoding enc, uint16_t dest,
+                       uint16_t src, uint8_t immediate, uint16_t addend,
+                       enum agx3_alu_hint src_hint,
+                       enum agx3_alu_hint addend_hint, bool dest_cache,
+                       uint16_t wait_mask,
+                       uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   return agx3_alu_fma_minifloat_mod(enc, dest, src, immediate, addend, false, false,
+                                     src_hint, addend_hint, dest_cache,
+                                     wait_mask, out, len);
+}
+
+bool
+agx3_alu_f32_to_s16(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+                    enum agx3_alu_hint hint, bool dest_cache,
+                    uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+                    uint8_t *len)
+{
+   if (wait_mask != 0 && wait_mask != 32)
+      return false;
+   return agx3_alu_float_to_int16(enc, dest, src, false, true, hint,
+                                  dest_cache, wait_mask, out, len);
+}
+
+bool
+agx3_alu_fmul_minifloat(enum agx_isa_encoding enc, uint16_t dest,
+                        uint16_t src, uint16_t immediate,
+                        enum agx3_alu_hint hint, uint16_t wait_mask,
+                        uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   return agx3_alu_fmul_minifloat_mod(
+      enc, dest, src, immediate, false, false, hint, wait_mask, out, len);
+}
+
+bool
+agx3_alu_hrcp(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+              enum agx3_alu_hint hint, bool dest_cache, uint16_t wait_mask,
+              uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   return agx3_alu_rcp(enc, dest, src, true, true, false, false, hint,
+                       dest_cache, wait_mask, out, len);
+}
+
+bool
+agx3_alu_f32rsqrt(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+                  enum agx3_alu_hint hint, bool dest_cache,
+                  uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+                  uint8_t *len)
+{
+   return agx3_alu_f32rsqrt_mod(enc, dest, src, hint, dest_cache, wait_mask,
+                                false, false, out, len);
+}
+
+bool
+agx3_alu_f32log2(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+                 enum agx3_alu_hint hint, bool dest_cache, uint16_t wait_mask,
+                 uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   return agx3_alu_log2(enc, dest, src, false, false, false, false, hint,
+                        dest_cache, wait_mask, out, len);
+}
+
+bool
+agx3_alu_f32exp2(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+                 enum agx3_alu_hint hint, bool dest_cache, uint16_t wait_mask,
+                 uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   return agx3_alu_unop(enc, "f32exp2", dest, src, false, false, hint,
+                        dest_cache, wait_mask, false, false, out, len);
+}
+
+bool
+agx3_alu_hexp2(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+               enum agx3_alu_hint hint, bool dest_cache,
+               uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+               uint8_t *len)
+{
+   return agx3_alu_hexp2_neg(enc, dest, src, hint, dest_cache, wait_mask,
+                             false, out, len);
+}
+
+bool
+agx3_alu_hlog2(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+               enum agx3_alu_hint hint, bool dest_cache,
+               uint16_t wait_mask, uint8_t out[AGX3_ALU_MAX_LENGTH],
+               uint8_t *len)
+{
+   return agx3_alu_log2(enc, dest, src, true, true, false, false, hint,
+                        dest_cache, wait_mask, out, len);
+}
+
+bool
+agx3_alu_sqrt_step_mod(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+                       enum agx3_alu_hint hint, bool dest_cache,
+                       uint16_t wait_mask, bool src_abs,
+                       uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   return agx3_alu_sqrt_step_source_modifiers(enc, dest, src, hint, dest_cache,
+                                             wait_mask, src_abs, false, out, len);
+}
+
+bool
+agx3_alu_f32log2_mod(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+                     enum agx3_alu_hint hint, bool dest_cache,
+                     uint16_t wait_mask, bool src_neg, bool src_abs,
+                     uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   return agx3_alu_log2(enc, dest, src, false, false, src_abs, src_neg, hint,
+                        dest_cache, wait_mask, out, len);
+}
+
+bool
+agx3_alu_sqrt_step(enum agx_isa_encoding enc, uint16_t dest, uint16_t src,
+                  enum agx3_alu_hint hint, bool dest_cache, uint16_t wait_mask,
+                  uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   return agx3_alu_sqrt_step_mod(enc, dest, src, hint, dest_cache, wait_mask,
+                                 false, out, len);
+}
+
 /* G17G no-fast-math fmin/fmax emit condition 3/7 with selected values
  * tied to their comparands. Do not admit those codes for an arbitrary
  * compare/select: only this native minNum/maxNum domain is witnessed. */
@@ -5302,7 +6312,25 @@ agx3_alu_fcmp_select32_gpu1(const struct agx3_fsel32_gpu1_desc *d,
         !agx3_gpu1_tied_minmax(d, false)))
       return false;
 
-
+   /* Two float constants select a half result on GPU1 (`fself16` in
+    * gpu/m5-xfb-alu10-reference, kernel fself_one_zero, followed by a widen);
+    * no 32-bit form carries both minifloats.
+    *
+    * Integer constants are another matter: `fseli32` takes an 8-bit integer
+    * in either selected slot, and both at once. applegpu_g18g and
+    * applegpu_g17g alike (g18ref-out/probe/m6-alu-sel, -sel2, -hints):
+    *
+    *   (a <  b)    ? 2u : 1u   f49 = 2, f57 = 1; f63 = 1, f71 = 1; f86 = 1
+    *   (a <  b)    ? 5u : 0u   f49 = 5 (f63 empty)       -- likewise 255u : 0u
+    *   (a <  b)    ? 0u : 2u   f63 = 2 (f49 empty)
+    *   (a == 0.0f) ? 2u : 1u   comparand minifloat 0: f40 = 1, f86 = 0
+    *   (a <  b)    ? c  : 1u   f50 = c, f57 = 2; f63 = 1, f71 = 1
+    *   (a <  b)    ? 1u : c    f49 = 1, f57 = 1; f64 = c, f71 = 2
+    *
+    * the immediate in f49/f63 with kind 1, a register in f50/f64 with kind
+    * 2, both widths f58/f72 = 2 -- exactly this function's `fseli32` layout
+    * with the selected kinds opened up. Comparand cache hints f25/f42 are
+    * witnessed on the same form (h_f_u32_lt21_live). */
    if (d->sel_immediate[0] && d->sel_immediate[1] && !d->sel_integer)
       return false;
 
@@ -5395,11 +6423,133 @@ agx3_alu_fcmp_select32_gpu1(const struct agx3_fsel32_gpu1_desc *d,
                             fields, n, out, len);
 }
 
+/* The general select's GPU1 branch, over the descriptor above. Mesa's
+ * fcmpsel carries integer immediates in its selected slots, so zero is the
+ * only constant it can hand to the minifloat-selecting `fself32`. */
+static bool
+agx3_alu_fcmp_select_gpu1(uint16_t dest, const uint16_t src[4],
+                        bool compare_zero, const bool compare_abs[2],
+                        const bool immediate[2],
+                        const enum agx3_alu_hint hints[4], unsigned condition,
+                        bool dest_16, bool dest_cache, uint16_t wait_mask,
+                        uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   /* A 16-bit result selecting a small constant against a register is its
+    * own form; the 32-bit one below selects two registers only. */
+   if (dest_16 && compare_zero && src[1] == 0 && !compare_abs[0] &&
+       !compare_abs[1] && immediate[0] && !immediate[1] && src[2] <= 7 &&
+       hints[2] == AGX3_ALU_HINT_NONE &&
+       agx3_alu_fcmp_select16_const_reg_gpu1(
+          dest, src[0], hints[0], 0, (uint8_t)src[2], src[3], condition,
+          wait_mask, out, len))
+      return true;
+
+   /* Every other 16-bit result is the general `fseli16`: registers or
+    * integer bytes on either side, a register or minifloat comparand. */
+   if (dest_16 && !compare_abs[0] && !compare_abs[1]) {
+      const struct agx3_fsel32_gpu1_desc d = {
+         .dest = dest,
+         .dest_cache = dest_cache,
+         .cmp0 = src[0],
+         .cmp0_hint = hints[0],
+         .cmp1_immediate = compare_zero,
+         .cmp1 = src[1],
+         .cmp1_hint = hints[1],
+         .sel_immediate = {immediate[0], immediate[1]},
+         .sel = {src[2], src[3]},
+         .sel_hint = {hints[2], hints[3]},
+         .condition = condition,
+         .wait_mask = wait_mask,
+      };
+      return agx3_alu_fcmp_select16_gpu1(&d, out, len);
+   }
+
+   if (dest_16 || compare_abs[0] || compare_abs[1] ||
+       (compare_zero && src[1] != 0) || (immediate[0] && src[2] != 0) ||
+       (immediate[1] && src[3] != 0))
+      return false;
+   const struct agx3_fsel32_gpu1_desc d = {
+      .dest = dest,
+      .dest_cache = dest_cache,
+      .cmp0 = src[0],
+      .cmp0_hint = hints[0],
+      .cmp1_immediate = compare_zero,
+      .cmp1 = src[1],
+      .cmp1_hint = hints[1],
+      .sel_immediate = {immediate[0], immediate[1]},
+      .sel = {src[2], src[3]},
+      .sel_hint = {hints[2], hints[3]},
+      .condition = condition,
+      .wait_mask = wait_mask,
+   };
+   return agx3_alu_fcmp_select32_gpu1(&d, out, len);
+}
+
+/*
+ * A 32-bit float comparison whose 16-bit result selects between a small
+ * constant and a register. Apple's fseli16 corpus above only ever selects
+ * two constants and the 32-bit fsel form only ever selects two registers, so
+ * `cond ? 1 : x` -- which is what Gallium hands the packer once it has
+ * lowered a boolean blend -- had no encoding at all and refused the whole
+ * shader.
+ *
+ * From applegpu_g17g compute kernels written with vector select() so the
+ * compiler cannot turn them into the conditional store it emits for the
+ * scalar form (gpu/m5-mixed-select3-reference.metal), comparing against an
+ * immediate zero with the register in half 10 and the constant 1:
+ *
+ *   select(c, 1, a <  0.0f)   2200050a2300a00214804e6021048000   f86 = 1
+ *   select(c, 1, a >= 0.0f)   2200050a2300a00214804e2421048000   f86 = 5
+ *
+ * f49 carries the selected constant, f64 the selected register and f71 = 2
+ * says the constant is the true value; f32 is the comparison's minifloat.
+ * The register slot has no lifetime field on this form, so a last-use hint
+ * on it is dropped rather than encoded -- conservative, and what the witness
+ * spells. Selecting the constant on the FALSE side, and comparing against a
+ * register rather than an immediate, move other fields and stay refused
+ * until each is witnessed on its own.
+ */
+bool
+agx3_alu_fcmp_select16_const_reg_gpu1(
+   uint16_t dest, uint16_t src0, enum agx3_alu_hint src0_hint,
+   uint8_t compare_minifloat, uint8_t if_true_constant,
+   uint16_t if_false_register, unsigned condition, uint16_t wait_mask,
+   uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   if (!out || !len || dest >= 256 || src0 >= 256 || (src0 & 1) ||
+       (if_false_register & 1) || if_false_register >= 256 ||
+       if_true_constant > 7 ||
+       (unsigned)src0_hint > AGX3_ALU_HINT_CACHE ||
+       (condition != 0 && condition != 1 && condition != 2 &&
+        condition != 5 && condition != 6) ||
+       (wait_mask & ~128u))
+      return false;
+
+   const struct agx3_field_kv base[] = {
+      {9, 2},  {10, 1}, {23, 2}, {24, 2}, {40, 1}, {41, 2},
+      {57, 1}, {58, 1}, {71, 2}, {72, 1}, {75, 1}, {76, 3}, {77, 75},
+   };
+   const struct agx3_field_kv fields[] = {
+      {2, dest},
+      {16, src0},
+      {25, src0_hint == AGX3_ALU_HINT_CACHE},
+      {27, src0_hint == AGX3_ALU_HINT_DISCARD},
+      {32, compare_minifloat},
+      {49, if_true_constant},
+      {64, if_false_register},
+      {85, !!(wait_mask & 128u)},
+      {86, condition},
+   };
+   return agx3_bind_compose(AGX_ISA_ENCODING_AGX3C, "fseli16", 8, base,
+                            sizeof(base) / sizeof(base[0]), fields,
+                            sizeof(fields) / sizeof(fields[0]), out, len);
+}
+
 
 bool
 agx3_alu_hadd_minifloat(enum agx_isa_encoding enc, uint16_t dest,
                       uint16_t src, uint16_t immediate, bool src_neg,
-                      enum agx3_alu_hint hint,
+                      bool saturate, enum agx3_alu_hint hint,
                       bool dest_cache, uint16_t wait_mask,
                       uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
 {
@@ -5415,16 +6565,17 @@ agx3_alu_hadd_minifloat(enum agx_isa_encoding enc, uint16_t dest,
    const struct agx3_field_kv base[] = {
       {9, 2}, {10, 1}, {24, 1}, {25, 1}, {41, 2}, {42, 1},
    };
-   struct agx3_field_kv fields[17] = {
+   struct agx3_field_kv fields[18] = {
       {2, dest},
       {16, immediate},
       {34, src},
       {47, src_neg},
+      {14, saturate},
       {11, dest_cache},
       {43, hint == AGX3_ALU_HINT_CACHE},
       {45, hint == AGX3_ALU_HINT_DISCARD},
    };
-   unsigned n = 7;
+   unsigned n = 8;
    if (m5) {
       fields[n++] = (struct agx3_field_kv){49, 3};
       fields[n++] = (struct agx3_field_kv){50, 41};
@@ -5478,6 +6629,23 @@ agx3_alu_fcmp_select16_gpu1(const struct agx3_fsel32_gpu1_desc *d,
    const enum agx3_alu_hint hints[4] = {d->cmp0_hint, d->cmp1_hint,
                                         d->sel_hint[0], d->sel_hint[1]};
 
+   /*
+    * The second comparand may also be a 16-bit register, which the
+    * comparison widens: f41, its width, drops to 1. Apple puts the float
+    * first and the half second, reversing the relation when the source had
+    * them the other way (applegpu_g18g/g17g, g18ref-out/probe/m6-alu-sel and
+    * m6-alu-hints):
+    *
+    *   (a != float(h)) ? 1 : 0   fseli16 h2 = ^r1 == h4 ? #0 : #1   f41 = 1
+    *   (float(h) != b) ? 1 : 0   the same instruction, operands exchanged
+    *   uint(float(h) >= b)       fseli16 h2 = ^r1 <= h4 ? #1 : #0; clr h3
+    *   ... with h reused         f42 = 1, h's cache hint
+    *
+    * Native float/half selects with a live half comparand also use odd
+    * halves (f33 = 5, f41 = 1, f42 = 1). Only full-width comparands need
+    * even half-register indices; selected values may likewise use either
+    * half independently.
+    */
    if (d->cmp1_16 && d->cmp1_immediate)
       return false;
    const bool half[4] = {d->cmp0_16, d->cmp1_16, true, true};
@@ -5559,6 +6727,87 @@ agx3_alu_iadd16_gpu1(uint16_t dest, bool dest_cache, bool src0_immediate,
          ov[n++] = (struct agx3_field_kv){46 + i, 1};
    return agx3_bind_compose(AGX_ISA_ENCODING_AGX3C, "iadd32", 0, base, 7, ov,
                             n, out, len);
+}
+
+bool
+agx3_alu_bit_imm_gpu1(enum agx3_alu_op op, uint16_t dest, bool dest_cache,
+                      uint16_t src, uint8_t immediate,
+                      enum agx3_alu_hint hint, uint16_t wait_mask,
+                      uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   /* Apple's varying-stencil fragment masks the reference with
+    * `bit_and r0h = r0l & 255`: 23 00 07 01 38 20 a3 02 c4 bf. As on G17P,
+    * the immediate operand's width field f38 stays 2 for a narrow result. */
+   if (!out || !len || op != AGX3_ALU_BAND || dest >= 256 || src >= 256 ||
+       (unsigned)hint > AGX3_ALU_HINT_CACHE || wait_mask > 0xff)
+      return false;
+   const struct agx3_field_kv base[] = {
+      {9, 2}, {10, 1}, {23, 2}, {24, 1}, {38, 2}, {42, 3}, {43, 10},
+   };
+   struct agx3_field_kv ov[16];
+   unsigned n = 0;
+   ov[n++] = (struct agx3_field_kv){2, dest};
+   ov[n++] = (struct agx3_field_kv){11, dest_cache ? 1 : 0};
+   ov[n++] = (struct agx3_field_kv){16, src};
+   ov[n++] = (struct agx3_field_kv){25, hint == AGX3_ALU_HINT_CACHE};
+   ov[n++] = (struct agx3_field_kv){27, hint == AGX3_ALU_HINT_DISCARD};
+   ov[n++] = (struct agx3_field_kv){37, 1};
+   ov[n++] = (struct agx3_field_kv){29, immediate};
+   for (unsigned i = 0; i < 8; ++i)
+      if (wait_mask & (1u << i))
+         ov[n++] = (struct agx3_field_kv){44 + i, 1};
+   return agx3_bind_compose(AGX_ISA_ENCODING_AGX3C, "bit_and", 1, base, 7, ov,
+                            n, out, len);
+}
+
+bool
+agx3_alu_iadd32_reg_imm_gpu1(uint16_t dest, bool dest_cache, uint16_t src,
+                             bool src_16, bool sign_extend,
+                             enum agx3_alu_hint hint, uint8_t immediate,
+                             bool saturate, uint16_t wait_mask,
+                             uint8_t out[AGX3_ALU_MAX_LENGTH], uint8_t *len)
+{
+   /* `iadd32` with the register in slot A (f16, kind f23 = 2, width f24)
+    * and an immediate in slot B (f30, kind f38 = 1, width f39 = 1), the
+    * order Apple keeps for these two shapes; applegpu_g18g and
+    * applegpu_g17g give the same vector but for the wait slot
+    * (g18ref-out/probe/m6-alu-misc, m6-alu-hints):
+    *
+    *   addsat(x, 1u), x dead    f16 0, f24 2, f27, f30 = 1, f54 = 1
+    *   int(short x),  x dead    f16 0, f24 1, f27, f28 = 1, f30 = 0
+    *   int(short x),  to r1     f2 2, f11 (the result is reused)
+    *
+    * f54 is the saturate bit (G17G's iadd32 keeps its shift in f55 and
+    * saturation beside it) and f28 slot A's sign extension. Only these two
+    * combinations are witnessed: an unsigned 32-bit saturating add, and a
+    * plain sign-extending add of a half. The eight waits are f46..f53, as
+    * on every GPU1 iadd32. */
+   if (!out || !len || (dest & 1) || dest >= 256 ||
+       (src_16 ? src >= 256 : ((src & 1) || src >= 256)) ||
+       (unsigned)hint > AGX3_ALU_HINT_CACHE || wait_mask > 0xff ||
+       !(saturate ? !src_16 && !sign_extend
+                  : src_16 && sign_extend && immediate == 0))
+      return false;
+   const struct agx3_field_kv base[] = {
+      {9, 2}, {10, 2}, {23, 2}, {38, 1}, {39, 1}, {44, 3}, {45, 80},
+   };
+   struct agx3_field_kv ov[20];
+   unsigned n = 0;
+   ov[n++] = (struct agx3_field_kv){2, dest};
+   ov[n++] = (struct agx3_field_kv){11, dest_cache ? 1 : 0};
+   ov[n++] = (struct agx3_field_kv){16, src};
+   ov[n++] = (struct agx3_field_kv){24, src_16 ? 1 : 2};
+   ov[n++] = (struct agx3_field_kv){25, hint == AGX3_ALU_HINT_CACHE};
+   ov[n++] = (struct agx3_field_kv){27, hint == AGX3_ALU_HINT_DISCARD};
+   ov[n++] = (struct agx3_field_kv){28, sign_extend ? 1 : 0};
+   ov[n++] = (struct agx3_field_kv){30, immediate};
+   ov[n++] = (struct agx3_field_kv){54, saturate ? 1 : 0};
+   for (unsigned i = 0; i < 8; ++i)
+      if (wait_mask & (1u << i))
+         ov[n++] = (struct agx3_field_kv){46 + i, 1};
+   return agx3_bind_compose(AGX_ISA_ENCODING_AGX3C, "iadd32",
+                            AGX3_BIND_APPLE_ORDER, base,
+                            sizeof(base) / sizeof(base[0]), ov, n, out, len);
 }
 
 
