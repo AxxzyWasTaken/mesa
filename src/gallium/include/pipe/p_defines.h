@@ -965,6 +965,11 @@ struct pipe_caps {
    bool stream_output_interleave_buffers;
    bool native_fence_fd;
    bool glsl_tess_levels_as_inputs;
+   /* GL's MAX_COMBINED_TEXTURE_IMAGE_UNITS counts every stage, compute
+    * included, as GLES does. Each stage still binds at most
+    * pipe_shader_caps::max_texture_samplers.
+    */
+   bool combined_texture_units_all_stages;
    bool legacy_math_rules;
    bool fp16;
    bool doubles;

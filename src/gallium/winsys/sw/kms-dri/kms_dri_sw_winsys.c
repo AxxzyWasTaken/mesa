@@ -41,6 +41,7 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <xf86drm.h>
+#include <linux/dma-buf.h>
 
 #include "drm-uapi/drm_fourcc.h"
 #include "util/compiler.h"
@@ -82,6 +83,8 @@ struct kms_sw_displaytarget
    unsigned size;
 
    uint32_t handle;
+   /* Imported GEM handles cannot be mapped with MAP_DUMB. */
+   int prime_fd;
    void *mapped;
    void *ro_mapped;
 
@@ -182,6 +185,7 @@ kms_sw_displaytarget_create(struct sw_winsys *ws,
 
    list_inithead(&kms_sw_dt->planes);
    kms_sw_dt->ref_count = 1;
+   kms_sw_dt->prime_fd = -1;
    kms_sw_dt->mapped = MAP_FAILED;
    kms_sw_dt->ro_mapped = MAP_FAILED;
 
@@ -279,6 +283,7 @@ kms_sw_displaytarget_create_mapped(struct sw_winsys *ws,
 
    list_inithead(&kms_sw_dt->planes);
    kms_sw_dt->ref_count = 1;
+   kms_sw_dt->prime_fd = -1;
    kms_sw_dt->mapped = data;
    kms_sw_dt->ro_mapped = MAP_FAILED;
 
@@ -327,6 +332,8 @@ kms_sw_displaytarget_destroy(struct sw_winsys *ws,
    list_del(&kms_sw_dt->link);
 
    mtx_destroy(&kms_sw_dt->map_lock);
+   if (kms_sw_dt->prime_fd >= 0)
+      close(kms_sw_dt->prime_fd);
    DEBUG_PRINT("KMS-DEBUG: destroyed buffer %u\n", kms_sw_dt->handle);
 
    struct kms_sw_plane *tmp;
@@ -347,19 +354,31 @@ kms_sw_displaytarget_map(struct sw_winsys *ws,
    struct kms_sw_displaytarget *kms_sw_dt = plane->dt;
    struct drm_mode_map_dumb map_req;
    int prot, ret;
+   int map_fd = kms_sw->fd;
+   bool sync_started = false;
 
    mtx_lock(&kms_sw_dt->map_lock);
    memset(&map_req, 0, sizeof map_req);
-   map_req.handle = kms_sw_dt->handle;
-   ret = drmIoctl(kms_sw->fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req);
-   if (ret)
-      goto fail_locked;
+   if (kms_sw_dt->prime_fd >= 0) {
+      map_fd = kms_sw_dt->prime_fd;
+      if (!kms_sw_dt->map_count) {
+         struct dma_buf_sync sync = { .flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_RW };
+         if (drmIoctl(map_fd, DMA_BUF_IOCTL_SYNC, &sync))
+            goto fail_locked;
+         sync_started = true;
+      }
+   } else {
+      map_req.handle = kms_sw_dt->handle;
+      ret = drmIoctl(kms_sw->fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req);
+      if (ret)
+         goto fail_locked;
+   }
 
    prot = (flags == PIPE_MAP_READ) ? PROT_READ : (PROT_READ | PROT_WRITE);
    void **ptr = (flags == PIPE_MAP_READ) ? &kms_sw_dt->ro_mapped : &kms_sw_dt->mapped;
    if (*ptr == MAP_FAILED) {
       void *tmp = mmap(NULL, kms_sw_dt->size, prot, MAP_SHARED,
-                       kms_sw->fd, map_req.offset);
+                       map_fd, map_req.offset);
       if (tmp == MAP_FAILED)
          goto fail_locked;
       *ptr = tmp;
@@ -374,6 +393,11 @@ kms_sw_displaytarget_map(struct sw_winsys *ws,
 
    return *ptr + plane->offset;
 fail_locked:
+   if (sync_started) {
+      struct dma_buf_sync sync = { .flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_RW };
+      if (drmIoctl(map_fd, DMA_BUF_IOCTL_SYNC, &sync))
+         fprintf(stderr, "KMS: DMA-BUF sync end failed: %s\n", strerror(errno));
+   }
    mtx_unlock(&kms_sw_dt->map_lock);
    return NULL;
 }
@@ -419,8 +443,16 @@ kms_sw_displaytarget_add_from_prime(struct kms_sw_winsys *kms_sw, int fd,
    kms_sw_dt->handle = handle;
 
    lseek(fd, 0, SEEK_SET);
+   kms_sw_dt->prime_fd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
+   if (kms_sw_dt->prime_fd < 0) {
+      FREE(kms_sw_dt);
+      return NULL;
+   }
+   mtx_init(&kms_sw_dt->map_lock, mtx_plain);
    plane = get_plane(kms_sw_dt, format, width, height, stride, offset);
    if (!plane) {
+      mtx_destroy(&kms_sw_dt->map_lock);
+      close(kms_sw_dt->prime_fd);
       FREE(kms_sw_dt);
       return NULL;
    }
@@ -448,6 +480,12 @@ kms_sw_displaytarget_unmap(struct sw_winsys *ws,
       DEBUG_PRINT("KMS-DEBUG: ignore unmap for busy buffer %u", kms_sw_dt->handle);
       mtx_unlock(&kms_sw_dt->map_lock);
       return;
+   }
+
+   if (kms_sw_dt->prime_fd >= 0) {
+      struct dma_buf_sync sync = { .flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_RW };
+      if (drmIoctl(kms_sw_dt->prime_fd, DMA_BUF_IOCTL_SYNC, &sync))
+         fprintf(stderr, "KMS: DMA-BUF sync end failed: %s\n", strerror(errno));
    }
 
    DEBUG_PRINT("KMS-DEBUG: unmapped buffer %u (was %p)\n", kms_sw_dt->handle, kms_sw_dt->mapped);

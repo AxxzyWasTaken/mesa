@@ -1,0 +1,1 @@
+{"pipelines":{"compute_pipelines":[{"compute_function":"ballot_dead"},{"compute_function":"ballot_live"}]}}

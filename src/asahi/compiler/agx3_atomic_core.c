@@ -15,10 +15,12 @@ encoding_ok(enum agx_isa_encoding enc)
    return enc == AGX_ISA_ENCODING_AGX3B ||
           enc == AGX_ISA_ENCODING_AGX3C;
 }
+/* Scoreboard slots are machine behaviour: eight on every G17-class part.
+ * Device atomics retain the agx3b/agx3c encoding_ok boundary. */
 static unsigned
 slot_count(enum agx_isa_encoding enc)
 {
-   return enc == AGX_ISA_ENCODING_AGX3C ? 8 : 6;
+   return agx_encoding_is_g17_class(enc) ? 8 : 6;
 }
 
 static bool
@@ -51,7 +53,15 @@ compose_first(enum agx_isa_encoding enc, const char *mnemonic,
               const struct agx3_field_kv *fields, unsigned nfields,
               uint8_t out[AGX3_ATOMIC_MAX_LENGTH], uint8_t *len)
 {
-   const unsigned count = enc == AGX_ISA_ENCODING_AGX3C ? 12 : 1;
+   if (enc == AGX_ISA_ENCODING_AGX3D)
+      return agx3_bind_compose(enc, mnemonic, AGX3_BIND_APPLE_ORDER,
+                              fields, nfields, NULL, 0, out, len);
+
+   /* The encoding points to try are a per-table layout: twelve agx3c
+    * atomicdev/atomictg forms, one agx3b form, none elsewhere. */
+   const unsigned count = enc == AGX_ISA_ENCODING_AGX3C   ? 12
+                          : enc == AGX_ISA_ENCODING_AGX3B ? 1
+                                                          : 0;
 
    for (unsigned ep = 0; ep < count; ++ep) {
       if (agx3_bind_compose(enc, mnemonic, ep, fields, nfields, NULL, 0,
@@ -190,12 +200,16 @@ agx3_atomic_encode_device(enum agx_isa_encoding enc,
    return compose_first(enc, "atomicdev", f, n, out, len);
 }
 
-bool
-agx3_atomic_encode_local(enum agx_isa_encoding enc,
-                         const struct agx3_local_atomic_desc *d,
-                         uint8_t out[AGX3_ATOMIC_MAX_LENGTH], uint8_t *len)
+/* g18g admits the G18G-witnessed returning form that kills its register
+ * byte address; agx3d is G18G only, so it always does. */
+static bool
+encode_local(enum agx_isa_encoding enc, const struct agx3_local_atomic_desc *d,
+             bool g18g, uint8_t out[AGX3_ATOMIC_MAX_LENGTH], uint8_t *len)
 {
-   if (!encoding_ok(enc) || d == NULL || out == NULL || len == NULL ||
+   g18g = g18g || enc == AGX_ISA_ENCODING_AGX3D;
+
+   if ((!encoding_ok(enc) && enc != AGX_ISA_ENCODING_AGX3D) ||
+       d == NULL || out == NULL || len == NULL ||
        !op_ok(d->op) || d->op == AGX3_ATOMIC_FADD || d->value > 191 ||
        (d->wait_mask & ~((1u << slot_count(enc)) - 1u)))
       return false;
@@ -207,10 +221,16 @@ agx3_atomic_encode_local(enum agx_isa_encoding enc,
           (d->address_kind == AGX3_ATOMIC_INDEX_IMMEDIATE &&
            (d->address & 3) != 0) ||
           (d->address_kind == AGX3_ATOMIC_INDEX_REGISTER && d->address > 191) ||
-          d->address_kill)
+          (d->address_kill &&
+           (!g18g || enc == AGX_ISA_ENCODING_AGX3B ||
+            d->address_kind != AGX3_ATOMIC_INDEX_REGISTER)))
          return false;
    } else {
-      /* M5 also has a no-result form at an immediate byte address. */
+      /* G17G-family (agx3c) also has a no-result form at an immediate byte
+       * address. G17G/G18G programs selecting between two threadgroup
+       * pointers establish the register byte-base form for all eleven
+       * operations, with and without a result; resultless forms omit the
+       * result registers and producer slot. */
       if (d->slot != 0)
          return false;
 
@@ -256,11 +276,12 @@ agx3_atomic_encode_local(enum agx_isa_encoding enc,
       f[n++] = (struct agx3_field_kv)KV(85, 1);
    }
 
-   if (d->op == AGX3_ATOMIC_XCHG || d->op == AGX3_ATOMIC_CMPXCHG)
+   if ((d->op == AGX3_ATOMIC_XCHG || d->op == AGX3_ATOMIC_CMPXCHG) &&
+       enc != AGX_ISA_ENCODING_AGX3D)
       f[n++] = (struct agx3_field_kv)KV(
          enc == AGX_ISA_ENCODING_AGX3C ? 83 : 81, 1);
 
-   if (enc == AGX_ISA_ENCODING_AGX3C) {
+   if (agx_encoding_is_g17_class(enc)) {
       if (d->returns_value)
          f[n++] = (struct agx3_field_kv)KV(11, 1);
       f[n++] = (struct agx3_field_kv)KV(59, 15);
@@ -276,4 +297,21 @@ agx3_atomic_encode_local(enum agx_isa_encoding enc,
 
    n = append_waits(d->wait_mask, f, n);
    return compose_first(enc, "atomictg", f, n, out, len);
+}
+
+bool
+agx3_atomic_encode_local(enum agx_isa_encoding enc,
+                         const struct agx3_local_atomic_desc *d,
+                         uint8_t out[AGX3_ATOMIC_MAX_LENGTH], uint8_t *len)
+{
+   return encode_local(enc, d, false, out, len);
+}
+
+bool
+agx3_atomic_encode_local_g18g(enum agx_isa_encoding enc,
+                              const struct agx3_local_atomic_desc *d,
+                              uint8_t out[AGX3_ATOMIC_MAX_LENGTH],
+                              uint8_t *len)
+{
+   return encode_local(enc, d, true, out, len);
 }

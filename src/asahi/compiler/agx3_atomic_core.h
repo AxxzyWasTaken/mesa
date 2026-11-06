@@ -13,6 +13,9 @@
  * one witnessed 64-bit form (Apple's G17P atomic_max on atomic_ulong, the
  * f90=3 min/max family) returns a changed flag rather than the old value on
  * hardware and is not encoded here, so the interface has no width selector.
+ * G17G/G18G ground returned and no-result threadgroup atomics with immediate
+ * and register byte addresses; G18G (agx3d) additionally kills the register
+ * address of a returning form (agx3_atomic_encode_local_g18g).
  */
 
 #pragma once
@@ -105,6 +108,13 @@ bool agx3_atomic_encode_local(enum agx_isa_encoding enc,
                               const struct agx3_local_atomic_desc *d,
                               uint8_t out[AGX3_ATOMIC_MAX_LENGTH],
                               uint8_t *len);
+
+/* G18G (M6) compiles as agx3c: as agx3_atomic_encode_local, plus the returning
+ * register-address form with address_kill. */
+bool agx3_atomic_encode_local_g18g(enum agx_isa_encoding enc,
+                                   const struct agx3_local_atomic_desc *d,
+                                   uint8_t out[AGX3_ATOMIC_MAX_LENGTH],
+                                   uint8_t *len);
 
 #ifdef __cplusplus
 }

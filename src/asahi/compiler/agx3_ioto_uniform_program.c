@@ -35,14 +35,16 @@ add_size(size_t *value, size_t add)
 }
 
 bool
-agx3_ioto_uniform_program_body_bound(
+agx3_ioto_uniform_program_body_bound_with_inputs(
    enum agx_chip chip, const struct agx3_ioto_uniform_range *ranges,
-   size_t range_count, size_t *bytes, size_t *chunks)
+   size_t range_count, const struct agx_ioto_cprog_inputs *inputs,
+   size_t *bytes, size_t *chunks)
 {
    if (bytes == NULL || chunks == NULL ||
        agx_ioto_load_target_encoding(chip) ==
           AGX_IOTO_LOAD_ENCODING_UNSUPPORTED ||
-       (range_count != 0 && ranges == NULL))
+       (range_count != 0 && ranges == NULL) ||
+       (inputs != NULL && (chip != AGX_CHIP_G17P || !inputs->known)))
       return false;
 
    size_t staged_bytes =
@@ -51,6 +53,7 @@ agx3_ioto_uniform_program_body_bound(
          ? AGX_IOTO_LOAD_GPU0_ROUND_NOP_SIZE
          : 0;
    size_t staged_chunks = 0;
+   uint64_t covered[AGX_IOTO_CPROG_UNIFORM_WORDS] = {0};
    const size_t per_chunk =
       agx_ioto_load_target_encoding(chip) == AGX_IOTO_LOAD_ENCODING_GPU0
          ? GPU0_CHUNK_BODY_BOUND
@@ -65,6 +68,26 @@ agx3_ioto_uniform_program_body_bound(
           range_chunks > SIZE_MAX / per_chunk ||
           !add_size(&staged_bytes, range_chunks * per_chunk))
          return false;
+
+      if (inputs != NULL) {
+         for (unsigned half = ranges[i].start_halfs;
+              half < ranges[i].start_halfs + ranges[i].size_halfs; ++half) {
+            const uint64_t bit = UINT64_C(1) << (half % 64);
+            if (!(inputs->uniform_halfs[half / 64] & bit))
+               continue;
+            if ((covered[half / 64] & bit) ||
+                !add_size(&staged_bytes, AGX_IOTO_LOAD_GPU0_COPY_MAX_SIZE))
+               return false;
+            covered[half / 64] |= bit;
+         }
+      }
+   }
+
+   if (inputs != NULL) {
+      for (unsigned i = 0; i < AGX_IOTO_CPROG_UNIFORM_WORDS; ++i) {
+         if (covered[i] != inputs->uniform_halfs[i])
+            return false;
+      }
    }
 
    *bytes = staged_bytes;
@@ -79,8 +102,9 @@ agx3_ioto_uniform_program_desc_body_bound(
 {
    size_t bound, count;
    if (!desc || !bytes || !chunks ||
-       !agx3_ioto_uniform_program_body_bound(chip, desc->ranges,
-          desc->range_count, &bound, &count))
+       (desc->preshader_inputs && (desc->cprog_inputs || desc->fast_path_enabled)) ||
+       !agx3_ioto_uniform_program_body_bound_with_inputs(chip, desc->ranges,
+          desc->range_count, desc->preshader_inputs, &bound, &count))
       return false;
    if (desc->cprog_inputs) {
       struct agx3_cprog_inputs checked;
@@ -136,6 +160,15 @@ agx3_ioto_uniform_program_desc_body_bound(
    *bytes = bound;
    *chunks = count;
    return true;
+}
+
+bool
+agx3_ioto_uniform_program_body_bound(
+   enum agx_chip chip, const struct agx3_ioto_uniform_range *ranges,
+   size_t range_count, size_t *bytes, size_t *chunks)
+{
+   return agx3_ioto_uniform_program_body_bound_with_inputs(
+      chip, ranges, range_count, NULL, bytes, chunks);
 }
 
 static bool
@@ -227,6 +260,15 @@ agx3_ioto_uniform_program_body_generate(
       workspace.sort,
       workspace.sort_capacity,
    };
+   struct agx3_ioto_load_packer packer;
+   struct agx_ioto_load_emit_ops ops;
+   if (desc->preshader_inputs != NULL) {
+      if (!agx3_ioto_load_packer_init(&packer, chip))
+         return false;
+      packer.cprog_inputs = desc->preshader_inputs;
+      packer.gpu0_copy_wait = false;
+      agx3_ioto_load_packer_ops(&packer, &ops);
+   }
    uint32_t cprog_dest_half = 0;
 
    for (size_t i = 0; i < desc->range_count; ++i) {
@@ -261,7 +303,10 @@ agx3_ioto_uniform_program_body_generate(
             }
          }
          struct agx_ioto_load_allocation allocation;
-         if (!agx3_ioto_load_absolute_native(&core, &load, sort, &allocation))
+         const bool loaded = desc->preshader_inputs != NULL
+            ? agx_ioto_load_absolute(&core, &load, &ops, sort, &allocation)
+            : agx3_ioto_load_absolute_native(&core, &load, sort, &allocation);
+         if (!loaded)
             return false;
 
          cprog_dest_half += 2u * (2u * count);
@@ -269,7 +314,10 @@ agx3_ioto_uniform_program_body_generate(
       }
    }
 
-   if (!agx3_ioto_load_finish_round_native(&core, true, sort))
+   const bool finished = desc->preshader_inputs != NULL
+      ? agx_ioto_load_finish_round(&core, true, &ops, sort)
+      : agx3_ioto_load_finish_round_native(&core, true, sort);
+   if (!finished)
       return false;
 
    *written = core.sink.length;
@@ -277,4 +325,54 @@ agx3_ioto_uniform_program_body_generate(
    if (workspace.relocations)
       *workspace.relocation_count = core.relocation_count;
    return true;
+}
+
+static bool
+array_overlaps(const void *array, size_t count, size_t element_size,
+               const void *output, size_t output_size)
+{
+   return count > SIZE_MAX / element_size ||
+          spans_overlap(array, count * element_size, output, output_size);
+}
+
+bool
+agx3_ioto_uniform_program_generate(
+   enum agx_chip chip, const struct agx3_ioto_uniform_program_desc *desc,
+   struct agx3_ioto_uniform_program_workspace workspace, void *output,
+   size_t capacity, size_t *written)
+{
+   size_t body_bound, chunk_count;
+   if (desc == NULL || output == NULL || written == NULL ||
+       !agx3_ioto_uniform_program_desc_body_bound(
+          chip, desc, &body_bound, &chunk_count) ||
+       (body_bound > workspace.body_capacity &&
+        !(desc->cprog_inputs && desc->cprog_inputs->count)) ||
+       (workspace.body_capacity != 0 && workspace.body == NULL) ||
+       workspace_overlaps(workspace) ||
+       spans_overlap(workspace.body, workspace.body_capacity, output,
+                     capacity) ||
+       array_overlaps(workspace.loads, workspace.load_capacity,
+                      sizeof(workspace.loads[0]), output, capacity) ||
+       array_overlaps(workspace.sort, workspace.sort_capacity,
+                      sizeof(workspace.sort[0]), output, capacity) ||
+       array_overlaps(workspace.cache, workspace.cache_capacity,
+                      sizeof(workspace.cache[0]), output, capacity))
+      return false;
+
+   (void)body_bound;
+   (void)chunk_count;
+   size_t body_size, copy_offset;
+   if (!agx3_ioto_uniform_program_body_generate(chip, desc, workspace,
+                                                &body_size, &copy_offset))
+      return false;
+   (void)copy_offset;
+
+   const struct agx_ioto_profile_control profile = {
+      .chip = chip,
+      .payload0 = desc->profile_payload0,
+      .payload1 = desc->profile_payload1,
+   };
+   return agx_ioto_program_compose_no_pixrel(
+      chip, desc->program_va, workspace.body, body_size, &desc->tail, &profile,
+      &desc->preshader, output, capacity, written);
 }

@@ -48,6 +48,14 @@
  * using texture state place the ordinary vertex ABI after this prefix. */
 #define AGX_ABI_G17P_TEXTURE_POINTER_HALFS 8
 
+/* G18 threadgroup accesses take their base from uniform half 8, which the
+ * hardware preloads. Ordinary pushed pointers or preamble exports must not
+ * overwrite it: stores then land nowhere and loads read zero. Keep API
+ * compute uniforms above this slot, aligned for 64-bit pointers. The native
+ * texture/storage prefix remains in halves 0..7. */
+#define AGX_ABI_G18_SHARED_BASE_HALF 8u
+#define AGX_ABI_G18_SHARED_UNIFORM_HALFS 12u
+
 /* AGX3 threadgroup accesses take their base from uniform half 8, which
  * agx_emit_local_store/load hard-code and which the hardware preloads -- no
  * driver path ever writes it.  A shader that places its own uniforms over
@@ -85,6 +93,13 @@
  * heap-index records. These are software ABI fields, not Gen9 hardware bits.
  */
 #define AGX_G17P_BUFFER_TEXTURE_PBE_OFFSET 32
+/* Gallium's Gen10 (G17G) buffer texture keeps its element count in the
+ * descriptor's last word, which no Gen10 field occupies. */
+#define AGX_GEN10_BUFFER_TEXTURE_SIZE_OFFSET 28
+/* Gallium's Gen10 storage PBE keeps the image-atomic address word (the
+ * G17P sideband, AGX_G17P_IMAGE_ATOMIC_SW_FROM_PBE) in its last eight bytes,
+ * which no Gen10 field occupies. */
+#define AGX_GEN10_IMAGE_ATOMIC_SW_OFFSET 24
 #define AGX_G17P_BUFFER_TEXTURE_METADATA_OFFSET 72
 #define AGX_G17P_BUFFER_TEXTURE_SIZE_OFFSET 72
 #define AGX_G17P_BUFFER_TEXTURE_TAIL_OFFSET 76

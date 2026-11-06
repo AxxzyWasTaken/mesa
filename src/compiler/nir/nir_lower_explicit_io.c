@@ -1445,6 +1445,17 @@ build_addr(nir_builder *b, nir_intrinsic_instr *intrin, nir_def *base_addr,
       addr.shift = MIN2(max_shift, util_logbase2(align));
       addr.def = explicit_io_address_from_deref_chain(
          b, deref, addr_format, deref->modes, addr.shift, comp_offset);
+   } else if (comp_offset && addr_format_needs_bounds_check(addr_format) &&
+              intrin->intrinsic == nir_intrinsic_load_deref) {
+      /* A component past 4 GiB is out of bounds; a wrapped offset would pass
+       * the bounds check and read the start of the buffer. Stores keep the
+       * wrapping per-component behaviour D3D drivers show (vkd3d-proton's
+       * structured_buffer_addressing_wrap).
+       */
+      nir_def *offset = nir_uadd_sat(b, nir_channel(b, base_addr, 3),
+                                     nir_imm_int(b, comp_offset));
+      addr.def = nir_vector_insert_imm(b, base_addr, offset, 3);
+      addr.shift = 0;
    } else {
       addr.def = nir_build_addr_iadd_imm(b, base_addr, addr_format,
                                          deref->modes, comp_offset);

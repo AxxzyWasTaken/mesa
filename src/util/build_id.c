@@ -205,5 +205,5 @@ copy_build_id_to_sha1(uint8_t sha1[BLAKE3_KEY_LEN],
 void
 _mesa_sha1_format(char *buf, const unsigned char *sha1)
 {
-   mesa_bytes_to_hex(buf, sha1, BLAKE3_KEY_LEN);
+   mesa_bytes_to_hex(buf, sha1, BUILD_ID_EXPECTED_HASH_LENGTH);
 }

@@ -310,6 +310,14 @@ agx3_split_texture_coordinates(agx_context *ctx)
    if (ctx->key->dev.encoding != AGX_ISA_ENCODING_AGX3C || ctx->is_preamble)
       return false;
 
+   /* G18G re-encodes the vector-coordinate fetch/sample forms. Its emitter
+    * publishes components from consecutive registers and does not consume
+    * the eight-source split-coordinate representation used by M5. Keep the
+    * collect so register allocation preserves that input layout.
+    */
+   if (agx_is_g18g(&ctx->key->dev))
+      return false;
+
    /* Every M5 stage stages its fetch and sample coordinates
     * (agx3_pack_binary.c). */
    switch (ctx->stage) {

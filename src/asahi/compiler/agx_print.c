@@ -220,6 +220,15 @@ agx_print_instr(const agx_instr *I, FILE *fp)
       fprintf(fp, "slot %u", I->scoreboard);
    }
 
+   if (I->memory_byte_offset) {
+      if (print_comma)
+         fprintf(fp, ", ");
+      else
+         print_comma = true;
+
+      fprintf(fp, "+%dB", I->memory_byte_offset);
+   }
+
    if (info.immediates & AGX_IMMEDIATE_NEST) {
       if (print_comma)
          fprintf(fp, ", ");

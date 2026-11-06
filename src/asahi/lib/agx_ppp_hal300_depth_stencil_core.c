@@ -30,13 +30,14 @@
  * by the G17G/G17X plugin witnesses.  This codec neither emits the surrounding
  * VDM PPP pointer nor admits a device or advertises a feature.
  */
-static bool
+bool
 agx_ppp_hal300_depth_stencil_core_supported(enum agx_chip chip)
 {
    switch (chip) {
    case AGX_CHIP_G17G:
    case AGX_CHIP_G17S:
    case AGX_CHIP_G17C:
+   case AGX_CHIP_G18G:
       return true;
 
    default:

@@ -37,6 +37,21 @@
 #define TILE_WIDTH  32
 #define TILE_HEIGHT 32
 
+/* The block-based copy kernel stages the destination tile in the workgroup
+ * imageblock (st_tile). G18G has no compute imageblock encoding, so it copies
+ * through plain image stores; only non-1D, single-sample images qualify
+ * either way. */
+static bool
+hk_meta_copy_block_based(struct vk_command_buffer *vk_cmd,
+                         const struct vk_image *image)
+{
+   struct hk_cmd_buffer *cmd = container_of(vk_cmd, struct hk_cmd_buffer, vk);
+   struct hk_device *dev = hk_cmd_buffer_device(cmd);
+
+   return dev->dev.chip != AGX_CHIP_G18G &&
+          image->image_type != VK_IMAGE_TYPE_1D && image->samples == 1;
+}
+
 static VkResult
 hk_cmd_bind_map_buffer(struct vk_command_buffer *vk_cmd,
                        struct vk_meta_device *meta, VkBuffer _buffer,
@@ -937,7 +952,7 @@ load_store_formatted(nir_builder *b, nir_def *base, nir_def *index,
 
 static nir_shader *
 build_image_copy_shader(const struct vk_meta_image_copy_key *key,
-                        bool native_formatted_memory)
+                        bool native_formatted_memory, bool g18g)
 {
    nir_builder build =
       nir_builder_init_simple_shader(MESA_SHADER_COMPUTE, NULL, "hk-meta-copy");
@@ -968,7 +983,14 @@ build_image_copy_shader(const struct vk_meta_image_copy_key *key,
 
    image->data.descriptor_set = 0;
    image->data.binding = BINDING_OUTPUT;
-   /* Partial tile copies read the destination before preserving its pixels. */
+   /* Partial tile copies read the destination before preserving its pixels.
+    *
+    * The block-based variant reads the destination back (the else branch's
+    * nir_image_deref_load). Declaring the image write-only makes nir_opt_access
+    * stamp ACCESS_NON_READABLE on that load, which the G17P/G18G indexed-image
+    * lowering declines by design (agx_nir_lower_g17p_combined_sampler.c,
+    * g17p_indexed_image_fetch_shape); the pass is all-or-nothing per shader, so
+    * the load kept its AGX2 bindless handle and the packer refused it. */
    image->data.access = key->block_based ? 0 : ACCESS_NON_READABLE;
 
    /* Multisampled stores use a linear PBE view. AGX2's address lowering
@@ -1076,7 +1098,12 @@ build_image_copy_shader(const struct vk_meta_image_copy_key *key,
             nir_image_deref_store(b, image_deref, nir_pad_vec4(b, dst_coord),
                                   ms_index, value1, nir_imm_int(b, 0),
                                   .image_dim = dim_dst,
-                                  .image_array = !dst_is_buf);
+                                  .image_array = !dst_is_buf,
+                                  /* G18G derives the imgwci format from the
+                                   * stored type; this kernel always writes
+                                   * the canonical 4x32 uint texel. */
+                                  .src_type = g18g ? nir_type_uint
+                                                   : nir_type_invalid);
          }
       }
       nir_push_else(b, NULL);
@@ -1223,7 +1250,11 @@ get_image_copy_pipeline(struct vk_device *device, struct vk_meta_device *meta,
       .nir = build_image_copy_shader(key,
          !agx_native_graphics(&container_of(device, struct hk_device, vk)->dev) &&
          !agx_chip_g17_m5(container_of(device, struct hk_device, vk)->dev.chip) &&
-         container_of(device, struct hk_device, vk)->dev.chip != AGX_CHIP_G16G),
+         container_of(device, struct hk_device, vk)->dev.chip != AGX_CHIP_G16G &&
+         /* G18G (AGX3) stores raw packed bytes too. */
+         container_of(device, struct hk_device, vk)->dev.chip != AGX_CHIP_G18G,
+         container_of(device, struct hk_device, vk)->dev.chip ==
+            AGX_CHIP_G18G),
    };
    const VkPipelineShaderStageCreateInfo cs_info = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -1448,7 +1479,8 @@ hk_meta_dispatch_to_image(struct vk_command_buffer *cmd,
                           VkPipelineLayout pipeline_layout,
                           struct vk_meta_push_data *push, VkOffset3D offset,
                           VkExtent3D extent, bool per_layer, unsigned layers,
-                          enum pipe_format p_dst_fmt, enum pipe_format p_format)
+                          enum pipe_format p_dst_fmt, enum pipe_format p_format,
+                          bool block_based)
 {
    push->dst_offset_el[0] = util_format_get_nblocksx(p_dst_fmt, offset.x);
    push->dst_offset_el[1] = util_format_get_nblocksy(p_dst_fmt, offset.y);
@@ -1457,6 +1489,21 @@ hk_meta_dispatch_to_image(struct vk_command_buffer *cmd,
    push->grid_el[0] = util_format_get_nblocksx(p_format, extent.width);
    push->grid_el[1] = util_format_get_nblocksy(p_format, extent.height);
    push->grid_el[2] = per_layer ? 1 : layers;
+
+   if (!block_based &&
+       hk_cmd_buffer_device(container_of(cmd, struct hk_cmd_buffer, vk))
+             ->dev.chip == AGX_CHIP_G18G) {
+      /* Plain image stores index the destination by global invocation id plus
+       * dst_offset_el in the kernel: no tile expansion, just cover the grid. */
+      disp->CmdPushConstants(vk_command_buffer_to_handle(cmd), pipeline_layout,
+                             VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(*push),
+                             push);
+      disp->CmdDispatch(vk_command_buffer_to_handle(cmd),
+                        DIV_ROUND_UP(push->grid_el[0], TILE_WIDTH),
+                        DIV_ROUND_UP(push->grid_el[1], TILE_HEIGHT),
+                        push->grid_el[2]);
+      return;
+   }
 
    unsigned w_el = util_format_get_nblocksx(p_format, extent.width);
    unsigned h_el = util_format_get_nblocksy(p_format, extent.height);
@@ -1524,8 +1571,7 @@ hk_meta_copy_buffer_to_image2(struct vk_command_buffer *cmd,
             .dst_format = hk_format_to_pipe_format(canonical),
 
             /* TODO: MSAA path */
-            .block_based =
-               (image->image_type != VK_IMAGE_TYPE_1D) && image->samples == 1,
+            .block_based = hk_meta_copy_block_based(cmd, image),
          };
 
          VkPipelineLayout pipeline_layout;
@@ -1627,7 +1673,8 @@ hk_meta_copy_buffer_to_image2(struct vk_command_buffer *cmd,
 
          hk_meta_dispatch_to_image(cmd, disp, pipeline_layout, &push,
                                    region->imageOffset, region->imageExtent,
-                                   per_layer, layers, p_format, p_format);
+                                   per_layer, layers, p_format, p_format,
+                                   key.block_based);
       }
    }
 }
@@ -1692,8 +1739,7 @@ hk_meta_copy_image2(struct vk_command_buffer *cmd, struct vk_meta_device *meta,
                   device, aspect_format(dst_image->format, dst_aspect_mask))),
 
                /* TODO: MSAA path */
-               .block_based = (dst_image->image_type != VK_IMAGE_TYPE_1D) &&
-                              dst_image->samples == 1,
+               .block_based = hk_meta_copy_block_based(cmd, dst_image),
             };
 
             assert(key.nr_samples == src_image->samples);
@@ -1831,7 +1877,8 @@ hk_meta_copy_image2(struct vk_command_buffer *cmd, struct vk_meta_device *meta,
 
             hk_meta_dispatch_to_image(cmd, disp, pipeline_layout, &push,
                                       region->dstOffset, region->extent,
-                                      per_layer, layers, p_dst_fmt, p_format);
+                                      per_layer, layers, p_dst_fmt, p_format,
+                                      key.block_based);
          }
       }
    }
@@ -4096,14 +4143,22 @@ hk_xfer_copybuffertoimage2(VkCommandBuffer commandBuffer,
 
    if (gfx) {
       /* M5 reaches this graphics upload only for a destination the raw
-       * upload above refuses, such as a compressed depth plane. A split
-       * depth/stencil destination needs the per-plane aspect views here as
-       * well: the interleaved R32G32_UINT alias is a view of plane 0 alone. */
-      const bool m5_split_zs = agx_chip_g17_m5(dev->dev.chip) &&
-                               hk_split_depth_stencil(dst_image->vk.format);
+       * upload above refuses, such as a compressed depth plane or colour
+       * image. A split depth/stencil destination needs the per-plane aspect
+       * views here as well: the interleaved R32G32_UINT alias is a view of
+       * plane 0 alone. A colour destination is written through the same
+       * integer alias image copies and readbacks use: through its own
+       * format, a normalized view would canonicalize the bits it copies
+       * (SNORM -1.0 has two encodings). */
+      const bool m5 = agx_chip_g17_m5(dev->dev.chip);
+      const bool m5_split_zs =
+         m5 && hk_split_depth_stencil(dst_image->vk.format);
+      const bool m5_color =
+         m5 && !vk_format_is_depth_or_stencil(dst_image->vk.format);
       struct vk_meta_copy_image_properties dst_props =
          hk_meta_copy_get_image_properties(
-            dst_image, dev, agx_native_graphics(&dev->dev) || m5_split_zs,
+            dst_image, dev,
+            agx_native_graphics(&dev->dev) || m5_split_zs || m5_color,
             m5_split_zs);
 
       if (agx_native_graphics(&dev->dev)) {

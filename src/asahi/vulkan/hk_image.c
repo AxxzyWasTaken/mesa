@@ -540,11 +540,13 @@ hk_can_compress(const struct agx_device *dev, VkFormat format, unsigned plane,
  * compressed PBE descriptors, and an input attachment reads it as a sampled
  * colour attachment does. Bits 0-10 select RGBA16F, RG16F, R16F, R32F, RG32F, RGBA32F,
  * RGBA8 UNORM, the other RGBA16 formats, the other RG16 formats, the other
- * RGBA8 formats and the other R16 formats, respectively; bit 12 admits
- * mipmapped images, whose levels compress as those of colour attachments
- * do. Zero retains the uncompressed diagnostic control. */
+ * RGBA8 formats and the other R16 formats, respectively; bit 11 selects
+ * B10G11R11, whose end-of-tile store keeps its class on M5
+ * (agx_rt0_pbe_format); bit 12 admits mipmapped images, whose levels
+ * compress as those of colour attachments do. Zero retains the uncompressed
+ * diagnostic control. */
 DEBUG_GET_ONCE_NUM_OPTION(m5_storage_compression,
-                         "ASAHI_M5_STORAGE_COMPRESSION", 6143)
+                         "ASAHI_M5_STORAGE_COMPRESSION", 8191)
 
 static bool
 hk_m5_storage_compression_eligible(const struct agx_device *dev, unsigned plane,
@@ -611,6 +613,7 @@ hk_m5_storage_compression_eligible(const struct agx_device *dev, unsigned plane,
    case VK_FORMAT_R16_SNORM:
    case VK_FORMAT_R16_UINT:
    case VK_FORMAT_R16_SINT: bit = 1024; break;
+   case VK_FORMAT_B10G11R11_UFLOAT_PACK32: bit = 2048; break;
    default: return false;
    }
    /* A mutable image's views may be FLOAT when the image is not: the list
@@ -636,16 +639,16 @@ hk_float_image_atomics(const struct hk_device *dev)
 }
 
 /* Compressed data is only decodable through its own channel class. Every
- * G17P writer of a colour image is a PBE; the end-of-tile PBE may store a
- * different format from the image (agx_g17p_rt0_pbe_format packs
+ * G17P/M5 writer of a colour image is a PBE; the end-of-tile PBE may store a
+ * different format from the image (agx_rt0_pbe_format: G17P packs
  * R11G11B10/RGB9E5 into R32_UINT words). Never compress an image whose store
  * class would differ from the class its textures read. */
 static bool
 hk_g17p_store_class_matches(const struct agx_device *dev, VkFormat format)
 {
    const enum pipe_format p_format = hk_format_to_pipe_format(format);
-   const enum pipe_format store = agx_g17p_rt0_pbe_format(
-      util_format_linear(hk_padded_image_format(p_format)));
+   const enum pipe_format store = agx_rt0_pbe_format(
+      dev->chip, util_format_linear(hk_padded_image_format(p_format)));
    if (ail_formats_compatible(p_format, store))
       return true;
 
@@ -1450,6 +1453,10 @@ hk_image_init(struct hk_device *dev, struct hk_image *image,
               const VkImageCreateInfo *pCreateInfo)
 {
    vk_image_init(&dev->vk, &image->vk, pCreateInfo);
+   image->swapchain_memory =
+      vk_find_struct_const(pCreateInfo->pNext, WSI_IMAGE_CREATE_INFO_MESA) ||
+      vk_find_struct_const(pCreateInfo->pNext,
+                           IMAGE_SWAPCHAIN_CREATE_INFO_KHR);
 
    if ((image->vk.usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) &&

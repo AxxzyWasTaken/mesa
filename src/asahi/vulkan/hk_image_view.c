@@ -483,7 +483,7 @@ pack_pbe(struct hk_device *dev, struct hk_image_view *view, unsigned view_plane,
 
    if (eot && (agx_native_graphics(&dev->dev) ||
                 agx_chip_g17_m5(dev->dev.chip)))
-      p_format = agx_g17p_rt0_pbe_format(p_format);
+      p_format = agx_rt0_pbe_format(dev->dev.chip, p_format);
 
    const struct util_format_description *desc =
       util_format_description(p_format);
@@ -741,7 +741,8 @@ hk_image_view_init(struct hk_device *dev, struct hk_image_view *view,
       if (!textures_valid)
          return VK_ERROR_FORMAT_NOT_SUPPORTED;
 
-      if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) {
+      if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+          dev->dev.chip == AGX_CHIP_G18G) {
          VkResult result = hk_descriptor_table_add(
             dev, &dev->sampled_images, &view->planes[p].sampled, 32,
             &view->planes[p].sampled_heap_index);
@@ -858,7 +859,8 @@ hk_DestroyImageView(VkDevice _device, VkImageView imageView,
    if (!view)
       return;
 
-   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) {
+   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+       dev->dev.chip == AGX_CHIP_G18G) {
       for (unsigned p = 0; p < view->plane_count; ++p) {
          if (view->planes[p].emrt_read_heap_index)
             hk_descriptor_table_remove(dev, &dev->sampled_images,
