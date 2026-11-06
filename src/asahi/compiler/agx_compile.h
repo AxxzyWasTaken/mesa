@@ -223,11 +223,14 @@ struct agx_shader_info {
    /* Shader is incompatible with triangle merging */
    bool disable_tri_merging;
 
-   /* Fragment shader reads implicit quad derivatives: an implicit-LOD texture
-    * op, ddx/ddy, or a quad intrinsic. Triangle merging packs fragments of two
-    * primitives that share an edge into a single 2x2 quad, so the lanes of a
-    * quad straddling that edge interpolate from two different plane equations
-    * and any derivative taken across it is meaningless.
+   /* Fragment shader takes quad derivatives: an implicit-LOD texture op or
+    * ddx/ddy, or it declares QuadDerivativesKHR. Triangle merging
+    * packs fragments of two primitives that share an edge into a single 2x2
+    * quad, so the lanes of a quad straddling that edge interpolate from two
+    * different plane equations and any derivative taken across it is
+    * meaningless. A quad intrinsic alone does not count: it reads another
+    * lane's own value, and merging is what keeps a clipped primitive's pieces
+    * in whole quads (Metal leaves it on for quad_broadcast on the M4 Pro).
     *
     * This is deliberately narrower than disable_tri_merging, which also covers
     * memory writes and wide subgroup intrinsics. Apple's own G17P shader
