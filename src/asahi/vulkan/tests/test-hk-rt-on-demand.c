@@ -114,7 +114,7 @@ __wrap_agx_bo_unreference(struct agx_device *dev, struct agx_bo *bo)
 
 int
 __wrap_agx_bo_bind(struct agx_device *dev, struct agx_bo *bo, uint64_t address,
-                   uint64_t size, uint64_t offset, uint32_t flags)
+                   size_t size, uint64_t offset, uint32_t flags)
 {
    if (flags & DRM_ASAHI_BIND_UNBIND)
       ++unbinds;
