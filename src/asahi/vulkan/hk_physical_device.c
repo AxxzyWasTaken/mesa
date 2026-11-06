@@ -1109,8 +1109,17 @@ hk_get_device_properties(const struct agx_device *dev,
       /* Storage buffers are lowered to global address arithmetic with a
        * zero-extended 32-bit offset, so the whole 32-bit range works. Direct3D
        * views reach just under 4 GiB.
+       *
+       * M5 and later fold constant index addends into a signed byte offset
+       * (agx_nir_lower_address() with byte_offsets), which sign-extends a
+       * scaled index and relies on every valid offset staying below 2^31.
+       * Keep them at INT32_MAX; G13/G14 and G17P take the full range.
        */
-      .maxStorageBufferRange = UINT32_MAX,
+      .maxStorageBufferRange =
+         agx_chip_isa_encoding(dev->chip) == AGX_ISA_ENCODING_AGX2 ||
+               agx_chip_isa_encoding(dev->chip) == AGX_ISA_ENCODING_AGX3B
+            ? UINT32_MAX
+            : INT32_MAX,
       .maxPushConstantsSize = HK_MAX_PUSH_SIZE,
       .maxMemoryAllocationCount = 4096,
       .maxSamplerAllocationCount = 1 << 20,
