@@ -41,6 +41,8 @@ agx_disk_cache_compute_key(struct disk_cache *cache,
       key_size = sizeof(shader_key->fs);
    else if (uncompiled->type == MESA_SHADER_COMPUTE)
       key_size = sizeof(shader_key->cs);
+   else if (uncompiled->type == MESA_SHADER_GEOMETRY)
+      key_size = sizeof(shader_key->gs);
    else
       key_size = 0;
 
@@ -73,6 +75,7 @@ write_shader(struct blob *blob, const struct agx_compiled_shader *binary,
    blob_write_bytes(blob, &binary->epilog_key, sizeof(binary->epilog_key));
    blob_write_uint8(blob, binary->g17p_texture_resources);
    blob_write_uint8(blob, binary->g17p_custom_border_emulation);
+   blob_write_uint8(blob, binary->g17g_samples_unrolled);
    blob_write_uint32(blob, binary->push_range_count);
    blob_write_bytes(blob, binary->push,
                     sizeof(binary->push[0]) * binary->push_range_count);
@@ -115,9 +118,14 @@ read_shader(struct agx_screen *screen, struct blob_reader *blob,
          memcpy(agx_bo_map(binary->bo), binary->b.binary, size);
       }
    } else if (size) {
+      /* G17P's native compute Ioto program is built from the shader bytes at
+       * dispatch time, so a cached compute shader needs the CPU copy as well
+       * as its executable BO.  Keeping only the BO made the uncached dispatch
+       * work and the identical cached dispatch fail descriptor validation. */
       binary->bo = agx_bo_create(&screen->dev, size, 0,
                                  AGX_BO_EXEC | AGX_BO_LOW_VA, "Executable");
-      if (agx_native_graphics(&screen->dev)) {
+      if (agx_native_graphics(&screen->dev) ||
+          screen->dev.chip == AGX_CHIP_G17G) {
          /* Native compute Ioto programs need the cached CPU shader bytes. */
          binary->b.binary = malloc(size);
          blob_copy_bytes(blob, binary->b.binary, size);
@@ -133,6 +141,7 @@ read_shader(struct agx_screen *screen, struct blob_reader *blob,
    blob_copy_bytes(blob, &binary->epilog_key, sizeof(binary->epilog_key));
    binary->g17p_texture_resources = blob_read_uint8(blob);
    binary->g17p_custom_border_emulation = blob_read_uint8(blob);
+   binary->g17g_samples_unrolled = blob_read_uint8(blob);
    binary->push_range_count = blob_read_uint32(blob);
    blob_copy_bytes(blob, binary->push,
                    sizeof(binary->push[0]) * binary->push_range_count);
@@ -221,7 +230,11 @@ void
 agx_disk_cache_init(struct agx_screen *screen)
 {
 #ifdef ENABLE_SHADER_CACHE
-   if (agx_get_compiler_debug() || (screen->dev.debug & ~ALLOWED_FLAGS))
+   /* G18G keeps j873's persistent cache off: its compiler A/B gates
+    * (agx_get_fs_structure_flags(), AGX_G18_MSAA4) select code paths that
+    * must never share persistent shader entries. */
+   if (agx_get_compiler_debug() || (screen->dev.debug & ~ALLOWED_FLAGS) ||
+       screen->dev.chip == AGX_CHIP_G18G)
       return;
 
    const char *renderer = screen->pscreen.get_name(&screen->pscreen);

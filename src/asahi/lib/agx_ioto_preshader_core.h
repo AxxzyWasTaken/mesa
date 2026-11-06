@@ -92,6 +92,33 @@ bool agx_ioto_constant_program_emit(
    uint64_t suffix_va, struct agx_ioto_preshader_output *output);
 
 /*
+ * Reproduce the size choice in setConstantCalculationProgramInfo:
+ *
+ *   end32 > start ? (uint32_t)(end32 - start) : alternate_end - start
+ *
+ * Unlike Apple's unchecked subtraction, malformed descending ranges fail.
+ * `size` is unchanged on failure.
+ */
+bool agx_ioto_preshader_program_size(uint32_t start, uint32_t end32,
+                                     uint64_t alternate_end, size_t *size);
+
+/*
+ * Bind a nonempty compiled range to matching CPU and GPU copies of its
+ * original binary. The GPU base must not refer to a separately linked main
+ * shader. Both copies must contain the whole range, and its GPU extent must
+ * fit the even-addressed 48-bit branch domain.
+ *
+ * Updates only code, code_size, and external_va. The caller's explicit
+ * force/prelude options are preserved; no ABI policy is inferred here.
+ * The descriptor is unchanged on failure, including a missing GPU mapping.
+ * This validates bounds, not instructions, register/scratch use, or BO lifetime.
+ */
+bool agx_ioto_preshader_bind_range(const void *binary, size_t binary_size,
+                                   uint64_t binary_va, size_t gpu_size,
+                                   size_t offset, size_t size,
+                                   struct agx_ioto_preshader_desc *desc);
+
+/*
  * Pack the target-family long B or BL form.  The constant-calculation suffix
  * calls this with link=false; BL is used by the separate profile-state loader.
  * `target_va` is the 48-bit two's-complement PC-relative byte displacement,

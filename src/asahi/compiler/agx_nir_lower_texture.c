@@ -23,6 +23,9 @@
 struct agx_texture_lower_options {
    bool gen9;
    bool gen10;
+   /* G18G (AGX_NIR_TEXTURE_GENERATION_G18G): Gen10 plus the forms the J873
+    * GL 4.6 campaign qualified. */
+   bool g18g;
    bool buffer_metadata;
    agx_buffer_texture_metadata_cb buffer_metadata_cb;
    /* Formatless image loads still need view-bounds robustness. */
@@ -103,6 +106,111 @@ buffer_texture_descriptor_ptr(nir_builder *b, nir_tex_instr *tex,
 }
 
 static bool
+bound_image_atomic(const nir_intrinsic_instr *intr, const void *data)
+{
+   return (intr->intrinsic == nir_intrinsic_image_atomic ||
+           intr->intrinsic == nir_intrinsic_image_atomic_swap) &&
+          intr->def.bit_size == 32;
+}
+
+static bool
+fence_bound_image_atomic(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+{
+   return bound_image_atomic(intr, NULL) && fence_image(b, intr, NULL);
+}
+
+/* Gallium G18 supplies explicit view metadata at binding lowering. Preserve
+ * the same fences as the later image lowering before removing the atomics. */
+bool
+agx_nir_lower_bound_image_atomics(nir_shader *s)
+{
+   nir_shader_intrinsics_pass(s, fence_bound_image_atomic,
+                              nir_metadata_control_flow, NULL);
+   return nir_lower_image_atomics_to_global(s, bound_image_atomic, NULL);
+}
+
+static bool
+bound_ms_image_store(const nir_intrinsic_instr *intr, const void *data)
+{
+   if (intr->intrinsic != nir_intrinsic_image_store ||
+       nir_intrinsic_image_dim(intr) != GLSL_SAMPLER_DIM_MS ||
+       intr->src[3].ssa->bit_size != 32)
+      return false;
+
+   switch (nir_intrinsic_format(intr)) {
+   case PIPE_FORMAT_NONE:
+      /* Formatless writes use the actual bound view's raw32 block size.
+       * The Gallium metadata validator rejects packed/normalized formats
+       * until their conversion lowering is implemented. */
+      return true;
+   case PIPE_FORMAT_R32_FLOAT:
+   case PIPE_FORMAT_R32_SINT:
+   case PIPE_FORMAT_R32_UINT:
+   case PIPE_FORMAT_R32G32_FLOAT:
+   case PIPE_FORMAT_R32G32_SINT:
+   case PIPE_FORMAT_R32G32_UINT:
+   case PIPE_FORMAT_R32G32B32A32_FLOAT:
+   case PIPE_FORMAT_R32G32B32A32_SINT:
+   case PIPE_FORMAT_R32G32B32A32_UINT:
+      return true;
+   default:
+      return false;
+   }
+}
+
+static bool
+lower_bound_ms_image_store(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+{
+   if (!bound_ms_image_store(intr, NULL))
+      return false;
+
+   b->cursor = nir_before_instr(&intr->instr);
+   enum pipe_format format = nir_intrinsic_format(intr);
+   unsigned components = util_format_get_blocksize(format) / 4;
+   nir_def *address = nir_image_texel_address(
+      b, 64, intr->src[0].ssa, intr->src[1].ssa, intr->src[2].ssa,
+      .image_dim = GLSL_SAMPLER_DIM_MS,
+      .image_array = nir_intrinsic_image_array(intr), .format = format,
+      .access = nir_intrinsic_access(intr));
+   nir_intrinsic_set_range_base(nir_def_as_intrinsic(address),
+                                nir_intrinsic_range_base(intr));
+   if (format == PIPE_FORMAT_NONE) {
+      nir_def *bytes = nir_load_image_block_size_agx(b, intr->src[0].ssa);
+      /* R/RG/RGBA raw32 views occupy 4/8/16 bytes. Never write unused
+       * components into the adjacent pixel or sample. The view may change
+       * between dispatches without recompiling this formatless program. */
+      for (unsigned c = 0; c < 4; ++c) {
+         nir_push_if(b, nir_uge_imm(b, bytes, (c + 1) * 4));
+         nir_store_global(b, nir_channel(b, intr->src[3].ssa, c),
+                          nir_iadd_imm(b, address, c * 4), .align_mul = 4,
+                          .write_mask = 1, .access = nir_intrinsic_access(intr));
+         nir_pop_if(b, NULL);
+      }
+   } else {
+      nir_store_global(b, nir_trim_vector(b, intr->src[3].ssa, components), address,
+                       .align_mul = 4, .write_mask = BITFIELD_MASK(components),
+                       .access = nir_intrinsic_access(intr));
+   }
+   if (!(nir_intrinsic_access(intr) & ACCESS_NON_READABLE))
+      nir_fence_mem_to_tex_agx(b);
+
+   b->shader->info.use_lowered_image_to_global = true;
+   nir_instr_remove(&intr->instr);
+   return true;
+}
+
+bool
+agx_nir_lower_bound_ms_image_stores(nir_shader *s)
+{
+   /* Raw memory lacks the image hardware's bounds checks. Guard coordinates
+    * and the sample index before removing the image operation, regardless
+    * of whether the GL context requested robust buffer access. */
+   bool progress = nir_lower_robust_access(s, bound_ms_image_store, NULL);
+   return nir_shader_intrinsics_pass(s, lower_bound_ms_image_store,
+                                     nir_metadata_none, NULL) || progress;
+}
+
+static bool
 has_nonzero_lod(nir_tex_instr *tex)
 {
    int idx = nir_tex_instr_src_index(tex, nir_tex_src_lod);
@@ -162,6 +270,12 @@ lower_tex_crawl(nir_builder *b, nir_instr *instr, void *data)
    if (options && options->buffer_metadata && tex->op == nir_texop_txs &&
        tex->sampler_dim == GLSL_SAMPLER_DIM_BUF) {
       res = load_buffer_metadata(b, ptr, AGX_G17P_BUFFER_TEXTURE_SIZE_OFFSET, 32);
+   } else if (options && options->gen10 && tex->op == nir_texop_txs &&
+              tex->sampler_dim == GLSL_SAMPLER_DIM_BUF) {
+      /* Gallium's Gen10 buffer texture keeps its element count in the
+       * descriptor's last word (agx_pack_texture), where Gen10 leaves it
+       * free; Gen10 has no G17P metadata record. */
+      res = load_buffer_metadata(b, ptr, AGX_GEN10_BUFFER_TEXTURE_SIZE_OFFSET, 32);
    } else if (gen9 && tex->op == nir_texop_txs &&
        tex->sampler_dim != GLSL_SAMPLER_DIM_BUF) {
       res = libagx_txs_gen9(b, ptr, lod, nir_imm_int(b, nr_comps),
@@ -173,7 +287,9 @@ lower_tex_crawl(nir_builder *b, nir_instr *instr, void *data)
       res = libagx_texture_levels_gen9(b, ptr);
    } else if (gen9 && tex->op == nir_texop_texture_samples) {
       res = libagx_texture_samples_gen9(b, ptr);
-   } else if (options && options->gen10 && tex->op == nir_texop_txs) {
+   } else if (options && options->gen10 && tex->op == nir_texop_txs &&
+              /* G18G sizes a buffer through the generic crawl below. */
+              !(options->g18g && tex->sampler_dim == GLSL_SAMPLER_DIM_BUF)) {
       res = libagx_txs_gen10(b, ptr, lod, nir_imm_int(b, nr_comps),
                            nir_imm_bool(b, tex->sampler_dim == GLSL_SAMPLER_DIM_1D),
                            nir_imm_bool(b, tex->sampler_dim == GLSL_SAMPLER_DIM_2D),
@@ -392,13 +508,22 @@ lower_buffer_texture(nir_builder *b, nir_tex_instr *tex, bool buffer_metadata,
                      int fixed_format, bool known_in_bounds, nir_def **result)
 {
    nir_def *coord = nir_steal_tex_src(tex, nir_tex_src_coord);
-   nir_def *size = nir_get_texture_size(b, tex);
+   nir_def *bound_metadata = NULL;
+   if (tex->backend_flags & AGX_TEXTURE_FLAG_BUFFER_METADATA) {
+      bound_metadata = nir_steal_tex_src(tex, nir_tex_src_backend2);
+      assert(bound_metadata && bound_metadata->num_components == 4 &&
+             bound_metadata->bit_size == 32);
+      tex->backend_flags &= ~AGX_TEXTURE_FLAG_BUFFER_METADATA;
+   }
+   nir_def *size = bound_metadata ? nir_channel(b, bound_metadata, 0)
+                                  : nir_get_texture_size(b, tex);
    nir_def *oob = known_in_bounds ? nir_imm_bool(b, false) :
       nir_uge(b, coord, size);
 
    /* Apply the buffer offset after calculating oob but before remapping */
-   nir_def *desc = buffer_texture_descriptor_ptr(b, tex, options);
-   coord = buffer_metadata
+   nir_def *desc =
+      bound_metadata ? NULL : buffer_texture_descriptor_ptr(b, tex, options);
+   coord = bound_metadata ? coord : buffer_metadata
       ? nir_iadd(b, coord, load_buffer_metadata(
            b, desc, AGX_G17P_BUFFER_TEXTURE_TAIL_OFFSET, 32))
       : libagx_buffer_texture_offset(b, desc, coord);
@@ -426,6 +551,8 @@ lower_buffer_texture(nir_builder *b, nir_tex_instr *tex, bool buffer_metadata,
     */
    nir_def *is_rgb32 = fixed_format >= 0
       ? nir_imm_bool(b, fixed_format)
+      : bound_metadata
+      ? nir_ine_imm(b, nir_channel(b, bound_metadata, 1), 0)
       : buffer_metadata
       ? nir_ine_imm(b, load_buffer_metadata(
            b, desc, AGX_G17P_BUFFER_TEXTURE_RGB32_OFFSET, 32), 0)
@@ -433,9 +560,11 @@ lower_buffer_texture(nir_builder *b, nir_tex_instr *tex, bool buffer_metadata,
    nir_if *nif = nir_push_if(b, nir_iand(b, is_rgb32, nir_inot(b, oob)));
 
    nir_def *rgb32;
-   if (buffer_metadata) {
-      nir_def *base = load_buffer_metadata(
-         b, desc, AGX_G17P_BUFFER_TEXTURE_ADDRESS_OFFSET, 64);
+   if (bound_metadata || buffer_metadata) {
+      nir_def *base = bound_metadata
+         ? nir_pack_64_2x32(b, nir_channels(b, bound_metadata, 0xc))
+         : load_buffer_metadata(
+              b, desc, AGX_G17P_BUFFER_TEXTURE_ADDRESS_OFFSET, 64);
       /* In-bounds RGB32 buffer indices fit the 32-bit multiply by three,
        * as in libagx_texture_load_rgb32. Keep the address add fully 64-bit.
        */
@@ -748,6 +877,7 @@ lower_regular_texture(nir_builder *b, nir_instr *instr, void *data)
    const struct agx_texture_lower_options *options = data;
    const bool gen9 = options && options->gen9;
    const bool native_bounds = options && (options->gen9 || options->gen10);
+   const bool g18g = options && options->g18g;
    const bool robust_texel_fetch = !options || options->robust_texel_fetch;
    b->cursor = nir_before_instr(instr);
 
@@ -842,8 +972,16 @@ lower_regular_texture(nir_builder *b, nir_instr *instr, void *data)
                         coord);
    }
 
+   /* Without image robustness an out-of-range layer only has to stay memory
+    * safe. The Gen9/10 texture unit bounds the 16-bit layer to the view
+    * itself (G17G returns zero past the view's last layer, see the sample
+    * layer clamp below), so the layer check is only needed for robust images
+    * there. */
+   const bool check_txf_layer =
+      tex->is_array && (!native_bounds || robust_texel_fetch);
+
    if (is_txf && !g17p_txf_oob &&
-       (has_nonzero_lod(tex) || tex->is_array ||
+       (has_nonzero_lod(tex) || check_txf_layer ||
         nir_tex_instr_src_index(tex, nir_tex_src_min_lod) >= 0) &&
        !(tex->backend_flags & AGX_TEXTURE_FLAG_NO_CLAMP)) {
 
@@ -866,13 +1004,14 @@ lower_regular_texture(nir_builder *b, nir_instr *instr, void *data)
        * Legacy mip fields overlap Gen10's sample/mipmap flags. */
       nir_def *(*lower)(nir_builder *, nir_def *, nir_def *, nir_def *,
                          nir_def *, nir_def *, nir_def *, nir_def *, nir_def *) =
-         native_bounds ? libagx_lower_txf_robustness_gen9
-                       : libagx_lower_txf_robustness;
+         g18g            ? libagx_lower_txf_robustness_gen10
+         : native_bounds ? libagx_lower_txf_robustness_gen9
+                         : libagx_lower_txf_robustness;
       nir_def *replaced = lower(
          b, texture_descriptor_ptr(b, tex),
          nir_imm_bool(b, has_nonzero_lod(tex)), lod,
          nir_imm_bool(b, min_lod != NULL), min_lod ?: nir_undef(b, 1, 16),
-         nir_imm_bool(b, tex->is_array), layer, nir_channel(b, coord, 0));
+         nir_imm_bool(b, check_txf_layer), layer, nir_channel(b, coord, 0));
 
       coord = nir_vector_insert_imm(b, coord, replaced, 0);
    }
@@ -887,6 +1026,25 @@ lower_regular_texture(nir_builder *b, nir_instr *instr, void *data)
       nir_def *unclamped_layer = nir_channel(b, coord, lidx);
       coord = nir_trim_vector(b, coord, lidx);
 
+      /* G17P and G17G clamp the 16-bit hardware layer to the view in
+       * hardware, so the software clamp to the layer count is dead weight
+       * there. nir_get_texture_size() lowers to loading and DECODING the
+       * packed descriptor -- once per indexed array sample -- purely to learn
+       * the layer count, and on the CTS 4-lookup array-shadow shape that is
+       * most of the shader: 1812 bytes with 17 device loads and ~79
+       * iadd/isel, where Apple's compiler emits 316 bytes with ZERO device
+       * loads from the same source. Dropping it takes that shader to 990.
+       *
+       * Verified on hardware with reproducers that read a distinct texel per
+       * layer, so they detect which layer was sampled. G17P: 4- and 8-layer
+       * images, requested layers 0/1/3/4/7/100/100000. G17G: a 12-layer 2D
+       * array view, a 2-layer view at base layer 1, cube array views of 2
+       * cubes and of 1 cube at base layer 6, layers 0..9/100/4095/65535/
+       * 100000/1e9 and negative ones. All return the correctly clamped layer.
+       * The clamp only sees the 16-bit layer, though: layer 65536 reads layer
+       * 0, so saturate to 0xFFFF before the truncation. */
+      const bool skip_layer_clamp = options && (options->gen9 || options->gen10);
+
       /* Round layer to nearest even */
       if (!is_txf) {
          unclamped_layer = nir_fround_even(b, unclamped_layer);
@@ -894,8 +1052,14 @@ lower_regular_texture(nir_builder *b, nir_instr *instr, void *data)
          /* Explicitly round negative to avoid undefined behaviour when constant
           * folding. This is load bearing on x86 builds.
           */
-         unclamped_layer =
-            nir_f2u32(b, nir_fmax(b, unclamped_layer, nir_imm_float(b, 0.0f)));
+         unclamped_layer = nir_fmax(b, unclamped_layer, nir_imm_float(b, 0.0f));
+
+         if (skip_layer_clamp) {
+            unclamped_layer =
+               nir_fmin(b, unclamped_layer, nir_imm_float(b, 65535.0f));
+         }
+
+         unclamped_layer = nir_f2u32(b, unclamped_layer);
       }
 
       /* For a cube array, the layer is zero-indexed component 3 of the
@@ -912,22 +1076,6 @@ lower_regular_texture(nir_builder *b, nir_instr *instr, void *data)
        * For txf, we drop out-of-bounds components rather than clamp, see the
        * above txf robustness workaround.
        */
-      /* G17P clamps the array layer in hardware, so the software clamp is
-       * dead weight there. nir_get_texture_size() lowers to loading and
-       * DECODING the packed descriptor -- once per indexed array sample --
-       * purely to learn the layer count, and on the CTS 4-lookup array-shadow
-       * shape that is most of the shader: 1812 bytes with 17 device loads and
-       * ~79 iadd/isel, where Apple's compiler emits 316 bytes with ZERO device
-       * loads from the same source. Dropping it takes that shader to 990.
-       *
-       * Verified on hardware with a multi-layer reproducer that reads a
-       * distinct texel per layer, so it detects which layer was sampled:
-       * 4- and 8-layer images, requested layers 0/1/3/4/7/100/100000, all
-       * return the correctly clamped layer with this disabled. An unclamped
-       * read would wrap or read out of bounds; layer 9 of 4 returns layer 3,
-       * not layer 1. */
-      const bool skip_layer_clamp = options && options->gen9;
-
       if (!(tex->backend_flags & AGX_TEXTURE_FLAG_NO_CLAMP) && !is_txf &&
           !skip_layer_clamp) {
          nir_def *txs = nir_get_texture_size(b, tex);
@@ -969,6 +1117,20 @@ lower_regular_texture(nir_builder *b, nir_instr *instr, void *data)
    nir_def *offset = nir_steal_tex_src(tex, nir_tex_src_offset);
 
    if (offset != NULL) {
+      /* G18G: native runtime gathers consume two signed halfword inputs.
+       * Keep the pair together through register allocation; PACK_SMPIR
+       * inserts its low nibbles and merges any array layer. Only constants
+       * use the compact immediate-offset representation. */
+      if (g18g && tex->op == nir_texop_tg4 &&
+          !g17p_offset_is_constant(offset)) {
+         assert(offset->num_components == 2);
+         nir_def *packed = nir_pack_32_2x16_split(
+            b, nir_i2i16(b, nir_channel(b, offset, 0)),
+            nir_i2i16(b, nir_channel(b, offset, 1)));
+         nir_tex_instr_add_src(tex, nir_tex_src_backend2, packed);
+         goto offset_lowered;
+      }
+
       /* G17G (generation 10) runtime offsets use the same PACK_SMPIR into
        * bank 6 as G17P, reading X and Y as separate 16-bit sources (native
        * texwit3/texwit4 d_auto, d_lvl2, d_bias1, d_grad, d_cmp*, d_gath*).
@@ -1159,8 +1321,9 @@ offset_lowered:
 
       /* HAL200's register/uniform sampler operand is the widened native-table
        * index. Immediate indices remain constants after folding, while a
-       * dynamic API index must reach the backend as one 64-bit operand. */
-      if (gen9)
+       * dynamic API index must reach the backend as one 64-bit operand.
+       * G18G's Gen10 register/uniform samplers use the same widened index. */
+      if (gen9 || g18g)
          native_sampler = nir_u2u64(b, native_sampler);
 
       nir_tex_instr_add_src(tex, nir_tex_src_sampler_handle, native_sampler);
@@ -1259,11 +1422,13 @@ image_texel_address(nir_builder *b, nir_intrinsic_instr *intr,
 
    if (dim == GLSL_SAMPLER_DIM_BUF && return_index) {
       return nir_channel(b, coord, 0);
-   } else if (dim == GLSL_SAMPLER_DIM_BUF && (buffer_metadata || gen9 || gen10)) {
+   } else if (dim == GLSL_SAMPLER_DIM_BUF && (buffer_metadata || gen9)) {
       /* Buffer atomics receive the PBE handle, but Gen9 has no AGX2
        * software address/offset fields. Use the same sideband as buffer
-       * loads and stores, relative to the start of the descriptor.
-       */
+       * loads and stores, relative to the start of the descriptor. Gen10
+       * Gallium has no such record: the PBE is a plain linear packet whose
+       * buffer field names the texels, so it falls through to the generic
+       * path below. */
       nir_def *desc = nir_iadd_imm(
          b, desc_address, -AGX_G17P_BUFFER_TEXTURE_PBE_OFFSET);
       nir_def *base = load_buffer_metadata(
@@ -1274,11 +1439,17 @@ image_texel_address(nir_builder *b, nir_intrinsic_instr *intr,
       return nir_iadd(b, base,
                       nir_imul(b, nir_u2u64(b, element),
                                nir_u2u64(b, blocksize_B)));
-   } else if (dim == GLSL_SAMPLER_DIM_BUF) {
+   } else if (dim == GLSL_SAMPLER_DIM_BUF && !(gen9 || gen10)) {
       return libagx_buffer_texel_address(b, desc_address, coord, blocksize_B);
    } else if (gen9 || gen10) {
+      /* Gen9 keeps the addressing word in the storage tail that follows the
+       * texture/PBE pair, 40 bytes past the PBE handle. Gen10 has no tail
+       * record; Gallium packs the same word into the PBE's last eight
+       * bytes, which no Gen10 field occupies. */
       nir_def *sw_address =
-         nir_iadd_imm(b, desc_address, AGX_G17P_IMAGE_ATOMIC_SW_FROM_PBE);
+         nir_iadd_imm(b, desc_address,
+                      gen10 ? AGX_GEN10_IMAGE_ATOMIC_SW_OFFSET
+                            : AGX_G17P_IMAGE_ATOMIC_SW_FROM_PBE);
       if (dim == GLSL_SAMPLER_DIM_MS) {
          /* MS storage uses a linear PBE over the tiled allocation. Its
           * native width is the buffer window, not the source image width.
@@ -1418,7 +1589,8 @@ lower_1d_image(nir_builder *b, nir_intrinsic_instr *intr)
  * libagx_lower_txf_robustness for more info.
  */
 static bool
-lower_image_load_robustness(nir_builder *b, nir_intrinsic_instr *intr, bool gen9)
+lower_image_load_robustness(nir_builder *b, nir_intrinsic_instr *intr,
+                            bool gen9, bool g18g)
 {
    if (nir_intrinsic_access(intr) & ACCESS_IN_BOUNDS)
       return false;
@@ -1443,7 +1615,9 @@ lower_image_load_robustness(nir_builder *b, nir_intrinsic_instr *intr, bool gen9
    /* image_load is effectively the same as txf, reuse the txf lower */
    nir_def *(*lower)(nir_builder *, nir_def *, nir_def *, nir_def *,
                       nir_def *, nir_def *, nir_def *, nir_def *, nir_def *) =
-      gen9 ? libagx_lower_txf_robustness_gen9 : libagx_lower_txf_robustness;
+      g18g    ? libagx_lower_txf_robustness_gen10
+      : gen9  ? libagx_lower_txf_robustness_gen9
+              : libagx_lower_txf_robustness;
    nir_def *replaced = lower(
       b, nir_load_from_texture_handle_agx(b, intr->src[0].ssa),
       nir_imm_bool(b, false /* lower LOD */), lod,
@@ -1506,6 +1680,7 @@ lower_images(nir_builder *b, nir_intrinsic_instr *intr, void *data)
    b->cursor = nir_before_instr(&intr->instr);
    const struct agx_texture_lower_options *options = data;
    const bool gen9 = options && options->gen9;
+   const bool g18g = options && options->g18g;
 
    switch (intr->intrinsic) {
    case nir_intrinsic_image_load:
@@ -1529,7 +1704,8 @@ lower_images(nir_builder *b, nir_intrinsic_instr *intr, void *data)
                  intr->intrinsic == nir_intrinsic_bindless_image_load ||
                  intr->intrinsic == nir_intrinsic_bindless_image_sparse_load) {
          lower_image_load_robustness(b, intr,
-                                      gen9 || (options && options->gen10));
+                                      gen9 || (options && options->gen10),
+                                      g18g);
       }
 
       switch (nir_intrinsic_image_dim(intr)) {
@@ -1909,10 +2085,13 @@ lower_texture(nir_shader *s, unsigned generation, bool buffer_metadata,
               agx_buffer_texture_metadata_cb buffer_metadata_cb)
 {
    bool progress = false;
+   const bool g18g = generation & AGX_NIR_TEXTURE_GENERATION_G18G;
+   generation &= ~AGX_NIR_TEXTURE_GENERATION_G18G;
    const bool gen9 = generation == 9;
    const struct agx_texture_lower_options options = {
       .gen9 = gen9,
       .gen10 = generation == 10,
+      .g18g = g18g && generation == 10,
       .buffer_metadata = buffer_metadata,
       .buffer_metadata_cb = buffer_metadata_cb,
       .robust_formatless_images = robust_formatless_images,
@@ -2045,7 +2224,11 @@ lower_multisampled_store(nir_builder *b, nir_intrinsic_instr *intr,
       return false;
 
    nir_def *index_px;
-   if (*(unsigned *)data == 9) {
+   const unsigned generation = *(unsigned *)data;
+   /* G18G: native eMRT tables carry software geometry outside the hardware
+    * PBE. This path is selected by the epilog's explicit private-table ABI. */
+   if (generation == 9 ||
+       generation == (10 | AGX_NIR_TEXTURE_GENERATION_G18G)) {
       nir_def *pbe = nir_load_from_texture_handle_agx(b, intr->src[0].ssa);
       index_px = libagx_emrt_ms_index_gen9(b,
          nir_iadd_imm(b, pbe, AGX_G17P_IMAGE_ATOMIC_SW_FROM_PBE),
@@ -2226,4 +2409,12 @@ agx_nir_lower_g17p_helper_samples(nir_shader *shader)
    assert(shader->info.stage == MESA_SHADER_FRAGMENT);
    return nir_shader_tex_pass(shader, agx_g17p_explicit_helper_gradient,
                               nir_metadata_control_flow, NULL);
+}
+
+bool
+agx_nir_lower_texture_early_with_2d_robustness(nir_shader *s,
+                                               bool support_lod_bias,
+                                               bool lower_2d_robustness)
+{
+   return lower_texture_early(s, support_lod_bias, lower_2d_robustness, false);
 }

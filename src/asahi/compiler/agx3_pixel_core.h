@@ -35,9 +35,10 @@ extern "C" {
 #define AGX3_G17P_MAX_COLOUR_PARTITIONS 3u
 
 /*
- * Open G17P's colour-tile protocol. This is the f14=512, f15=1 pixwait form
+ * Open the colour-tile protocol. This is the f14=512, f15=1 pixwait form
  * that precedes the ordinary class-12 colour wait. It is byte-exactly
- * witnessed on AGX3b only; AGX3c and AGX2 are refused.
+ * witnessed on G17P (AGX3b) and the M5 native flat-colour fragment (AGX3c).
+ * AGX2 is refused. Encoding this gate does not qualify other M5 transactions.
  */
 bool agx3_pixel_colour_entry(enum agx_isa_encoding enc,
                              uint8_t out[AGX3_PIXEL_MAX_LENGTH], uint8_t *len);

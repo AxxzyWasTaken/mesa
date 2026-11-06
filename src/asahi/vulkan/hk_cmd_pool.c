@@ -119,11 +119,11 @@ hk_cmd_bo_create(struct hk_cmd_pool *pool, enum hk_cmd_bo_type type,
    bo->addr = bo->bo->va->addr;
    bo->size = bo->bo->size;
 
-   /* G17P command recording must not take first-write faults midway through a
-    * draw. These BOs are recycled by the command pool, so populate and
-    * initialize their shared mappings once at creation; subsequent command
+   /* G17P and M5 command recording must not take first-write faults midway
+    * through a draw. These BOs are recycled by the command pool, so populate
+    * and initialize their shared mappings once at creation; subsequent command
     * buffers reuse already-resident pages without adding per-draw work. */
-   if (agx_native_graphics(&dev->dev)) {
+   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) {
       memset(bo->map, 0, bo->bo->size);
       if (hk_g17p_cached_cmd_memory(&dev->dev))
          util_flush_range(bo->map, bo->bo->size);

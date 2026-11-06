@@ -10,7 +10,10 @@
  * agx_lower_pseudo() turns *every* AGX_OPCODE_ICMP into an icmpsel -- without
  * this encoder no shader containing any integer comparison can be compiled.
  *
- * Everything here is probe-witnessed, not inferred. A ladder of 12 MSL
+ * The GPU0 forms below are probe-witnessed. GPU1 additionally has a separate
+ * 32-bit iseli32 encoder derived from the AGX3c tables; its field mapping and
+ * encoding regression do not by themselves establish hardware correctness.
+ * A ladder of 12 MSL
  * kernels differing only in the comparison operator was compiled by Apple's
  * own offline translator (`metal-nt -arch applegpu_g16g`, the AGX3b encoding
  * G17P uses) and decoded through Apple's own encoder tables. The condition
@@ -57,6 +60,13 @@
  * it for a 16-bit boolean result even though both selected values are
  * immediates. The compact native wait selector represents one slot or slots1+2;
  * other producer combinations must be retired separately before this form.
+ *
+ * GPU1 (applegpu_g17g) witnesses from gpu/m5-xfb-alu8-reference.metal pin a
+ * ushort comparand against the immediate 2 with a word result -- selecting a
+ * register or zero, and two registers -- plus the uint-comparand twin. All
+ * three store their result directly and carry f11=0 whatever the selected
+ * operands, so on GPU1 f11 is the destination-cache hint (as in every other
+ * GPU1 form with the f9/f10/f2/f11 header), not a mixed-selection flag.
  */
 
 #pragma once
@@ -107,9 +117,21 @@ struct agx3_isel_desc {
    bool cmp0_uniform;
    bool cmp1_uniform;
    bool cmp_16;
+
+   /* G18G only (agx3_isel_encode_g18g): GPU1 widens a half-register second
+    * comparand against a full-register first comparand inside the select:
+    * f39 takes the immediate/narrow value and f43 selects sign extension.
+    * Witnessed on applegpu_g17g from `uint >= uint(ushort)` (zero extension)
+    * and `int < int(short)` (sign extension); Apple puts the wide comparand
+    * first and reverses the condition when the source had them the other
+    * way round. agx3_isel_encode refuses both. */
+   bool cmp1_16;
+   bool cmp1_sign_extend;
    bool cmp_mixed_width; /* M5: the second register has the opposite width. */
    bool explicit_hints;
-   bool dest_cache; /* f12: result is consumed through the register cache */
+   /* The result is consumed through the register cache: f12 on GPU0, f11 on
+    * GPU1. */
+   bool dest_cache;
    bool cache[4];
    bool discard[4];
 
@@ -127,6 +149,13 @@ struct agx3_isel_desc {
 bool agx3_isel_encode(enum agx_isa_encoding encoding,
                       const struct agx3_isel_desc *desc,
                       uint8_t out[AGX3_ISEL_MAX_LENGTH], uint8_t *len);
+
+/* G18G (M6) compiles as agx3c: the GPU1 integer select with cmp1_16 and
+ * cmp1_sign_extend; uniform and cmp_mixed_width descriptors and every other
+ * encoding go through agx3_isel_encode. */
+bool agx3_isel_encode_g18g(enum agx_isa_encoding encoding,
+                           const struct agx3_isel_desc *desc,
+                           uint8_t out[AGX3_ISEL_MAX_LENGTH], uint8_t *len);
 
 /* G17P condition 3 is a nonzero mask test. Fresh mask1/2/4 witnesses pin
  * f49 and f106; selected-negation contrasts pin f78/f95. The quadrant

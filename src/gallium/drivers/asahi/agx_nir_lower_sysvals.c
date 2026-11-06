@@ -359,7 +359,7 @@ lay_out_table(struct agx_compiled_shader *shader, struct table_state *state,
 
          /* Now make the range with the given size (naturally aligned).
           *
-          * G17P's Ioto loader moves uniform dwords, so on that chip a range
+          * G17P/G18G Ioto loaders move uniform dwords, so on those chips a range
           * must also start at an even half and cover an even number of them.
           * The natural alignment of a 16-bit run is one half, which put the
           * run after a three-texture handle range at an odd uniform and had

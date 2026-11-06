@@ -123,7 +123,10 @@ lower(agx_builder *b, agx_instr *I)
       const int truth = agx3_immediate_compare(b->shader, I);
       const agx_index chosen = I->src[truth ? 2 : 3];
       if (truth >= 0 && chosen.type == AGX_INDEX_IMMEDIATE)
-         return agx_mov_imm_to(b, I->dest[0], chosen.value);
+         return agx_mov_imm_to(b, I->dest[0],
+                               I->fcmpsel_minifloat_select
+                                  ? fui(agx_minifloat_decode(chosen.value))
+                                  : chosen.value);
       if (truth >= 0 && !chosen.abs && !chosen.neg &&
           chosen.size == I->dest[0].size)
          return agx_bitop_to(b, I->dest[0], chosen, agx_zero(),
@@ -131,6 +134,29 @@ lower(agx_builder *b, agx_instr *I)
    }
 
    switch (I->op) {
+
+   case AGX_OPCODE_FADD:
+      /* G18G only for now; candidate for all chips. */
+      if (agx3 && agx_is_g18g(&b->shader->key->dev) && I->nr_dests == 1 &&
+          I->nr_srcs == 2 &&
+          I->dest[0].type == AGX_INDEX_REGISTER && !I->dest[0].memory &&
+          I->dest[0].size == AGX_SIZE_32 && agx_channels(I->dest[0]) == 1 &&
+          I->src[0].type == AGX_INDEX_IMMEDIATE && I->src[0].value <= UINT8_MAX &&
+          I->src[1].type == AGX_INDEX_IMMEDIATE && I->src[1].value <= UINT8_MAX &&
+          !I->src[0].memory && !I->src[1].memory &&
+          agx_channels(I->src[0]) == 1 && agx_channels(I->src[1]) == 1) {
+         /* Constant propagation can leave two minifloats at a floating
+          * move/conversion. Native FADD needs a register operand. Reuse
+          * the assigned destination for the exact first constant, then
+          * keep the original arithmetic and modifiers. This retains
+          * signed-zero behavior and rounding without a host-side fold. */
+         const agx_index immediate = I->src[0];
+         agx_mov_imm_to(b, I->dest[0], fui(agx_minifloat_decode(immediate.value)));
+         I->src[0] = agx_register(I->dest[0].value, AGX_SIZE_32);
+         I->src[0].abs = immediate.abs;
+         I->src[0].neg = immediate.neg;
+      }
+      return NULL;
 
    /* Various instructions are implemented as bitwise truth tables */
    case AGX_OPCODE_MOV:

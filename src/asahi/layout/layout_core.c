@@ -43,7 +43,7 @@ ail_m5_layer_stride_B(uint64_t unaligned_size_B, unsigned layers,
 }
 
 struct ail_tile
-ail_m5_compression_tile_size(unsigned blocksize_B)
+ail_m5_compression_tile_size(unsigned blocksize_B, unsigned sample_count_sa)
 {
    switch (blocksize_B) {
    case 1:
@@ -52,6 +52,11 @@ ail_m5_compression_tile_size(unsigned blocksize_B)
    case 8:
       return (struct ail_tile){16, 16};
    case 16:
+      /* HAL300/HAL400 getMacroBlockDimensions uses logical-pixel blocks
+       * of 8x8 at 2x and 4x4 at 8x for RGBA32. Express those in the same
+       * sample-element coordinates used by AIL's metadata addressing. */
+      if (sample_count_sa == 2 || sample_count_sa == 8)
+         return (struct ail_tile){8, 16};
       return (struct ail_tile){16, 8};
    default:
       UNREACHABLE("Unsupported M5 compression block size");

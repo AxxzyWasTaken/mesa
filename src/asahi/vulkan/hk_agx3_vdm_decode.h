@@ -24,7 +24,9 @@ extern "C" {
 /* Bump whenever the Honeykrisp shader payload below changes.  Vulkan shader
  * binaries carry this version outside the driver-private blob, so stale
  * layouts are rejected before any fields are consumed. */
-#define HK_AGX3_SHADER_BINARY_VERSION 36u
+/* AGX3 moves to 37 when M5 binaries begin to keep the NIR of uniform-colour
+ * blended fragment shaders. */
+#define HK_AGX3_SHADER_BINARY_VERSION 37u
 #define HK_CLASSIC_SHADER_BINARY_VERSION 34u
 /* AGX2 image-acquire binaries now include memory-to-texture visibility. */
 #define HK_AGX2_SHADER_BINARY_VERSION 36u
@@ -42,6 +44,7 @@ hk_shader_binary_version(enum agx_chip chip)
    case AGX_CHIP_G17P:
    case AGX_CHIP_G17G:
    case AGX_CHIP_G17S:
+   case AGX_CHIP_G17C:
       return HK_AGX3_SHADER_BINARY_VERSION;
    default:
       return HK_CLASSIC_SHADER_BINARY_VERSION;
@@ -103,6 +106,28 @@ bool hk_agx3_g17p_vertex_program_info(
    enum agx_chip chip,
    const struct hk_agx3_g17p_vertex_compile_info *compiler_info,
    struct agx_vdm_state_update_program_info *program);
+
+/* HAL300 hardware vertex profiles: position, optional point size, and one
+ * float4 user color. No preamble. Pre-HAL300 flag bits are always absent. */
+bool hk_agx3_g17g_vertex_program_info(
+   enum agx_chip chip,
+   const struct hk_agx3_g17p_vertex_compile_info *compiler_info,
+   struct agx_vdm_state_update_program_info *program);
+
+/*
+ * Decode one record from a potentially longer AGX3 VDM stream through the
+ * shared Mesa classifier. This is a validation surface only: it does not
+ * follow links, inspect PPP payloads, emit commands, submit work, admit an
+ * AGX3 device, or expose a Vulkan capability.
+ */
+bool hk_agx3_decode_vdm_record(enum agx_chip chip, const void *command,
+                               size_t available,
+                               struct agx_vdm_decoded_record *record);
+
+/* Validation-only structural bridge. */
+bool hk_agx3_encode_vdm_state_update_template(
+   enum agx_chip chip, const struct agx_vdm_state_update_template_info *info,
+   struct agx_vdm_state_update *out);
 
 /* Exact AGX3 VertexProgramVariant selector bridge used by live draw emission. */
 bool hk_agx3_encode_vdm_state_update_draw(

@@ -18,6 +18,44 @@ static const struct agx_va_interval g17p_kernel_reserved[] = {
    {AGX_G17P_RENDER_AUX_ALIAS_START, AGX_G17P_RENDER_AUX_ALIAS_END},
 };
 
+/* Reserve the growing kernel arenas together, including their expansion
+ * space. Allocation and range validation must use the same exclusion. */
+static const struct agx_va_interval g17p_vdm_kernel_reserved[] = {
+   {AGX_G17P_VDM_ALIAS_RESERVED_START, AGX_G17P_VDM_ALIAS_RESERVED_END},
+};
+
+bool
+agx_g17p_vdm_alias_kernel_reserved(uint64_t addr, uint64_t size)
+{
+   if (size == 0 || size > UINT64_MAX - addr)
+      return false;
+
+   for (unsigned i = 0; i < ARRAY_SIZE(g17p_vdm_kernel_reserved); ++i) {
+      const struct agx_va_interval *r = &g17p_vdm_kernel_reserved[i];
+      if (addr < r->end && addr + size > r->start)
+         return true;
+   }
+
+   return false;
+}
+
+uint64_t
+agx_g17p_vdm_alias_heap_capacity(void)
+{
+   const uint64_t heap_start = AGX_G17P_VDM_ALIAS_BASE;
+   const uint64_t heap_end = heap_start + AGX_G17P_VDM_ALIAS_SIZE;
+   uint64_t reserved = 0;
+
+   for (unsigned i = 0; i < ARRAY_SIZE(g17p_vdm_kernel_reserved); ++i) {
+      const uint64_t start = MAX2(g17p_vdm_kernel_reserved[i].start, heap_start);
+      const uint64_t end = MIN2(g17p_vdm_kernel_reserved[i].end, heap_end);
+      if (start < end)
+         reserved += end - start;
+   }
+
+   return AGX_G17P_VDM_ALIAS_SIZE - reserved;
+}
+
 bool
 agx_g17p_vdm_alias_heap_init(struct util_vma_heap *heap)
 {
@@ -27,13 +65,23 @@ agx_g17p_vdm_alias_heap_init(struct util_vma_heap *heap)
    util_vma_heap_init(heap, AGX_G17P_VDM_ALIAS_BASE,
                       AGX_G17P_VDM_ALIAS_SIZE);
    heap->alloc_high = false;
-   if (!util_vma_heap_alloc_addr(heap, AGX_G17P_VDM_ALIAS_RESERVED_START,
-                                 AGX_G17P_VDM_ALIAS_RESERVED_END -
-                                    AGX_G17P_VDM_ALIAS_RESERVED_START)) {
-      util_vma_heap_finish(heap);
-      return false;
+
+   /* Carve the kernel's own arenas out before the first allocation, so a
+    * client that outgrows the 24 MiB below G17P_RENDER_USER_ALIAS_START
+    * continues above it instead of binding into a range the kernel refuses. */
+   const uint64_t heap_start = AGX_G17P_VDM_ALIAS_BASE;
+   const uint64_t heap_end = heap_start + AGX_G17P_VDM_ALIAS_SIZE;
+   for (unsigned i = 0; i < ARRAY_SIZE(g17p_vdm_kernel_reserved); ++i) {
+      const uint64_t start = MAX2(g17p_vdm_kernel_reserved[i].start, heap_start);
+      const uint64_t end = MIN2(g17p_vdm_kernel_reserved[i].end, heap_end);
+      if (start >= end)
+         continue;
+      if (!util_vma_heap_alloc_addr(heap, start, end - start)) {
+         util_vma_heap_finish(heap);
+         return false;
+      }
    }
-   if (heap->free_size != AGX_G17P_VDM_ALIAS_AVAILABLE_SIZE) {
+   if (heap->free_size != agx_g17p_vdm_alias_heap_capacity()) {
       util_vma_heap_finish(heap);
       return false;
    }

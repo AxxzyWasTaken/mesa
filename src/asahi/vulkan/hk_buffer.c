@@ -147,6 +147,22 @@ hk_bind_scratch(struct hk_device *dev, struct agx_va *va, unsigned offset_B,
    return VK_SUCCESS;
 }
 
+VkResult
+hk_bind_unbound_sparse_buffer(struct hk_device *dev, struct agx_va *va,
+                              size_t size_B)
+{
+   if (!hk_sparse_buffer_unmapped(&dev->dev))
+      return hk_bind_scratch(dev, va, 0, size_B);
+
+   int ret = agx_bo_bind(&dev->dev, dev->dev.zero_bo,
+                         va->addr + dev->dev.sparse_ro_offset, size_B, 0,
+                         DRM_ASAHI_BIND_READ | agx_fill_bind_flags(&dev->dev));
+   if (ret)
+      return errno == ENOMEM ? VK_ERROR_OUT_OF_DEVICE_MEMORY : VK_ERROR_UNKNOWN;
+
+   return VK_SUCCESS;
+}
+
 /* M5 publishes every scratch-filled sparse page through the hypervisor,
  * which allocates one page-table frame from its own heap per 32 MiB of VA and
  * never frees it. Keep each device within its advertised
@@ -242,7 +258,7 @@ hk_CreateBuffer(VkDevice device, const VkBufferCreateInfo *pCreateInfo,
          }
          buffer->sparse_scratch_B =
             agx_chip_g17_m5(dev->dev.chip) ? vma_size_B : 0;
-         result = hk_bind_scratch(dev, buffer->va, 0, vma_size_B);
+         result = hk_bind_unbound_sparse_buffer(dev, buffer->va, vma_size_B);
          if (result != VK_SUCCESS) {
             hk_release_sparse_scratch(dev, buffer->sparse_scratch_B);
             agx_va_free(&dev->dev, buffer->va, true);

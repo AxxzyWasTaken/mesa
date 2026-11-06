@@ -297,6 +297,15 @@ shader_texture_lod_and_rect(const _mesa_glsl_parse_state *state)
           state->ARB_texture_rectangle_enable;
 }
 
+/** True if GL_EXT_shader_texture_lod's Lod/Grad functions are available. */
+static bool
+shader_texture_lod_es(const _mesa_glsl_parse_state *state)
+{
+   return state->es_shader &&
+          state->stage == MESA_SHADER_FRAGMENT &&
+          state->EXT_shader_texture_lod_enable;
+}
+
 static bool
 shader_bit_encoding(const _mesa_glsl_parse_state *state)
 {
@@ -4352,6 +4361,35 @@ builtin_builder::create_builtins()
 
    add_function("shadow2DRectProjGradARB",
                 _texture(ir_txd, shader_texture_lod_and_rect, &glsl_type_builtin_vec4,  &glsl_type_builtin_sampler2DRectShadow, &glsl_type_builtin_vec4, TEX_PROJECT),
+                NULL);
+
+   /* GL_EXT_shader_texture_lod: the same explicit LOD and gradient
+    * functions for GLSL ES fragment shaders.
+    */
+   add_function("texture2DLodEXT",
+                _texture(ir_txl, shader_texture_lod_es, &glsl_type_builtin_vec4, &glsl_type_builtin_sampler2D, &glsl_type_builtin_vec2),
+                NULL);
+
+   add_function("texture2DProjLodEXT",
+                _texture(ir_txl, shader_texture_lod_es, &glsl_type_builtin_vec4, &glsl_type_builtin_sampler2D, &glsl_type_builtin_vec3, TEX_PROJECT),
+                _texture(ir_txl, shader_texture_lod_es, &glsl_type_builtin_vec4, &glsl_type_builtin_sampler2D, &glsl_type_builtin_vec4, TEX_PROJECT),
+                NULL);
+
+   add_function("textureCubeLodEXT",
+                _texture(ir_txl, shader_texture_lod_es, &glsl_type_builtin_vec4, &glsl_type_builtin_samplerCube, &glsl_type_builtin_vec3),
+                NULL);
+
+   add_function("texture2DGradEXT",
+                _texture(ir_txd, shader_texture_lod_es, &glsl_type_builtin_vec4, &glsl_type_builtin_sampler2D, &glsl_type_builtin_vec2),
+                NULL);
+
+   add_function("texture2DProjGradEXT",
+                _texture(ir_txd, shader_texture_lod_es, &glsl_type_builtin_vec4, &glsl_type_builtin_sampler2D, &glsl_type_builtin_vec3, TEX_PROJECT),
+                _texture(ir_txd, shader_texture_lod_es, &glsl_type_builtin_vec4, &glsl_type_builtin_sampler2D, &glsl_type_builtin_vec4, TEX_PROJECT),
+                NULL);
+
+   add_function("textureCubeGradEXT",
+                _texture(ir_txd, shader_texture_lod_es, &glsl_type_builtin_vec4, &glsl_type_builtin_samplerCube, &glsl_type_builtin_vec3),
                 NULL);
 
    add_function("texture4",

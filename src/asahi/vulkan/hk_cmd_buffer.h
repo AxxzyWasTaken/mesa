@@ -52,6 +52,27 @@
 
 #include <stdio.h>
 
+extern int hk_g17p_launch_trace_state;
+int hk_g17p_launch_trace_init(void);
+
+static inline bool
+hk_g17p_launch_trace_enabled(void)
+{
+   int enabled = hk_g17p_launch_trace_state;
+   if (unlikely(enabled < 0))
+      enabled = hk_g17p_launch_trace_init();
+   return enabled != 0;
+}
+void hk_g17p_trace_hexdump(const char *label, uint64_t base, const void *data,
+                           size_t len);
+void hk_g17p_trace_line(const char *label, uint64_t base, const void *data,
+                        size_t len);
+
+void *hk_cmd_buffer_emit_cdm_terminate(struct hk_cmd_buffer *cmd,
+                                       void *current);
+void *hk_cmd_buffer_emit_vdm_terminate(struct hk_cmd_buffer *cmd,
+                                       void *current);
+
 struct set;
 struct hk_buffer;
 struct hk_cmd_bo;
@@ -487,6 +508,9 @@ struct hk_render_registers {
    struct agx_zls_control_packed zls_control, zls_control_partial;
    uint32_t depth_dimensions;
    bool process_empty_tiles;
+   /* The render area is every attachment's full extent: the tile stores
+    * write no pixel outside it. */
+   bool whole_attachments;
    enum u_tristate dbias_is_int;
 
    struct {
@@ -1064,6 +1088,9 @@ struct hk_cs {
    /* Start pointer of the root control stream */
    void *start;
 
+   /* Size of the root control stream allocation */
+   uint32_t root_size;
+
    /* Current pointer within the control stream */
    void *current;
 
@@ -1105,6 +1132,10 @@ struct hk_cs {
    /* Active-context selector consumed by AGX3 VertexProgramVariant. */
    bool agx3_active_context_selector_valid;
    uint32_t agx3_raw_active_context_selector;
+   /* G18G: a terminated M5 dispatch owns this stream; no record may follow
+    * it, and the submission carries the stream's compute resources. */
+   bool g18_dispatch_sealed;
+   struct drm_asahi_g18_compute_resources g18_compute_resources;
 
    /* Whether the sampler heap is required. Although we always must maintain the
     * heap for correctness, it's often not necessary since we can push lots of
@@ -1119,6 +1150,11 @@ struct hk_cs {
 
    /* At least one AS-build dispatch or compute transfer is in this stream. */
    bool as_build;
+   /* M5: a pre-rasterization program recorded in this CS keeps state in
+    * thread-private storage (a spill frame or constant-program inputs), so
+    * its tiling must not overlap earlier renders' fragment work
+    * (hk_sync_resolve_submit()). */
+   bool m5_vertex_tps;
 
    /* M5: a later render pass instance continues in this stream
     * (hk_m5_pass_merge_begin()); its draws may not share the stream's
@@ -1204,6 +1240,9 @@ struct hk_cs {
    /* Consecutive GPU query resets share one strong flush, at the first
     * consumer or the end of the stream. G13 never sets this. */
    bool query_reset_pending;
+
+   /* A query copy or reset was recorded into this stream. */
+   bool query_access;
 
    /* Statistics */
    struct {
@@ -1487,6 +1526,7 @@ hk_cs_merge_cdm(struct hk_cs *a, const struct hk_cs *b)
    a->stats.query_reset_dispatches += b->stats.query_reset_dispatches;
    a->stats.query_reset_queries += b->stats.query_reset_queries;
    a->stats.query_reset_flushes += b->stats.query_reset_flushes;
+   a->query_access |= b->query_access;
    assert(!a->query_reset_pending && !b->query_reset_pending);
 }
 
@@ -2151,6 +2191,9 @@ hk_cmd_buffer_get_cs_general(struct hk_cmd_buffer *cmd, struct hk_cs **ptr,
    if (vk_command_buffer_has_error(&cmd->vk))
       return NULL;
 
+   if (*ptr && (*ptr)->g18_dispatch_sealed)
+      *ptr = NULL;
+
    /* A recorded dependency may have ordered the open general compute stream
     * after work that follows it in the list. It is then ended, and the work
     * goes into a stream positioned after that requirement. Work of a new
@@ -2176,6 +2219,7 @@ hk_cmd_buffer_get_cs_general(struct hk_cmd_buffer *cmd, struct hk_cs **ptr,
          .type = compute ? HK_CS_CDM : HK_CS_VDM,
          .addr = root.gpu,
          .start = root.cpu,
+         .root_size = initial_size,
          .chunk = root,
          .current = root.cpu,
          .end = root.cpu + initial_size,
@@ -2586,6 +2630,9 @@ void hk_dispatch_m5_native(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
 void hk_dispatch_g17p_native(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
                              struct hk_shader *s, struct agx_grid grid,
                              struct agx_workgroup local_size);
+void hk_dispatch_g17g_native(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
+                             struct hk_shader *s, struct agx_grid grid,
+                             struct agx_workgroup local_size);
 
 bool hk_gen1_upload_fragment_query_state(struct hk_cmd_buffer *cmd, bool vertex_stage,
    struct agx3_ioto_uniform_range *range);
@@ -2648,6 +2695,10 @@ hk_dispatch_with_local_size(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
       return;
 
    struct hk_device *dev = hk_cmd_buffer_device(cmd);
+   if (dev->dev.chip == AGX_CHIP_G18G) {
+      hk_dispatch_g17g_native(cmd, cs, s, grid, local_size);
+      return;
+   }
    if (agx_chip_g17_m5(dev->dev.chip)) {
       hk_dispatch_m5_native(cmd, cs, s, grid, local_size);
       return;

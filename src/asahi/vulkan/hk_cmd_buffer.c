@@ -8,6 +8,7 @@
 #include "util/format/u_format.h"
 #include "hk_frame_anatomy.h"
 #include "hk_ppp_state.h"
+#include "hk_sampler_index.h"
 #include "asahi/compiler/agx3_graphics_program.h"
 #include "hk_g17p_patch.h"
 #include "asahi/lib/agx_scs_layout.h"
@@ -21,6 +22,9 @@
 #include "decode.h"
 #include "hk_agx3_ioto_program_core.h"
 #include "asahi/compiler/agx3_compute_program.h"
+#include "asahi/compiler/agx3_transcode.h"
+#include "asahi/lib/agx3_compute_program_core.h"
+#include "asahi/lib/agx3_cdm_direct_launch_semantic_core.h"
 #include "asahi/compiler/agx_debug.h"
 #include "hk_agx3_vdm_decode.h"
 #include "asahi/lib/agx_ioto_load_core.h"
@@ -45,6 +49,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include "util/log.h"
+#include "util/u_debug.h"
 #include "util/hash_table.h"
 #include "util/set.h"
 #include "util/u_debug.h"
@@ -736,7 +741,79 @@ hk_cmd_buffer_emit_cs_jump(struct hk_cmd_buffer *cmd, void *current,
    return current;
 }
 
-static void *
+int hk_g17p_launch_trace_state = -1;
+
+int
+hk_g17p_launch_trace_init(void)
+{
+   const int enabled = debug_get_bool_option("HK_G17P_LAUNCH_TRACE", false) ? 1 : 0;
+   hk_g17p_launch_trace_state = enabled;
+   return enabled;
+}
+
+/* Single line, distinct tag. The multi-line dump below has twice been reported
+ * as "only the header printed", so anything that must not be lost in a log
+ * filter goes through this instead. */
+void
+hk_g17p_trace_line(const char *label, uint64_t base, const void *data,
+                   size_t len)
+{
+   const uint8_t *bytes = data;
+   fprintf(stderr, "G17P %s: base=%" PRIx64 " len=%zu bytes=", label, base,
+           len);
+   for (size_t i = 0; i < len; ++i)
+      fprintf(stderr, "%02x", bytes[i]);
+   fprintf(stderr, "\n");
+   fflush(stderr);
+}
+
+void
+hk_g17p_trace_hexdump(const char *label, uint64_t base, const void *data,
+                      size_t len)
+{
+   const uint8_t *bytes = data;
+   fprintf(stderr, "G17P dump: %s base=%" PRIx64 " len=%zu\n", label, base,
+           len);
+   for (size_t off = 0; off < len; off += 16) {
+      fprintf(stderr, "G17P dump:   +%04zx ", off);
+      for (size_t i = 0; i < 16 && off + i < len; ++i)
+         fprintf(stderr, "%02x ", bytes[off + i]);
+      fprintf(stderr, "\n");
+   }
+   fflush(stderr);
+}
+
+/* w74: HK_G17P_LAUNCH_TRACE=1 dump of one graphics stage's uniform ranges, one
+ * line per range. A draw's texture/descriptor/root bindings reach the shader
+ * only through these ranges, so this is what to compare with the shader's
+ * load_preamble/device_load bases in the AGX3 dump. */
+static void
+hk_g17p_trace_gfx_ranges(const struct hk_shader *s,
+                         const struct agx3_ioto_uniform_range *ranges,
+                         size_t count, const uint8_t *sources)
+{
+   fprintf(stderr,
+           "G17P gfx-ranges: stage=%d count=%zu root_uniform=%u set_count=%u "
+           "uses_root=%d combined_sampler=%d indexed_sampler=%d "
+           "rodata16=%u uniform_dma=%u push_count=%u\n",
+           (int)s->info.stage, count, s->info.agx3_root_uniform,
+           (unsigned)s->info.set_count, (int)s->info.agx3_uses_root,
+           (int)s->info.agx3_combined_sampler_valid,
+           (int)s->info.agx3_indexed_sampler_valid,
+           (unsigned)s->b.info.rodata.size_16,
+           (unsigned)s->b.info.agx3_uniform_dma_count,
+           (unsigned)s->b.info.push_count);
+   for (size_t i = 0; i < count; ++i)
+      fprintf(stderr,
+              "G17P gfx-range: stage=%d i=%zu start_halfs=%u size_halfs=%u "
+              "address=%" PRIx64 " source=%u\n",
+              (int)s->info.stage, i, (unsigned)ranges[i].start_halfs,
+              (unsigned)ranges[i].size_halfs, (uint64_t)ranges[i].address,
+              (unsigned)sources[i]);
+   fflush(stderr);
+}
+
+void *
 hk_cmd_buffer_emit_cdm_terminate(struct hk_cmd_buffer *cmd, void *current)
 {
    struct hk_device *dev = hk_cmd_buffer_device(cmd);
@@ -848,10 +925,18 @@ hk_BeginCommandBuffer(VkCommandBuffer commandBuffer,
 static void
 merge_control_streams(struct hk_cmd_buffer *cmd)
 {
+   struct hk_device *dev = hk_cmd_buffer_device(cmd);
+   const bool g18 = dev->dev.chip == AGX_CHIP_G18G;
    struct hk_cs *last = NULL;
 
    list_for_each_entry_safe(struct hk_cs, cs, &cmd->control_streams, node) {
-      if (cs->type == HK_CS_CDM && last && last->type == HK_CS_CDM &&
+      /* G18G CDM streams never merge: launches would add past the
+       * HK_G18_BATCH cap (the >9-launch firmware ceiling) and
+       * hk_cs_merge_cdm does not combine g18_compute_resources, so the
+       * merged command would keep only the first stream's registers,
+       * staging and local size. */
+      if (cs->type == HK_CS_CDM && last && last->type == HK_CS_CDM && !g18 &&
+          !last->g18_dispatch_sealed && !cs->g18_dispatch_sealed &&
           !last->timestamp.end.handle &&
           !(last->timestamp.start.handle && cs->g17p_timestamp_query) &&
           !(last->timestamp.start.handle && cs->timestamp.start.handle) &&
@@ -984,7 +1069,13 @@ hk_EndCommandBuffer(VkCommandBuffer commandBuffer)
     * missing stream terminates.
     */
    list_for_each_entry(struct hk_cs, cs, &cmd->control_streams, node) {
-      if (cs->type == HK_CS_CDM) {
+      /* A G18G native dispatch stream is sealed: the launch is followed by its
+       * barrier and its own stream terminate (hk_cmd_dispatch.c, hk_cmd_buffer.c
+       * helper path).  Appending a second terminate makes the stream 52 bytes;
+       * the G18 kernel admits at most 48 (one dispatch) and refuses the submit
+       * with ENOTSUPP ("G18 compute admission rejected ... stream_bytes=52").
+       */
+      if (cs->type == HK_CS_CDM && !cs->g18_dispatch_sealed) {
          cs->current = hk_cmd_buffer_emit_cdm_terminate(cmd, cs->current);
       }
    }
@@ -2044,7 +2135,13 @@ hk_g17p_basic_graphics_program_supported(struct hk_cmd_buffer *cmd,
 
    {
       const bool smooth = hk_g17p_smooth_varyings_supported(cmd, linked);
-      const bool layout = hk_g17p_basic_fragment_layout(cmd);
+      /* The narrow RT0 colour-link layout is a G17G witness-profile guard.
+       * The G18G general path binds any tile layout through the general
+       * graphics core and the separately validated EEOT, so it is not a
+       * composer constraint there. */
+      const bool layout =
+         hk_cmd_buffer_device(cmd)->dev.chip == AGX_CHIP_G18G ||
+         hk_g17p_basic_fragment_layout(cmd);
 
       if (!smooth || !layout) {
          mesa_loge_once("G17P graphics program refused: stage=fs "
@@ -2602,6 +2699,11 @@ hk_g17p_graphics_uniform_ranges(
              (const uint8_t *)set_map +
                 binding->sampler_index_offset_B,
              sizeof(sampler_index));
+      /* G18G publishes AGX2-biased sampler indices (native_sampler_indices
+       * in hk_descriptor_set_layout.c); the combined-sampler pointer path
+       * needs the heap index. */
+      if (dev->dev.chip == AGX_CHIP_G18G)
+         sampler_index = hk_sampler_heap_index(false, sampler_index);
 
       const unsigned sampler_element_size =
          agx_chip_sampler_heap_element_size(dev->dev.chip);
@@ -2662,6 +2764,42 @@ hk_g17p_graphics_uniform_ranges(
       if (!pointers_va)
          return hk_g17p_graphics_ranges_refused(range_count, count);
 
+      if (hk_g17p_launch_trace_enabled()) {
+         /* Descriptor bytes as the set holds them, the texture state the
+          * hardware will actually read (the 32-byte aligned copy), and the
+          * sampler heap element the shader's sampler index selects. */
+         const uint8_t *tex_src =
+            (const uint8_t *)set_map + binding->texture_offset_B;
+         hk_g17p_trace_line("gfx-combined-set-texture", set_addr +
+                               binding->texture_offset_B, tex_src,
+                            MIN2(set_size - binding->texture_offset_B,
+                                 (uint32_t)sizeof(struct hk_sampled_image_descriptor)));
+         fprintf(stderr,
+                 "G17P gfx-combined: set_addr=%" PRIx64 " set_size=%u "
+                 "texture_offset_B=%u sampler_index_offset_B=%u "
+                 "sampler_index=%u sampler_count=%u sampler_elem_B=%u "
+                 "tex_ptr_in=%" PRIx64 " tex_ptr_published=%" PRIx64
+                 " sampler_heap_va=%" PRIx64 " pointers_va=%" PRIx64 "\n",
+                 set_addr, set_size, binding->texture_offset_B,
+                 binding->sampler_index_offset_B, (unsigned)sampler_index,
+                 (unsigned)dev->samplers.table.alloc, sampler_element_size,
+                 pointers[0], cached->valid ? cached->published[0] : 0,
+                 pointers[1], pointers_va);
+         if (sampler_index < dev->samplers.table.alloc)
+            hk_g17p_trace_line(
+               "gfx-combined-sampler-element",
+               dev->samplers.table.bo->va->addr +
+                  (uint64_t)sampler_index * sampler_element_size,
+               hk_descriptor_table_entry(&dev->samplers.table, sampler_index),
+               sampler_element_size);
+         if (cached->valid && cached->published[0])
+            fprintf(stderr, "G17P gfx-combined: texture state %s 32-byte "
+                            "aligned\n",
+                    (cached->published[0] & (HK_G17P_TEXTURE_STATE_ALIGN - 1))
+                       ? "NOT" : "is");
+         fflush(stderr);
+      }
+
       sources[count] = HK_G17P_RANGE_SOURCE_UPLOADED;
       ranges[count++] = (struct agx3_ioto_uniform_range){
          .start_halfs = texture_uniform_base,
@@ -2683,6 +2821,17 @@ hk_g17p_graphics_uniform_ranges(
           !dev->rodata.indexed_heap_pointers)
          return hk_g17p_graphics_ranges_refused(range_count, count);
       const uint64_t pointers_va = dev->rodata.indexed_heap_pointers;
+      if (hk_g17p_launch_trace_enabled())
+         fprintf(stderr,
+                 "G17P gfx-indexed: sampled_images_base_va=%" PRIx64
+                 " sampled_image_desc_size=%u sampled_images_alloc=%u "
+                 "sampler_heap_va=%" PRIx64 " sampler_alloc=%u "
+                 "heap_pointers_va=%" PRIx64 "\n",
+                 dev->sampled_images.base_va,
+                 (unsigned)dev->sampled_images.desc_size,
+                 (unsigned)dev->sampled_images.alloc,
+                 dev->samplers.table.bo->va->addr,
+                 (unsigned)dev->samplers.table.alloc, pointers_va);
       sources[count] = HK_G17P_RANGE_SOURCE_CONSTANT;
       ranges[count++] = (struct agx3_ioto_uniform_range){
          .start_halfs = texture_uniform_base, .size_halfs = 8, .address = pointers_va,
@@ -2738,6 +2887,8 @@ hk_g17p_graphics_uniform_ranges(
                            HK_AGX3_G17P_GRAPHICS_MAX_RANGES, &count, sources))
       return hk_g17p_graphics_ranges_refused(range_count, count);
 
+   if (hk_g17p_launch_trace_enabled())
+      hk_g17p_trace_gfx_ranges(s, ranges, count, sources);
    *range_count = count;
    return count <= HK_AGX3_G17P_GRAPHICS_MAX_RANGES;
 }
@@ -3374,6 +3525,7 @@ static uint64_t
 hk_m5_upload_graphics_program(struct hk_cmd_buffer *cmd, struct hk_shader *s,
                               struct hk_linked_shader *linked)
 {
+   s = hk_linked_shader_source(s, linked);
    const unsigned stage = s->info.stage == MESA_SHADER_FRAGMENT ? 1 : 0;
    struct hk_g17p_graphics_ioto_cache_entry *cached =
       &cmd->state.gfx.g17p_ioto[stage];
@@ -3474,6 +3626,90 @@ hk_upload_usc_words_internal(struct hk_cmd_buffer *cmd, struct hk_shader *s,
                              struct hk_linked_shader *linked)
 {
    struct hk_device *dev = hk_cmd_buffer_device(cmd);
+   if (dev->dev.chip == AGX_CHIP_G18G) {
+      struct agx3_ioto_uniform_range ranges[HK_AGX3_G17P_GRAPHICS_MAX_RANGES];
+      uint8_t sources[HK_AGX3_G17P_GRAPHICS_MAX_RANGES];
+      size_t range_count = 0;
+      struct hk_agx3_g17p_graphics_program_desc desc;
+      size_t capacity;
+
+      /* G17G retains its native uncached composer. G17P's new loader and
+       * replay records describe a different instruction encoding. */
+      if (!hk_g17p_basic_graphics_program_supported(cmd, s, linked) ||
+          !hk_g17p_graphics_uniform_ranges(cmd, s, linked, cmd->state.gfx.root,
+                                           ranges, &range_count, sources) ||
+          !hk_g17p_graphics_program_desc_init(cmd, s, linked, ranges,
+                                              range_count, &desc) ||
+          !hk_agx3_g17g_graphics_program_bound(
+             dev->dev.chip == AGX_CHIP_G18G ? AGX_CHIP_G17G : dev->dev.chip,
+             ranges, range_count, &capacity)) {
+         vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+         return 0;
+      }
+
+      /* Room for the agx3d re-encoding: twice the G17G bound covers every
+       * witness (agx_ioto_capacity). Callers refuse a longer program. */
+      const size_t reserve_capacity =
+         dev->dev.chip == AGX_CHIP_G18G ? 2 * capacity : capacity;
+      hk_cmd_buffer_retain_bo(cmd, linked->b.bo);
+      if (s->b.info.rodata.size_16 != 0 || s->b.info.has_preamble)
+         hk_cmd_buffer_retain_bo(cmd, s->bo);
+
+      struct hk_ioto_reservation reservation;
+      if (!hk_cmd_reserve_ioto_program(cmd, reserve_capacity,
+                                        "G17G Ioto program", &reservation))
+         return 0;
+      desc.program_va = reservation.va;
+      if (!agx_va_in_usc_window(&dev->dev, desc.program_va) ||
+          !agx_va_in_usc_window(&dev->dev, desc.shader_va)) {
+         vk_command_buffer_set_error(&cmd->vk, VK_ERROR_UNKNOWN);
+         return 0;
+      }
+
+      struct hk_agx3_g17p_graphics_program program;
+      if (!hk_agx3_g17g_basic_graphics_program_generate(dev->dev.chip, &desc,
+                                                        &program)) {
+         vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+         return 0;
+      }
+      if (program.length > capacity) {
+         vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+         return 0;
+      }
+      if (dev->dev.chip == AGX_CHIP_G18G) {
+         /* G18G consumes the canonical GPU1 record re-encoded as agx3d. The
+          * G17G program embeds no address of its own, so the longer text
+          * stays position-independent (agx_ioto_capacity). */
+         struct util_dynarray code;
+         util_dynarray_init(&code, NULL);
+         memcpy(util_dynarray_grow_bytes(&code, 1, program.length),
+                program.bytes, program.length);
+         const struct agx3_transcode_ioto ioto = {
+            .api_program = true,
+            .shader_gprs = s->b.info.nr_gprs,
+         };
+         const char *why = NULL;
+         unsigned at = 0;
+         const bool ok =
+            agx3_transcode_agx3d_ioto(&code, 0, &ioto, &why, &at) &&
+            code.size <= reserve_capacity;
+         if (!ok) {
+            mesa_loge("hk: G18G Ioto program not re-encoded: %s at +0x%x",
+                      why ? why : "longer than the reservation", at);
+            util_dynarray_fini(&code);
+            vk_command_buffer_set_error(&cmd->vk,
+                                        VK_ERROR_FEATURE_NOT_PRESENT);
+            return 0;
+         }
+         const size_t published_size = code.size;
+         memcpy(reservation.map, code.data, code.size);
+         util_dynarray_fini(&code);
+         return hk_cmd_publish_ioto_program(cmd, &reservation,
+                                            published_size);
+      }
+      memcpy(reservation.map, program.bytes, program.length);
+      return hk_cmd_publish_ioto_program(cmd, &reservation, program.length);
+   }
 
    if (agx_chip_g17_m5(dev->dev.chip))
       return hk_m5_upload_graphics_program(cmd, s, linked);
@@ -3688,7 +3924,239 @@ hk_dispatch_precomp(struct hk_cmd_buffer *cmd, struct agx_grid grid,
 
    struct agx_precompiled_shader *prog = agx_get_precompiled(&dev->bg_eot, idx);
    if (!prog) {
+      if (dev->dev.chip == AGX_CHIP_G18G)
+         mesa_loge("missing precompiled helper %u on %s (barrier=%u)",
+                   idx, agx_chip_name(dev->dev.chip), barrier);
       vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+      return;
+   }
+
+   if (dev->dev.chip == AGX_CHIP_G18G) {
+      /* M5 compute launch (the grounded Gallium agx_launch_precomp_m5
+       * shape): a per-dispatch Ioto program re-encoded as agx3d, the
+       * native direct CDM record, and one terminated dispatch per
+       * command stream. Scratch and threadgroup-memory kernels need the
+       * G18 scratch admission this kernel build does not enable. */
+      struct hk_cs **target =
+         (barrier & AGX_POSTGFX)  ? &cmd->current_cs.post_gfx
+         : (barrier & AGX_PREGFX) ? &cmd->current_cs.pre_gfx
+                                  : &cmd->current_cs.cs;
+      struct hk_cs *cs = hk_cmd_buffer_get_cs_general(cmd, target, true);
+      if (!cs)
+         return;
+
+      const uint32_t scratch_bytes =
+         MAX3(prog->info.scratch_size, prog->info.agx3_spectpr_scratch_size,
+              prog->info.agx3_tps_size);
+      if (!prog->bo || !prog->info.main_size || !prog->info.nr_gprs ||
+          prog->info.nr_preamble_gprs || scratch_bytes ||
+          prog->info.local_size ||
+          (prog->info.rodata.size_16 && !prog->rodata_offset) ||
+          (prog->info.printf_uniform &&
+           prog->info.printf_uniform < AGX_ABI_AGX3_PRECOMP_ARG_HALFS) ||
+          !prog->info.agx3_staging_known || !data || !data_size ||
+          data_size > UINT16_MAX * 2u ||
+          prog->entry_offset > UINT64_MAX - prog->ptr ||
+          !prog->b.workgroup.x || !prog->b.workgroup.y ||
+          !prog->b.workgroup.z ||
+          agx_is_indirect(grid) || !grid.count[0] || !grid.count[1] ||
+          !grid.count[2]) {
+         mesa_loge("hk: refusing precompiled G18G program %u shape "
+                   "(preamble_gprs=%u scratch=%u tps=%u local=%u "
+                   "staging_known=%u indirect=%u)",
+                   idx, prog->info.nr_preamble_gprs, scratch_bytes,
+                   prog->info.agx3_tps_size, prog->info.local_size,
+                   prog->info.agx3_staging_known,
+                   agx_is_indirect(grid));
+         vk_command_buffer_set_error(&cmd->vk,
+                                     VK_ERROR_FEATURE_NOT_PRESENT);
+         return;
+      }
+
+      /* Uniform ranges: rebased arguments above the hardware ABI halves,
+       * then promoted constants (agx_precomp_agx3_uniform_ranges). */
+      const size_t printf_offset =
+         prog->info.printf_uniform
+            ? (size_t)(prog->info.printf_uniform -
+                       AGX_ABI_AGX3_PRECOMP_ARG_HALFS) * 2
+            : 0;
+      const size_t upload_size =
+         ALIGN_POT(prog->info.printf_uniform
+                      ? MAX2(data_size, printf_offset + 8)
+                      : data_size, 4);
+      struct agx_ptr uploaded = hk_pool_alloc(cmd, upload_size, 4);
+      if (!uploaded.cpu || upload_size / 2 > UINT16_MAX) {
+         vk_command_buffer_set_error(&cmd->vk,
+                                     VK_ERROR_OUT_OF_DEVICE_MEMORY);
+         return;
+      }
+      memcpy(uploaded.cpu, data, data_size);
+      memset((uint8_t *)uploaded.cpu + data_size, 0,
+             upload_size - data_size);
+      if (prog->info.printf_uniform)
+         memcpy((uint8_t *)uploaded.cpu + printf_offset,
+                &dev->dev.printf_buffer_address, sizeof(uint64_t));
+      struct agx3_ioto_uniform_range ranges[2] = {0};
+      unsigned range_count = 0;
+      ranges[range_count++] = (struct agx3_ioto_uniform_range){
+         .start_halfs = AGX_ABI_AGX3_PRECOMP_ARG_HALFS,
+         .size_halfs = upload_size / 2,
+         .address = uploaded.gpu,
+      };
+      if (prog->info.rodata.size_16) {
+         ranges[range_count++] = (struct agx3_ioto_uniform_range){
+            .start_halfs = prog->info.rodata.base_uniform,
+            .size_halfs = prog->info.rodata.size_16,
+            .address = prog->ptr + prog->rodata_offset,
+         };
+      }
+
+      /* The Ioto program must lie in the USC window (checked below).  The main
+       * command pool is not allocated LOW_VA, so its addresses never are:
+       * every G18G precompiled-helper dispatch used to fail here with
+       * VK_ERROR_UNKNOWN at vkEndCommandBuffer.  Use the USC pool. */
+      struct agx_ptr program_t = hk_pool_usc_alloc(
+         cmd, AGX3_G17P_COMPUTE_PROGRAM_MAX_SIZE,
+         AGX_IOTO_PROGRAM_ALIGNMENT);
+      if (!program_t.cpu) {
+         vk_command_buffer_set_error(&cmd->vk,
+                                     VK_ERROR_OUT_OF_DEVICE_MEMORY);
+         return;
+      }
+      if (!agx_va_in_usc_window(&dev->dev, program_t.gpu) ||
+          !agx_va_in_usc_window(&dev->dev,
+                                prog->ptr + prog->entry_offset)) {
+         mesa_loge("hk: G18G helper %u: program %" PRIx64 " or entry %" PRIx64
+                   " outside the USC window (base %" PRIx64 ")",
+                   idx, (uint64_t)program_t.gpu,
+                   (uint64_t)(prog->ptr + prog->entry_offset),
+                   (uint64_t)dev->dev.shader_base);
+         vk_command_buffer_set_error(&cmd->vk, VK_ERROR_UNKNOWN);
+         return;
+      }
+      const struct agx3_g17p_graphics_program_desc desc = {
+         .program_va = program_t.gpu,
+         .shader_va = prog->ptr + prog->entry_offset,
+         .uniform_ranges = ranges,
+         .uniform_range_count = range_count,
+         .shader_binary_size = prog->info.main_size,
+         .scratch_size = 0,
+         .nr_gprs = prog->info.nr_gprs,
+         .compiler_d_valid = prog->info.agx3_staging_known,
+         .compiler_d = (uint32_t)prog->info.agx3_staging_halfs * 2,
+         .threadgroup_memory_size_B = 0,
+      };
+      struct agx3_g17p_graphics_program generated;
+      if (!agx3_g18g_compute_program_generate(&desc, &generated) ||
+          generated.length > AGX3_G17P_COMPUTE_PROGRAM_MAX_SIZE) {
+         mesa_loge("hk: G18G compute program %u generation failed", idx);
+         vk_command_buffer_set_error(&cmd->vk,
+                                     VK_ERROR_FEATURE_NOT_PRESENT);
+         return;
+      }
+      struct util_dynarray code;
+      util_dynarray_init(&code, NULL);
+      memcpy(util_dynarray_grow_bytes(&code, 1, generated.length),
+             generated.bytes, generated.length);
+      const struct agx3_transcode_ioto ioto = {
+         .api_program = true,
+         .shader_gprs = prog->info.nr_gprs,
+      };
+      const char *why = NULL;
+      unsigned at = 0;
+      const bool ok =
+         agx3_transcode_agx3d_ioto(&code, 0, &ioto, &why, &at) &&
+         code.size <= AGX3_G17P_COMPUTE_PROGRAM_MAX_SIZE;
+      if (!ok) {
+         mesa_loge("hk: G18G compute program %u not re-encoded: %s at "
+                   "+0x%x", idx, why ? why : "too long", at);
+         util_dynarray_fini(&code);
+         vk_command_buffer_set_error(&cmd->vk,
+                                     VK_ERROR_FEATURE_NOT_PRESENT);
+         return;
+      }
+      memcpy(program_t.cpu, code.data, code.size);
+      util_dynarray_fini(&code);
+
+      struct agx3_g17p_native_compute_program_desc bind_desc = {
+         .chip = AGX_CHIP_G17G,
+         .program_va = program_t.gpu,
+         .shader_va = prog->ptr + prog->entry_offset,
+      };
+      struct agx3_compute_program launch;
+      if (!agx3_cdm_direct_template_sources_compute(false, false, false,
+                                                    &bind_desc.launch_sources) ||
+          !agx3_g17g_native_compute_program_bind(&bind_desc, &launch)) {
+         mesa_loge("hk: G18G compute program %u bind failed", idx);
+         vk_command_buffer_set_error(&cmd->vk,
+                                     VK_ERROR_FEATURE_NOT_PRESENT);
+         return;
+      }
+      /* w7C/w7P: the helper's identity and size, for the stream decodes. */
+      mesa_logi("hk: G18G precomp helper %u dispatch: main_size=%u "
+                "generated=%u grid=%ux%ux%u wg=%ux%ux%u",
+                idx, prog->info.main_size, (unsigned)generated.length,
+                grid.count[0], grid.count[1], grid.count[2],
+                prog->b.workgroup.x, prog->b.workgroup.y,
+                prog->b.workgroup.z);
+      hk_ensure_cs_has_space(cmd, cs, 0x200);
+      struct agx3_compute_dispatch_sink sink = {
+         .data = cs->current,
+         .capacity = (size_t)((uint8_t *)cs->end - (uint8_t *)cs->current),
+      };
+      /* G18G's only grounded post-dispatch barrier word is the flag-free
+       * form the dispatcher embeds. */
+      const struct agx3_compute_direct_grid direct = {
+         .source = AGX3_CDM_DIRECT_GRID_GLOBAL_THREADS,
+         .size = {grid.count[0], grid.count[1], grid.count[2]},
+         .local_size = {prog->b.workgroup.x, prog->b.workgroup.y,
+                        prog->b.workgroup.z},
+         .dimensions = grid.count[2] != 1 || prog->b.workgroup.z != 1
+                          ? 3
+                          : (grid.count[1] != 1 || prog->b.workgroup.y != 1
+                                ? 2
+                                : 1),
+      };
+      /* rel29: the helper joins an open batch with the SAME strong (flags=5)
+       * barrier the user launches use — the stall signature had the helper's
+       * weak 0x60000160 as the Nth (>=10th) launch's tail word, and user
+       * batches of 16 pass when the helper is sealed away (rel28b), so the
+       * weak barrier mid-batch at position >=10 is the suspect, not the
+       * launch count. */
+      const bool launched = agx3_g17g_native_compute_dispatch_append(
+         &launch, &direct, 5, &sink);
+      uint8_t terminate[AGX3_CDM_STREAM_TERMINATE_SIZE];
+      if (!launched ||
+          !agx3_cdm_stream_terminate_pack(dev->dev.chip, terminate) ||
+          sink.capacity - sink.length < sizeof(terminate)) {
+         mesa_loge("hk: G18G compute program %u dispatch append failed",
+                   idx);
+         vk_command_buffer_set_error(&cmd->vk,
+                                     VK_ERROR_FEATURE_NOT_PRESENT);
+         return;
+      }
+      memcpy(sink.data + sink.length, terminate, sizeof(terminate));
+      sink.length += sizeof(terminate);
+      cs->current = sink.data + sink.length;
+      cs->stats.cmds++;
+      cs->g18_dispatch_sealed = true;
+      /* Overwrite (last-wins) as in the admitted shape: this branch seals
+       * the stream, so it ends a batch rather than joining one; the
+       * validator-safe cross-launch merge is the rel28 work (per-bit flag
+       * OR, largest-product local dims). */
+      cs->g18_compute_resources = (struct drm_asahi_g18_compute_resources){
+         .version = 1,
+         .flags = 1,
+         .registers_16 = prog->info.nr_gprs,
+         .scratch_bytes = prog->info.scratch_size,
+         .spectpr_scratch_bytes = prog->info.agx3_spectpr_scratch_size,
+         .staging_16 = prog->info.agx3_staging_halfs,
+         .local_bytes = prog->info.local_size,
+         .imageblock_stride = prog->info.imageblock_stride,
+         .local_size = {prog->b.workgroup.x, prog->b.workgroup.y,
+                        prog->b.workgroup.z},
+      };
+      hk_cmd_buffer_retain_bo(cmd, prog->bo);
       return;
    }
 
@@ -3836,11 +4304,14 @@ hk_cs_init_graphics(struct hk_cmd_buffer *cmd, struct hk_cs *cs)
 
    hk_drm_attachment_set_init(&cs->fragment_attachments);
 
-   /* Only the native AGX3 path submits the spans (hk_queue.c). */
-   if (agx_native_graphics(&dev->dev))
+   /* Only the native AGX3 path submits the spans (hk_queue.c). G18G
+    * submits them too, as it did before the paths were split. */
+   const bool g18g = dev->dev.chip == AGX_CHIP_G18G;
+   if (agx_native_graphics(&dev->dev) || g18g)
       hk_cs_capture_fragment_attachments(dev, render, cs);
 
-   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) {
+   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+       g18g) {
       /* The kext preserves a zero final VDM word when this selector is the
        * UINT32_MAX sentinel.  This reproduces m1n1's direct-triangle prefix. */
       cs->agx3_active_context_selector_valid = true;

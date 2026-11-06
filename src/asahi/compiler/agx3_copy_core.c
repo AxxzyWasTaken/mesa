@@ -114,15 +114,16 @@ agx3_copy_encode_reg32(enum agx_isa_encoding encoding, uint16_t dest_half,
 bool
 agx3_copy_encode_reg_to_uniform(enum agx_isa_encoding encoding,
                                 uint16_t uniform_half, uint16_t src_half,
-                                bool kill, uint8_t out[AGX3_COPY_MAX_LENGTH],
+                                bool kill, uint16_t wait_mask,
+                                uint8_t out[AGX3_COPY_MAX_LENGTH],
                                 uint8_t *len)
 {
    if (out == NULL || len == NULL)
       return false;
 
    if (encoding == AGX_ISA_ENCODING_AGX3C) {
-      if ((uniform_half & 1) || uniform_half + 2 > 512 || (src_half & 1) ||
-          src_half + 2 > 256)
+      if (wait_mask != 0 || (uniform_half & 1) || uniform_half + 2 > 512 ||
+          (src_half & 1) || src_half + 2 > 256)
          return false;
       /* Same M5 COPY uniform destination as the captured IOTO publisher.
        * Retain its exact domain tags and caller-owned last-use hint. */
@@ -137,7 +138,9 @@ agx3_copy_encode_reg_to_uniform(enum agx_isa_encoding encoding,
       }
       return false;
    }
-   if (encoding != AGX_ISA_ENCODING_AGX3B)
+   /* These forms carry no wait of their own; callers retire producers
+    * first. G18G's waiting form is agx3_copy_encode_reg_to_uniform_g18g(). */
+   if (encoding != AGX_ISA_ENCODING_AGX3B || wait_mask != 0)
       return false;
 
    if ((uniform_half & 1) || uniform_half + 2 > 512 || (src_half & 1) ||
@@ -181,6 +184,50 @@ agx3_copy_encode_reg_to_uniform(enum agx_isa_encoding encoding,
    out[9] = 0x00;
    *len = 10;
    return true;
+}
+
+bool
+agx3_copy_encode_reg_to_uniform_g18g(enum agx_isa_encoding encoding,
+                                     uint16_t uniform_half, uint16_t src_half,
+                                     bool kill, uint16_t wait_mask,
+                                     uint8_t out[AGX3_COPY_MAX_LENGTH],
+                                     uint8_t *len)
+{
+   if (out == NULL || len == NULL || encoding != AGX_ISA_ENCODING_AGX3C)
+      return false;
+
+   if ((uniform_half & 1) || uniform_half + 2 > 512 || (src_half & 1) ||
+       src_half + 2 > 256)
+      return false;
+
+   /* Every G17G fragment preamble ends with this copy: the pointer just
+    * loaded into r0 goes to uniform pair 4, waiting for the load in slot
+    * 1 (gpu/m5-fragment-depth-reference.metal and four more, all
+    * 23 04 07 02 56 a0 a4 0a). It is the G17P form on ep1 with the
+    * AGX3c selector pair and f42, and carries its wait itself (f30+i).
+    * The form's destination field is nine bits wide (f3 deposits at
+    * shifts 0..8), so the geometry preamble's pointer table above half
+    * 128 composes in the same witnessed form; the composer round-trips
+    * every value through the decoder. */
+   if (wait_mask >= (1u << 8))
+      return false;
+   const struct agx3_field_kv baseline[] = {
+      KV(9, 3), KV(10, 2), KV(23, 2), KV(24, 2), KV(28, 1), KV(29, 35),
+      KV(42, 1),
+   };
+   struct agx3_field_kv overrides[11] = {
+      KV(3, uniform_half),
+      KV(16, src_half),
+      KV(27, kill ? 1 : 0),
+   };
+   unsigned n = 3;
+   for (unsigned i = 0; i < 8; ++i) {
+      if (wait_mask & (1u << i))
+         overrides[n++] = (struct agx3_field_kv)KV(30 + i, 1);
+   }
+   return agx3_bind_compose(encoding, "copy", 1, baseline,
+                            AGX3_COPY_ARRAY_SIZE(baseline), overrides, n,
+                            out, len);
 }
 
 bool
@@ -230,7 +277,15 @@ agx3_copy_encode_uniform_to_reg32(enum agx_isa_encoding encoding,
    if (encoding == AGX_ISA_ENCODING_AGX3B) {
       baseline = agx3b_copy_baseline;
       nbaseline = AGX3_COPY_ARRAY_SIZE(agx3b_copy_baseline);
-   } else if (encoding == AGX_ISA_ENCODING_AGX3C) {
+   } else if (agx_encoding_is_g17_class(encoding)) {
+      /* G18G (agx3d) spells this copy with the agx3c field vector: the
+       * applegpu_g18g build of a kernel storing a constant-buffer float4
+       * reads it with copy.ep0 83 00 08 08 .. 83 06 0e 08 (f2 0..6,
+       * f17 8..14, f23=3 f24=2 f28=3 f29=35), the G17G build with the same
+       * fields. Only those compact destinations are witnessed there. */
+      if (encoding == AGX_ISA_ENCODING_AGX3D &&
+          dest_half >= AGX3_COPY_REG16_DEST_HALVES)
+         return false;
       baseline = agx3c_copy_baseline;
       nbaseline = AGX3_COPY_ARRAY_SIZE(agx3c_copy_baseline);
    } else {
@@ -250,8 +305,8 @@ agx3_copy_encode_uniform_to_reg32(enum agx_isa_encoding encoding,
    };
 
    if (dest_half < AGX3_COPY_REG16_DEST_HALVES)
-      return agx3_bind_compose(encoding, "copy", 0, baseline, nbaseline,
-                               overrides,
+      return agx3_bind_compose(encoding, "copy", agx3_bind_ep(encoding, 0),
+                               baseline, nbaseline, overrides,
                                AGX3_COPY_ARRAY_SIZE(overrides), out, len);
 
    /* The compact four-byte copy carries its destination in a seven-bit f2 and

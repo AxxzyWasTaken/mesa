@@ -7,6 +7,7 @@
 
 #include "compiler/nir/nir.h"
 #include "asahi/lib/agx_chip.h"
+#include "asahi/lib/agx_ioto_load_core.h"
 #include "agx3_fltnorm_core.h"
 #include "agx3_cprog_input.h"
 #include "util/bitset.h"
@@ -14,6 +15,9 @@
 #include "util/u_dynarray.h"
 #include "util/u_tristate.h"
 #include "shader_enums.h"
+
+/* Cache-line align shader programs. This matches the prop compiler. */
+#define AGX_CODE_ALIGN 0x80
 
 /* G17P's register file: halves 0..191. */
 #define AGX3B_NUM_REGS (192)
@@ -122,6 +126,14 @@ agx3_uniform_dma_span_equal(const struct agx3_uniform_dma_span *a,
           a->halfs == b->halfs && a->offset_B == b->offset_B;
 }
 
+enum agx_g18_sample_mask_form {
+   AGX_G18_SAMPLE_MASK_KILL = (1 << 0),
+   AGX_G18_SAMPLE_MASK_FULL = (1 << 1),
+   AGX_G18_SAMPLE_MASK_OTHER = (1 << 2),
+   /* Native1121 psdiscard: per-sample kill and update words (run 1128). */
+   AGX_G18_SAMPLE_MASK_SAMPLE = (1 << 3),
+};
+
 struct agx_shader_info {
    mesa_shader_stage stage;
    uint32_t binary_size;
@@ -162,7 +174,8 @@ struct agx_shader_info {
     * launchers need its extent independently of the main function's offset. */
    unsigned main_size, preamble_size;
 
-   /* Does the shader have a preamble? If so, it is at offset preamble_offset.
+   /* Does the shader have a preamble? If so, it is preamble_size bytes long
+    * at offset preamble_offset.
     * The main shader is at offset main_offset. The preamble is executed first.
     */
    bool has_preamble;
@@ -193,6 +206,10 @@ struct agx_shader_info {
 
    /* Does the shader control the sample mask? */
    bool writes_sample_mask;
+
+   /* Union of emitted G18 2x/4x sample-mask forms. A full late transaction
+    * does not establish proof for an unrelated partial or early update. */
+   uint8_t g18_sample_mask_forms;
 
    /* Depth layout, never equal to NONE */
    enum gl_frag_depth_layout depth_layout;
@@ -244,14 +261,20 @@ struct agx_shader_info {
     */
    uint16_t nr_gprs, nr_preamble_gprs;
 
-   /* Half of the AGX3 compiler staging footprint. The launch path doubles
-    * this value to reproduce Apple ShaderInfo fields 38/42. */
+   /* AGX3 IPR footprints in halfwords. The launch path doubles these values
+    * to obtain bytes: ShaderInfo fields 38/42 for main, and field 37
+    * (thread_invariant_largest_ipr_bytes) for the preamble. These are not
+    * temporary GPR counts. */
    uint16_t agx3_staging_halfs;
    bool agx3_staging_known;
    /* Separate thread-invariant IPR footprint for native CProg. It must not
     * inherit the main program's texture/staging domain or its GPR count. */
    uint16_t agx3_preamble_staging_halfs;
    bool agx3_preamble_staging_known;
+
+   /* Live uniform inputs after optimization, lowering, and register allocation.
+    * Retained separately from resource sizes and hardware entry policy. */
+   struct agx_ioto_cprog_inputs agx3_preamble_encoded_inputs;
 
    /* Output mask set during driver lowering */
    uint64_t outputs;
@@ -280,6 +303,11 @@ struct agx_shader_info {
     * clears it if another part precedes this one in the executable. */
    bool agx3_fltnorm_start;
    struct agx3_colour_link_info agx3_colour_link;
+
+   /* Pixel classes this fragment part waited for outside control flow, so
+    * holds on every path into the next part. A G17G epilog must not wait for
+    * them again (framebuffer fetch: the main waits for class 8). */
+   uint8_t agx3_pixel_held;
 };
 
 struct agx_precompiled_kernel_info {
@@ -291,9 +319,14 @@ struct agx_precompiled_kernel_info {
    uint16_t workgroup_size[3];
    uint16_t local_size;
    uint16_t imageblock_stride;
+   uint16_t scratch_size;
+   uint16_t agx3_spectpr_scratch_size;
    bool uses_txf;
    bool agx3_staging_known;
    uint16_t agx3_staging_halfs;
+   bool agx3_preamble_staging_known;
+   uint16_t agx3_preamble_staging_halfs;
+   struct agx_ioto_cprog_inputs agx3_preamble_encoded_inputs;
 
    /* AGX3 kernels read the printf buffer address from a 64-bit uniform at this
     * half, the first multiple of 4 after their arguments, or 0 if they do not
@@ -304,7 +337,7 @@ struct agx_precompiled_kernel_info {
    /* AGX3 thread-private storage frame in bytes: spills and returned atomic
     * words. AGX2 kernels do not spill.
     */
-   uint16_t agx3_tps_size;
+   uint32_t agx3_tps_size;
 };
 
 static inline struct agx_precompiled_kernel_info
@@ -327,11 +360,16 @@ agx_compact_kernel_info(struct agx_shader_info *info)
                          info->workgroup_size[2]},
       .local_size = info->local_size,
       .imageblock_stride = info->imageblock_stride,
+      .scratch_size = info->scratch_size,
+      .agx3_spectpr_scratch_size = info->agx3_spectpr_scratch_size,
       .uses_txf = info->uses_txf,
       .agx3_staging_known = info->agx3_staging_known,
       .agx3_staging_halfs = info->agx3_staging_halfs,
+      .agx3_preamble_staging_known = info->agx3_preamble_staging_known,
+      .agx3_preamble_staging_halfs = info->agx3_preamble_staging_halfs,
+      .agx3_preamble_encoded_inputs = info->agx3_preamble_encoded_inputs,
       .agx3_tps_size =
-         (uint16_t)MAX2(info->scratch_size, info->agx3_spectpr_scratch_size),
+         MAX2(info->scratch_size, info->agx3_spectpr_scratch_size),
    };
 }
 
@@ -434,7 +472,29 @@ struct agx_device_key {
    /* Physical A18 Pro capability, not the G17P profile shared with T6040.
     * Offline/shared library keys leave this disabled. */
    bool shader_quad_control;
+
+   /*
+    * Re-encode the finished code as agx3d (G18G). The rest of the key then
+    * describes G17G: G18G executes the G17G instruction set, so the compiler
+    * runs exactly as for G17G and agx3_transcode_agx3d() re-encodes each
+    * function's code after packing. See agx3_transcode.c for the evidence.
+    */
+   bool emit_agx3d;
 };
+
+/*
+ * Is this a compile for the M6 GPU (G18G)? G18G compiles with the G17G key
+ * (AGX_ISA_ENCODING_AGX3C, the G17G-family encoding shared by G17G, G17S and
+ * G18P) and re-encodes as agx3d, so a gate on the encoding alone also fires
+ * on every G17G-family GPU. Gate M6-only workarounds
+ * and facts grounded only by G18G witnesses on this; keep the encoding gate
+ * for G17G instruction-set behaviour that G17G and G18G share.
+ */
+static inline bool
+agx_is_g18g(const struct agx_device_key *dev)
+{
+   return dev->encoding == AGX_ISA_ENCODING_AGX3C && dev->emit_agx3d;
+}
 
 struct agx_shader_key {
    /* Device info */
@@ -470,6 +530,10 @@ struct agx_shader_key {
     * otherwise be moved to a generated preamble.
     */
    bool no_preamble;
+
+   /* A complete, single-sample M5 uniform-colour blend variant. The packer
+    * still proves its one read/write pixel transaction before admitting it. */
+   bool m5_uniform_blend;
 
    /* AGX3B: build the preamble as a native constant program (CProg inputs
     * imported through its TPS frame, arithmetic results selected straight
@@ -523,6 +587,20 @@ struct agx_shader_key {
     * single-sample target on every path except VK_ATTACHMENT_STORE_OP_STORE. */
    bool g17p_rt0_eot_multisample;
 
+   /* These selectors retain the separately witnessed G17G EOT ABI. */
+   /* Select the native R5G6B5 imgwblk tail (0x35). RGB565 has three logical
+    * F16 imageblock lanes spanning two words and lowers to a raw I16 block
+    * store, but it does not share RGBA16F's selector. */
+   bool g17p_rt0_eot_rgb565;
+
+   /* Select the native normalized-16 imgwblk tail (0x95). Scalar R16 and
+    * RG16 are both one imageblock word, so word count alone is insufficient. */
+   bool g17p_rt0_eot_norm16_selector_95;
+
+   /* Select the separately grounded 84-byte signed two-word I16 builtin.
+    * RGBA16_SINT is not byte-compatible with the unsigned I16 EOT. */
+   bool g17p_rt0_eot_i16_signed_two_words;
+
    /* Authorize the exact I32 G17P EOT builtin. Set only for logical formats
     * whose I32 store shape and PBE descriptor are both grounded. */
    bool g17p_rt0_eot_i32;
@@ -535,6 +613,22 @@ struct agx_shader_key {
    /* Authorize the signed four-word I32 builtin, which stays single-sample. */
    bool g17p_rt0_eot_i32_signed_four_words;
 
+   /* Select the native 0x15 imgwblk variant for an I32 store. This is
+    * independently grounded only for the two-word R32G32 SINT layout. */
+   bool g17p_rt0_eot_i32_selector_15;
+
+   /* Select the native 0x75 imgwblk variant for an I32 store. This is
+    * independently grounded only for the two-word R32G32 UINT layout. */
+   bool g17p_rt0_eot_i32_selector_75;
+
+   /* Authorize the G17G native single-sample, single-layer RT0 builtin. The
+    * program itself is picked by the store-shape fields above, which describe
+    * Mesa's lowered imageblock store rather than a GPU generation: Apple's
+    * builtin factory maps an attachment key to the same format class on both
+    * G17P and G17G. Its PBE table and tile byte offset occupy uniform
+    * halves 0..5. */
+   bool g17g_rt0_eot;
+
    /* Authorize the exact two-partition packed R11G11B10 EOT. Its post-RA
     * graph is otherwise indistinguishable from unsupported dual-I32 layouts. */
    bool g17p_r11g11b10_mrt_eot;
@@ -546,6 +640,13 @@ struct agx_shader_key {
    /* Generated native eMRT epilog. Memory writes may split its sample groups
     * into blocks, but tile operations retain the per-sample partition order. */
    bool g17p_emrt;
+
+   /* A fragment epilog, background or end-of-tile program of a G18
+    * single-sample mixed-format tile (agx_g18g_native_mixed_mask, run 1139).
+    * Selects the native1130 tile forms: partial masks of every witnessed
+    * format, blend reads, lstcol's lifetime bit by last use, the long lldcol
+    * form, and the 8-bit-integer and R11G11B10 end-of-tile classes. */
+   bool g18_native_mixed;
 
    /* A Honeykrisp hardware vertex binary adjacent to software geometry or
     * transform feedback. The API VS hardware variant may expose only values
@@ -599,6 +700,7 @@ uint64_t agx_gather_texcoords(nir_shader *nir);
 
 void agx_preprocess_nir(nir_shader *nir);
 void agx_preprocess_nir_g17p(nir_shader *nir);
+void agx_preprocess_nir_g18g(nir_shader *nir);
 
 /* Access private (scratch) memory in whole 32-bit words, the only width the
  * AGX3 stack protocol encodes. agx_preprocess_nir_g17p() runs it. */
@@ -606,6 +708,16 @@ bool agx3_nir_lower_scratch_words(nir_shader *nir);
 void agx_preprocess_nir_m5(nir_shader *nir);
 bool agx_nir_lower_discard_zs_emit(nir_shader *s);
 bool agx_nir_lower_sample_mask(nir_shader *s);
+/* TARGET/LIVE retain their normal semantics. This flag records the proof that
+ * the update is either whole-sample testing or a disjoint non-testing kill. */
+#define AGX_SAMPLE_MASK_FULL_OR_KILL (1u << 2)
+/* Proof about the unmasked source; not permission to emit a full update. */
+#define AGX_SAMPLE_MASK_SUBSET_FULL_OR_KILL (1u << 3)
+/* sample_mask_agx3 IMM bit: stage the word at staging 2 with scoreboard slot
+ * 2 and no class transaction (native1121 psdiscard's update word). */
+#define AGX_SAMPLE_MASK_AGX3_SECOND_STAGING (1u << 2)
+bool agx_nir_mark_g18_sample_mask_tests(nir_shader *s);
+bool agx_nir_coalesce_sample_mask_updates(nir_shader *s, unsigned nr_samples);
 bool agx_nir_lower_sample_mask_m5(nir_shader *s);
 
 /* store_zs_agx base bit: the sample mask names exactly one covered sample,
@@ -616,10 +728,12 @@ bool agx_nir_lower_sample_mask_deferred(nir_shader *s);
 bool agx_nir_lower_sample_mask_deferred_g17p(nir_shader *s, bool *a2c_in_main);
 bool agx_nir_lower_sample_mask_deferred_m5(nir_shader *s);
 bool agx_nir_lower_interpolation(nir_shader *s, bool layer_as_varying);
+bool agx_nir_fix_g17g_constant_interpolation(nir_shader *s);
 
 bool agx_nir_lower_cull_distance_vs(struct nir_shader *s);
 bool agx_nir_lower_cull_distance_fs(struct nir_shader *s,
-                                    unsigned nr_distances);
+                                    unsigned nr_distances,
+                                    bool native_constant_planes);
 bool agx_mem_vectorize_cb(unsigned align_mul, unsigned align_offset,
                           unsigned bit_size, unsigned num_components,
                           int64_t hole_size, nir_intrinsic_instr *low,

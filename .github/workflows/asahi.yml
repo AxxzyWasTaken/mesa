@@ -1,0 +1,57 @@
+name: asahi
+
+# Builds the Asahi Gallium and Honeykrisp Vulkan drivers with their unit tests
+# on 64-bit Arm Linux and runs the asahi test suite.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: asahi-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04-arm
+    container: fedora:44
+    timeout-minutes: 120
+    steps:
+      - name: Install build dependencies
+        run: |
+          dnf -y install dnf-plugins-core git
+          dnf -y builddep mesa
+          dnf -y install ccache clang
+
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Restore the compiler cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-asahi-${{ github.sha }}
+          restore-keys: ccache-asahi-
+
+      - name: Configure
+        run: |
+          CC="ccache clang" CXX="ccache clang++" meson setup build \
+            -Dgallium-drivers=asahi -Dvulkan-drivers=asahi \
+            -Dplatforms=wayland,x11 -Dbuild-tests=true
+
+      - name: Build
+        run: meson compile -C build
+
+      - name: Test
+        run: meson test -C build --suite asahi --num-processes "$(nproc)" --print-errorlogs
+
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: asahi-meson-logs
+          path: build/meson-logs/
+          retention-days: 5

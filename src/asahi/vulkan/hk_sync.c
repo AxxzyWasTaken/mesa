@@ -550,18 +550,19 @@ hk_sync_barrier(struct hk_cmd_buffer *cmd, uint8_t src_kinds,
    barrier_source_dependencies(cmd, src_kinds, dep);
 
    /* M5: of the renders this dependency orders pre-rasterization work after,
-    * only those that wrote memory other than their attachments
-    * (HK_SYNC_GFX_MEM) can hand that work anything it reads without an
-    * image. Order the vertex half (HK_SYNC_GFX) after the latest of them;
-    * the fragment half and image-reading vertex work keep the whole
+    * graphics or transfer, only those that wrote memory other than their
+    * attachments (HK_SYNC_GFX_MEM) can hand that work anything it reads
+    * without an image. Order the vertex half (HK_SYNC_GFX) after the latest
+    * of them; the fragment half and image-reading vertex work keep the whole
     * dependency. The compute subqueue's requirement is unchanged: the kernel
     * orders both halves after compute work either way. */
-   if ((src_kinds & HK_SYNC_GFX) && (dst_kinds & HK_SYNC_GFX) &&
+   const uint8_t render_kinds = HK_SYNC_GFX | HK_SYNC_XFER;
+   if ((src_kinds & render_kinds) && (dst_kinds & HK_SYNC_GFX) &&
        agx_chip_g17_m5(hk_cmd_buffer_device(cmd)->dev.chip)) {
       struct hk_sync_dep vtx = dep[HK_SYNC_VDM];
       vtx.cut = memory_cut(vtx.cut);
-      if (vtx.prior & HK_SYNC_GFX)
-         vtx.prior = (vtx.prior & ~HK_SYNC_GFX) | HK_SYNC_GFX_MEM;
+      if (vtx.prior & render_kinds)
+         vtx.prior = (vtx.prior & ~render_kinds) | HK_SYNC_GFX_MEM;
       const unsigned gfx = util_logbase2(HK_SYNC_GFX);
       dep_max(&cmd->sync.req[gfx][HK_SYNC_VDM], &vtx);
       dep_max(&cmd->sync.req[gfx][HK_SYNC_CDM], &dep[HK_SYNC_CDM]);
@@ -725,7 +726,9 @@ hk_sync_stream_created(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
    struct hk_cs *gfx = cmd->current_cs.gfx;
    const bool pre_gfx = compute && slot == &cmd->current_cs.pre_gfx && gfx &&
                         gfx != cs;
-   if (unlikely(hk_cmd_buffer_device(cmd)->frame_anatomy)) {
+   /* Unit-test fixtures have no device. */
+   const struct hk_device *dev = hk_cmd_buffer_device(cmd);
+   if (unlikely(dev && dev->frame_anatomy)) {
       cs->anatomy_api_barriers = cmd->anatomy_bar.count;
       cs->anatomy_api_mem = cmd->anatomy_bar.mem;
       cs->anatomy_api_buf = cmd->anatomy_bar.buf;
@@ -751,8 +754,12 @@ hk_sync_stream_created(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
    }
 
    cs->sync.kind = stream_kind(cmd, slot, compute);
-   if (cs->sync.kind != HK_SYNC_GFX || slot == &cmd->current_cs.pre_gfx ||
-       slot == &cmd->current_cs.post_gfx)
+   /* A transfer render writes its attachments, like any render; the draws
+    * it records mark it if they write other memory
+    * (hk_m5_note_render_resources). */
+   const bool xfer_render = !compute && cs->sync.kind == HK_SYNC_XFER;
+   if ((cs->sync.kind != HK_SYNC_GFX && !xfer_render) ||
+       slot == &cmd->current_cs.pre_gfx || slot == &cmd->current_cs.post_gfx)
       cs->sync.kind |= HK_SYNC_GFX_MEM;
    cs->sync.prev_mem =
       st->last[util_logbase2(HK_SYNC_GFX_MEM)][hk_sync_sq(cs)];
@@ -1978,6 +1985,16 @@ hk_sync_resolve_submit(struct hk_queue *queue,
             memcpy(cs->sync.prior_ta, cs->sync.prior,
                    sizeof(cs->sync.prior_ta));
             continue;
+         }
+         /* M5: tiling whose pre-rasterization programs keep state in
+          * thread-private storage corrupts that state when it overlaps an
+          * earlier render's fragment work (Counter-Strike 2: one-frame
+          * garbage geometry and blocks, only for such renders). Such a
+          * render's vertex half keeps the whole render-subqueue prefix;
+          * its compute prefix may still be narrower. */
+         if (cs->m5_vertex_tps) {
+            cs->sync.barrier_ta[HK_SYNC_VDM] = cs->sync.barrier[HK_SYNC_VDM];
+            cs->sync.prior_ta[HK_SYNC_VDM] = cs->sync.prior[HK_SYNC_VDM];
          }
          for (unsigned sq = 0; sq < HK_SYNC_NUM_SQ; ++sq) {
             cs->sync.ta_split |=

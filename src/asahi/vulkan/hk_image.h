@@ -82,6 +82,13 @@ struct hk_image {
 
    uint8_t plane_count;
    struct hk_image_plane planes[3];
+
+   /** True for a swapchain image and for an image bound to swapchain memory.
+    *
+    * Such memory can be aliased by other images only, never by a buffer, so
+    * work reads what it holds only through an image.
+    */
+   bool swapchain_memory;
 };
 
 VK_DEFINE_NONDISP_HANDLE_CASTS(hk_image, vk.base, VkImage, VK_OBJECT_TYPE_IMAGE)
@@ -247,7 +254,7 @@ hk_eot_pbe_format(const struct agx_device *dev, enum pipe_format format)
 {
    return format == PIPE_FORMAT_R11G11B10_FLOAT && agx_is_m4_pro(dev)
              ? format
-             : agx_g17p_rt0_pbe_format(format);
+             : agx_rt0_pbe_format(dev->chip, format);
 }
 
 /* The format an end-of-tile program stores a target as, which only selects

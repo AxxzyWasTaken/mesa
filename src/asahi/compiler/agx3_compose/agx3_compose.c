@@ -149,8 +149,8 @@ bool agx3_compose_known(const agx3_table *t, uint32_t form,
    /* Composition is used by parallel shader compilers.  Keep all mutable
     * traversal state on this invocation; the generated tables are immutable. */
    /* Generated AGX3B/C tables currently select at most 73 commands along any
-    * form path.  One slot per field leaves more than twice that headroom and
-    * fails closed if a future table exceeds it. */
+    * form path, and AGX3D at most 68.  One slot per field leaves more than
+    * twice that headroom and fails closed if a future table exceeds it. */
    struct direct_cmd direct_cmds[AGX3_MAX_FIELDS];
    ctx c = {0};
    ctx *cp = &c;
@@ -276,6 +276,51 @@ int32_t agx3_compose_mnemonic(const agx3_table *t, const char *mnemonic,
          *size = t->forms[i].size;
          return (int32_t)i;
       }
+   }
+   return -1;
+}
+
+/*
+ * Apple's encoder tries a mnemonic's encoding points by ascending size, the
+ * ep number breaking ties, and keeps the first that encodes the field vector
+ * (the forms[].size order of the generated table; see agx3_compose.h). The
+ * forms of one mnemonic are contiguous in a table, which is sorted by
+ * (mnemonic, ep).
+ */
+int32_t
+agx3_compose_apple_order(const agx3_table *t, const char *mnemonic,
+                         const uint64_t fields[AGX3_MAX_FIELDS], uint8_t *out)
+{
+   int32_t lo = -1;
+   for (uint8_t ep = 0; ep < 64 && lo < 0; ++ep)
+      lo = agx3_form_index(t, mnemonic, ep);
+   if (lo < 0)
+      return -1;
+
+   uint32_t first = (uint32_t)lo;
+   while (first > 0 && strcmp(t->forms[first - 1].mnemonic, mnemonic) == 0)
+      first--;
+   uint32_t end = (uint32_t)lo;
+   while (end < t->num_forms && strcmp(t->forms[end].mnemonic, mnemonic) == 0)
+      end++;
+
+   /* At most a few dozen forms per mnemonic: try them smallest first. */
+   bool tried[64] = {false};
+   if (end - first > 64)
+      return -1;
+   for (unsigned n = 0; n < end - first; ++n) {
+      int32_t best = -1;
+      for (uint32_t f = first; f < end; ++f) {
+         if (tried[f - first])
+            continue;
+         if (best < 0 || t->forms[f].size < t->forms[best].size ||
+             (t->forms[f].size == t->forms[best].size &&
+              t->forms[f].ep < t->forms[best].ep))
+            best = (int32_t)f;
+      }
+      tried[best - first] = true;
+      if (agx3_compose(t, (uint32_t)best, fields, out))
+         return best;
    }
    return -1;
 }
