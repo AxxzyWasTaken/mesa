@@ -423,7 +423,12 @@ hk_CreateSampler(VkDevice device,
             info->pNext,
             SAMPLER_BORDER_COLOR_COMPONENT_MAPPING_CREATE_INFO_EXT);
 
-      if (swiz_info) {
+      /* Descriptor generation 9 applies the image view's component mapping
+       * to the border when the descriptor is written or sampled (see
+       * hk_border_swizzle_word()), and the mapping given here must match
+       * the view's, so swizzling here as well would apply it twice. */
+      if (swiz_info &&
+          agx_chip_descriptor_generation(pdev->dev.chip) != 9) {
          const bool is_int = vk_border_color_is_int(info->borderColor);
          bc = vk_swizzle_color_value(bc, swiz_info->components, is_int);
       }
