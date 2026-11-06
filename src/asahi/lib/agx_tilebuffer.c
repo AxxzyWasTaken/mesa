@@ -238,6 +238,24 @@ agx_build_tilebuffer_layout_with_limits(
 }
 
 struct agx_tilebuffer_layout
+agx_build_tilebuffer_layout_rt0_resident(const enum pipe_format *formats,
+                                         uint8_t nr_cbufs, uint8_t nr_samples,
+                                         uint32_t max_bytes_per_tile,
+                                         uint16_t max_samples_per_tile)
+{
+   struct agx_tilebuffer_layout tib = agx_build_tilebuffer_layout_with_limits(
+      formats, MIN2(nr_cbufs, 1), nr_samples, false, 0, max_bytes_per_tile,
+      max_samples_per_tile);
+
+   for (unsigned rt = 1; rt < nr_cbufs; ++rt) {
+      tib.logical_format[rt] = formats[rt];
+      tib.spilled[rt] = formats[rt] != PIPE_FORMAT_NONE;
+   }
+
+   return tib;
+}
+
+struct agx_tilebuffer_layout
 agx_build_tilebuffer_layout_for_imageblock(
    const enum pipe_format *formats, uint8_t nr_cbufs, uint8_t nr_samples,
    bool layered, uint8_t max_sample_size_B, uint32_t max_bytes_per_tile,

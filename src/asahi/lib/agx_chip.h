@@ -135,6 +135,10 @@ enum agx_submission_model {
  * the same offsets. */
 #define AGX_G17P_MAX_BYTES_PER_SAMPLE (128)
 
+/* G17G tile budget: a full 32 KiB, at most 2048 samples per tile. */
+#define AGX_G17G_MAX_BYTES_PER_TILE   (32768)
+#define AGX_G17G_MAX_SAMPLES_PER_TILE (2048)
+
 /* On a G17P tile that no colour-writing geometry covered, the background
  * program -- clear or reload alike -- delivers only the low eight bytes of
  * each sample when the tilebuffer is multisampled. Measured on an A18 Pro:

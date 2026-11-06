@@ -662,6 +662,22 @@ agx_optimizer_fmov_rev(agx_context *ctx, agx_instr *I, agx_instr *use)
        (I->src[0].abs || I->src[0].neg || I->src[1].abs || I->src[1].neg))
       return false;
 
+   /* M5 (AGX3C): the rounding/log/exp funops have no half-destination form
+    * over a word source (agx3_alu_unary_m5 refuses it), and rsqrt and the
+    * gradients take a single width. Folding the narrowing move into one made
+    * exp/log/floor/ceil/trunc/rsqrt shaders unencodable and the draw was
+    * skipped, so keep the explicit f32-to-f16 move and compute at word
+    * width. */
+   if (ctx->key && ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3C &&
+       I->dest[0].size == AGX_SIZE_32 && use->dest[0].size == AGX_SIZE_16 &&
+       I->src[0].size == AGX_SIZE_32 &&
+       (I->op == AGX_OPCODE_EXP2 || I->op == AGX_OPCODE_LOG2 ||
+        I->op == AGX_OPCODE_FLOOR || I->op == AGX_OPCODE_CEIL ||
+        I->op == AGX_OPCODE_TRUNC || I->op == AGX_OPCODE_ROUNDEVEN ||
+        I->op == AGX_OPCODE_RSQRT || I->op == AGX_OPCODE_DFDX ||
+        I->op == AGX_OPCODE_DFDY))
+      return false;
+
    /* saturate(saturate(x)) = saturate(x) */
    I->saturate |= use->saturate;
    I->dest[0] = use->dest[0];

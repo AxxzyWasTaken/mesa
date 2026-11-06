@@ -134,7 +134,7 @@ lower_custom_border_query(nir_builder *b, nir_tex_instr *tex, bool native_index)
 
 static bool
 lower_sampler(nir_builder *b, nir_tex_instr *tex, bool wide_native_handle,
-              bool clamp_to_zero, bool native_index)
+              bool clamp_to_zero, bool native_index, bool query_lod_bank)
 {
    if (!nir_tex_instr_need_sampler(tex))
       return false;
@@ -162,9 +162,10 @@ lower_sampler(nir_builder *b, nir_tex_instr *tex, bool wide_native_handle,
       handle = nir_iadd_imm(b, handle,
          AGX_GALLIUM_G17P_BORDER_NONCOMPARE_BASE -
          AGX_GALLIUM_G17P_CUSTOM_BORDER_BASE);
-   if (wide_native_handle && tex->op == nir_texop_lod) {
+   if (query_lod_bank && tex->op == nir_texop_lod) {
       /* The ordinary table maps API i to native i+1. The query bank is
-       * disjoint from both this bank and the custom-border companions. */
+       * disjoint from both this bank and the custom-border companions.
+       * G17G uploads no such bank, so it keeps the ordinary handle. */
       handle = nir_iadd_imm(b, handle, AGX_GALLIUM_G17P_QUERY_LOD_BASE - 1);
    }
    if (wide_native_handle)
@@ -319,10 +320,12 @@ lower(nir_builder *b, nir_instr *instr, void *data)
              bindful_sampler_count);
 
       const bool query_lod = options->g17p_native_sampler_handles &&
+                             !options->table_index_crawls &&
                              tex->op == nir_texop_lod;
       if ((sampler_outside_bindful || clamp_to_zero || noncompare || query_lod) &&
           lower_sampler(b, tex, options->g17p_native_sampler_handles,
-                        clamp_to_zero, options->g17p_shadow_gather)) {
+                        clamp_to_zero, options->g17p_shadow_gather,
+                        query_lod)) {
          progress = true;
          if (!clamp_to_zero)
             *uses_bindless_samplers = true;
@@ -339,6 +342,15 @@ lower(nir_builder *b, nir_instr *instr, void *data)
           nir_tex_instr_src_index(tex, nir_tex_src_texture_offset) == -1 &&
           !force_bindless)
          return progress;
+
+      /* G17G's native fetches with a run-time level are bindful: the
+       * instruction names the texture state entry and only the level and
+       * layer clamps read the descriptor. Keep that shape here; the handle
+       * added below feeds the crawl alone (AGX_TEXTURE_FLAG_TABLE_INDEX). */
+      if (options->table_index_crawls &&
+          tex->texture_index < AGX_NUM_TEXTURE_STATE_REGS &&
+          nir_tex_instr_src_index(tex, nir_tex_src_texture_offset) == -1)
+         tex->backend_flags |= AGX_TEXTURE_FLAG_TABLE_INDEX;
 
       /* Otherwise, lower to bindless. Could be optimized. */
       nir_def *index = nir_steal_tex_src(tex, nir_tex_src_texture_offset);
@@ -421,12 +433,102 @@ shadow_gather_border(nir_builder *b, nir_tex_instr *tex, nir_def *ordinary)
                     nir_b2fN(b, compared, tex->def.bit_size));
 }
 
+static nir_tex_instr *
+clone_tex(nir_builder *b, nir_tex_instr *tex, bool compare)
+{
+   nir_instr *instr = nir_instr_clone(b->shader, &tex->instr);
+   nir_tex_instr *clone = nir_instr_as_tex(instr);
+   /* Sources join their use lists on insertion. */
+   nir_builder_instr_insert(b, instr);
+   if (!compare) {
+      nir_tex_instr_remove_src(
+         clone, nir_tex_instr_src_index(clone, nir_tex_src_comparator));
+      clone->is_shadow = false;
+      clone->is_new_style_shadow = false;
+      clone->component = 0;
+   }
+   return clone;
+}
+
+/*
+ * The M5 has no custom border colour: the API sampler borders with opaque
+ * white, so a depth comparison sees border depth 1.0 (gpu/gatherborder.c).
+ * Its record leaves the comparison to the instruction, so a gather without
+ * one returns the raw depths, the border's as 1.0, and one through the
+ * clamp-to-zero bank returns the border's as 0.0: a texel whose two raw
+ * depths differ is border. A border texel compares as
+ * ref OP border == ref + (1 - border) OP 1.0, which a second comparing
+ * gather with that reference computes against the opaque-white border
+ * (dEQP-GLES31 texture.border_clamp.depth_compare_mode.depth32f_stencil8.
+ * gather_size_*, whose float borders are not clamped).
+ */
+static bool
+lower_custom_border_shadow_gather(nir_builder *b, nir_tex_instr *tex)
+{
+   const int comparator =
+      nir_tex_instr_src_index(tex, nir_tex_src_comparator);
+   if (comparator < 0 || tex->def.num_components != 4)
+      return false;
+
+   b->cursor = nir_after_instr(&tex->instr);
+   nir_def *has_custom = has_custom_border(b, tex);
+   nir_def *ordinary = &clone_tex(b, tex, true)->def;
+
+   nir_push_if(b, has_custom);
+   nir_def *replaced;
+   {
+      nir_def *raw_one = &clone_tex(b, tex, false)->def;
+      nir_tex_instr *zero = clone_tex(b, tex, false);
+      zero->backend_flags |= AGX_TEXTURE_FLAG_CLAMP_TO_0;
+      nir_def *raw_zero = &zero->def;
+
+      nir_def *ref = tex->src[comparator].src.ssa;
+      nir_def *border = nir_channel(b, query_custom_border(b, tex), 0);
+      if (border->bit_size != ref->bit_size)
+         border = nir_f2fN(b, border, ref->bit_size);
+      nir_def *shifted_ref = nir_fadd(b, ref, nir_fsub_imm(b, 1.0, border));
+
+      nir_tex_instr *shifted_tex = clone_tex(b, tex, true);
+      nir_src_rewrite(&shifted_tex->src[comparator].src, shifted_ref);
+      nir_def *shifted = &shifted_tex->def;
+
+      nir_def *comps[4];
+      for (unsigned c = 0; c < 4; ++c) {
+         nir_def *is_border = nir_fneu(b, nir_channel(b, raw_zero, c),
+                                       nir_channel(b, raw_one, c));
+         comps[c] = nir_bcsel(b, is_border, nir_channel(b, shifted, c),
+                              nir_channel(b, ordinary, c));
+      }
+      replaced = nir_vec(b, comps, 4);
+   }
+   nir_pop_if(b, NULL);
+
+   nir_def *result = nir_if_phi(b, replaced, ordinary);
+   nir_def_replace(&tex->def, result);
+   return true;
+}
+
+/* How the correctness-only custom border lowering treats depth-compare
+ * gathers. G17P probes with raw comparison-disabled gathers; G17G's record
+ * leaves the comparison to the instruction, so it shifts the reference
+ * instead. */
+struct custom_border_lowering {
+   bool shadow_gathers;
+   bool g17g_shadow_gathers;
+};
+
 static bool
 lower_custom_border(nir_builder *b, nir_tex_instr *tex, void *data)
 {
-   const bool shadow_gather = *(bool *)data;
+   const struct custom_border_lowering *lowering = data;
+   if (lowering->shadow_gathers && lowering->g17g_shadow_gathers &&
+       tex->is_shadow && tex->op == nir_texop_tg4 &&
+       nir_tex_instr_need_sampler(tex))
+      return lower_custom_border_shadow_gather(b, tex);
+
    if (!nir_tex_instr_need_sampler(tex) || nir_tex_instr_is_query(tex) ||
-       (tex->is_shadow && (!shadow_gather || tex->op != nir_texop_tg4)))
+       (tex->is_shadow && (!lowering->shadow_gathers ||
+                           tex->op != nir_texop_tg4)))
       return false;
 
    b->cursor = nir_after_instr(&tex->instr);
@@ -470,8 +572,11 @@ lower_custom_border(nir_builder *b, nir_tex_instr *tex, void *data)
 bool
 agx_nir_lower_custom_border_g17p(nir_shader *shader, bool shadow_gather)
 {
+   struct custom_border_lowering lowering = {
+      .shadow_gathers = shadow_gather,
+   };
    bool progress = nir_shader_tex_pass(shader, lower_custom_border,
-                                       nir_metadata_none, &shadow_gather);
+                                       nir_metadata_none, &lowering);
 
    if (progress) {
       bool uses_bindless_samplers = false;
@@ -490,6 +595,44 @@ agx_nir_lower_custom_border_g17p(nir_shader *shader, bool shadow_gather)
        * after the initial texture-lowering pass.
        */
       progress |= agx_nir_rebind_g17p_texture_crawls(shader);
+
+      /* Gallium variants apply this pass after the common AGX preprocess so
+       * ordinary shaders do not pay for border emulation. Lower the small
+       * amount of high-level NIR introduced above before handing the variant
+       * to the backend. */
+      NIR_PASS(_, shader, nir_lower_flrp, 16 | 32 | 64, false);
+      NIR_PASS(_, shader, nir_lower_alu_to_scalar, NULL, NULL);
+      NIR_PASS(_, shader, nir_lower_all_phis_to_scalar);
+      NIR_PASS(_, shader, nir_opt_dce);
+   }
+
+   return progress;
+}
+
+/* G17G has no comparison-disabled companion bank, so depth-compare gathers
+ * use the reference-shifted form instead. The border sampling itself is the
+ * same clamp-to-one/clamp-to-zero pair; the texture handles stay bindful for
+ * the descriptor crawl (AGX_TEXTURE_FLAG_TABLE_INDEX). */
+bool
+agx_nir_lower_custom_border_g17g(nir_shader *shader)
+{
+   struct custom_border_lowering lowering = {
+      .shadow_gathers = true,
+      .g17g_shadow_gathers = true,
+   };
+   bool progress = nir_shader_tex_pass(shader, lower_custom_border,
+                                       nir_metadata_none, &lowering);
+
+   if (progress) {
+      bool uses_bindless_samplers = false;
+      struct agx_lower_bindings_options options = {
+         .uses_bindless_samplers = &uses_bindless_samplers,
+         .g17p_native_sampler_handles = true,
+         .table_index_crawls = true,
+         .bindful_sampler_count = AGX_GALLIUM_G17P_API_SAMPLERS,
+      };
+      progress |= nir_shader_instructions_pass(
+         shader, lower, nir_metadata_control_flow, &options);
 
       /* Gallium variants apply this pass after the common AGX preprocess so
        * ordinary shaders do not pay for border emulation. Lower the small
@@ -557,6 +700,42 @@ load_g17p_texture_index(nir_builder *b, nir_def *index)
    nir_def *address = nir_iadd(b, table_base, nir_u2u64(b, offset));
    return nir_u2u64(
       b, nir_load_global_constant(b, 1, 16, address, .align_mul = 2));
+}
+
+/*
+ * G17G has no grounded texel fetch with a register texture index. An array
+ * or cube image load is made bindless only for its layer clamp (a descriptor
+ * crawl); once agx_nir_lower_texture() has made that crawl explicit, put a
+ * statically bound load back on its immediate texture state index.
+ */
+static bool
+rebind_g17g_image_load(nir_builder *b, nir_intrinsic_instr *intr,
+                       UNUSED void *data)
+{
+   if (intr->intrinsic != nir_intrinsic_bindless_image_load)
+      return false;
+
+   nir_intrinsic_instr *handle = nir_src_as_intrinsic(intr->src[0]);
+   if (!handle || handle->intrinsic != nir_intrinsic_load_texture_handle_agx ||
+       !nir_src_is_const(handle->src[0]) ||
+       nir_src_as_uint(handle->src[0]) >= AGX_NUM_TEXTURE_STATE_REGS)
+      return false;
+
+   b->cursor = nir_before_instr(&intr->instr);
+   nir_rewrite_image_intrinsic(
+      intr, nir_imm_intN_t(b, nir_src_as_uint(handle->src[0]), 16),
+      nir_image_intrinsic_type_default);
+   return true;
+}
+
+bool
+agx_nir_rebind_g17g_image_loads(nir_shader *shader)
+{
+   bool progress = nir_shader_intrinsics_pass(
+      shader, rebind_g17g_image_load, nir_metadata_control_flow, NULL);
+   if (progress)
+      NIR_PASS(_, shader, nir_opt_dce);
+   return progress;
 }
 
 /*

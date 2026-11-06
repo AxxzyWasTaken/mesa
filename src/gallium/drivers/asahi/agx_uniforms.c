@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include "pipe/p_state.h"
 #include "util/format/u_format.h"
 #include "util/half_float.h"
@@ -54,6 +55,13 @@ agx_upload_vbos(struct agx_batch *batch)
          attribs->key[i].stride, attribs->src_offsets[i], &addr);
 
       batch->uniforms.attrib_base[i] = addr;
+      if (getenv("NEO_AGX_UNIFORM_DIAGNOSTICS") &&
+          attribs->key[i].format != PIPE_FORMAT_NONE)
+         fprintf(stderr, "NEO_VBO attrib=%u buffer=%u gpu=%#llx source_gpu=%#llx size=%zu offset=%u stride=%u divisor=%u clamp=%u\n",
+                 i, buf, (unsigned long long)addr,
+                 (unsigned long long)buffers[buf], buf_sizes[buf],
+                 attribs->src_offsets[i], attribs->key[i].stride,
+                 attribs->key[i].divisor, batch->uniforms.attrib_clamp[i]);
    }
 }
 
@@ -116,7 +124,7 @@ agx_set_sampler_uniforms(struct agx_batch *batch, mesa_shader_stage stage)
    struct agx_stage_uniforms *unif = &batch->stage_uniforms[stage];
    struct agx_device *dev = agx_device(ctx->base.screen);
 
-   if (agx_native_graphics(dev)) {
+   if (agx_native_graphics(dev) || dev->chip == AGX_CHIP_G17G) {
       for (unsigned s = 0; s < PIPE_MAX_SAMPLERS; ++s) {
          unif->custom_border_sampler_handle[s] = -1;
          memset(unif->custom_border[s], 0, sizeof(unif->custom_border[s]));
@@ -126,7 +134,7 @@ agx_set_sampler_uniforms(struct agx_batch *batch, mesa_shader_stage stage)
    u_foreach_bit(s, st->valid_samplers) {
       unif->lod_bias[s] = st->samplers[s]->lod_bias_as_fp16;
 
-      if (agx_native_graphics(dev) &&
+      if ((agx_native_graphics(dev) || dev->chip == AGX_CHIP_G17G) &&
           st->samplers[s]->uses_custom_border) {
          uint16_t handle;
          if (!agx_gallium_g17p_custom_border_handle(dev->chip, s, &handle))
@@ -149,10 +157,13 @@ agx_set_sampler_uniforms(struct agx_batch *batch, mesa_shader_stage stage)
    }
 
    /* Materialize indirect sampler handles. AGX2 uses its global heap; G17P
-    * indexes the native per-stage table uploaded with the graphics program. */
+    * and G17G index the native per-stage table uploaded with the graphics
+    * program (G17G's sixteenth API sampler, handle 16, is past the
+    * immediate field and read the heap handle's empty entry instead:
+    * GLES3 texture.units.all_units). */
    if (st->shader && st->shader->uses_bindless_samplers) {
       u_foreach_bit(s, st->valid_samplers) {
-         if (agx_native_graphics(dev)) {
+         if (agx_native_graphics(dev) || dev->chip == AGX_CHIP_G17G) {
             /* The G17P graphics Ioto program publishes the per-stage HAL200
              * table directly. Indirect operands therefore name the same
              * i+1 entries as immediate operands; the old 28+index handle
@@ -182,6 +193,11 @@ agx_set_cbuf_uniforms(struct agx_batch *batch, mesa_shader_stage stage)
    u_foreach_bit(cb, st->cb_mask) {
       unif->ubo_base[cb] = agx_const_buffer_ptr(batch, &st->cb[cb]);
       unif->ubo_size[cb] = st->cb[cb].buffer_size;
+      if (getenv("NEO_AGX_UNIFORM_DIAGNOSTICS"))
+         fprintf(stderr, "NEO_UBO stage=%u cb=%u gpu=%#llx offset=%u size=%u backed=%u\n",
+                 stage, cb, (unsigned long long)unif->ubo_base[cb],
+                 st->cb[cb].buffer_offset, st->cb[cb].buffer_size,
+                 st->cb[cb].buffer != NULL);
    }
 }
 

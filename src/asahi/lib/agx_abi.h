@@ -85,6 +85,13 @@
  * heap-index records. These are software ABI fields, not Gen9 hardware bits.
  */
 #define AGX_G17P_BUFFER_TEXTURE_PBE_OFFSET 32
+/* Gallium's Gen10 (G17G) buffer texture keeps its element count in the
+ * descriptor's last word, which no Gen10 field occupies. */
+#define AGX_GEN10_BUFFER_TEXTURE_SIZE_OFFSET 28
+/* Gallium's Gen10 storage PBE keeps the image-atomic address word (the
+ * G17P sideband, AGX_G17P_IMAGE_ATOMIC_SW_FROM_PBE) in its last eight bytes,
+ * which no Gen10 field occupies. */
+#define AGX_GEN10_IMAGE_ATOMIC_SW_OFFSET 24
 #define AGX_G17P_BUFFER_TEXTURE_METADATA_OFFSET 72
 #define AGX_G17P_BUFFER_TEXTURE_SIZE_OFFSET 72
 #define AGX_G17P_BUFFER_TEXTURE_TAIL_OFFSET 76
