@@ -1577,6 +1577,14 @@ hk_get_device_properties(const struct agx_device *dev,
    if (agx_chip_g17_m5(dev->chip))
       properties->sparseResidencyNonResidentStrict = agx_has_soft_fault(dev);
 
+   /* G17P maps unbound pages to a zeroed fill page, so they read zero, but
+    * the page is writable: a store or copy into an unbound page is read back
+    * afterwards, which strict residency forbids. Report it only where the
+    * driconf asks (vkd3d-proton, for tiled resources tier 2). */
+   if (dev->chip == AGX_CHIP_G17P)
+      properties->sparseResidencyNonResidentStrict =
+         instance->drirc.misc.sparse_strict_residency;
+
    if (agx_chip_native_agx3(dev->chip)) {
       /* Measured per operation under the G17P drm-shim:
        *
