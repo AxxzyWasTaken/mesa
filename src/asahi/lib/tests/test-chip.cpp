@@ -74,6 +74,18 @@ TEST(AGXChip, G16GUsesSharedNativePathWithItsOwnCapabilities)
    EXPECT_FALSE(agx_chip_uses_legacy_precompiled_programs(AGX_CHIP_G16G));
 }
 
+TEST(AGXChip, UncoveredTileReloadDefect)
+{
+   /* M4 Pro keeps a 2x reload in the tilebuffer; 4x and A18 Pro spill. */
+   EXPECT_FALSE(agx_chip_uncovered_tile_ms_reload_defect(AGX_CHIP_G17P, 0x6040, 2));
+   EXPECT_TRUE(agx_chip_uncovered_tile_ms_reload_defect(AGX_CHIP_G17P, 0x6040, 4));
+   EXPECT_TRUE(agx_chip_uncovered_tile_ms_reload_defect(AGX_CHIP_G17P, 0x8140, 2));
+   EXPECT_TRUE(agx_chip_uncovered_tile_ms_reload_defect(AGX_CHIP_G17P, 0x8140, 4));
+   EXPECT_TRUE(agx_chip_uncovered_tile_ms_reload_defect(AGX_CHIP_G16G, 0x8132, 2));
+   EXPECT_TRUE(agx_chip_uncovered_tile_ms_reload_defect(AGX_CHIP_G15S, 0x6030, 2));
+   EXPECT_FALSE(agx_chip_uncovered_tile_ms_reload_defect(AGX_CHIP_G13G, 0x8103, 2));
+}
+
 TEST(AGXChip, G16GSharedComputeLaunchBytes)
 {
    agx3_g17p_native_compute_program_desc desc = {};

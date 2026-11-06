@@ -28,8 +28,22 @@
  *    texels are excluded so that a single-sample tilebuffer never spills a
  *    compressed target (spilling needs libagx_decompress, which has no G17P
  *    binary): 8 targets x 8 B fit in the 120 B/sample G17P budget.
+ *  - Colour at 2x on M4 Pro: also colour attachments of one layer. G17P
+ *    cannot spill a compressed target; at 2x the tile holds 64 bytes a
+ *    sample, so the eight bytes-at-most targets, allocated first
+ *    (hk_resident_attachments()), always stay in it. M4 Pro keeps a 2x
+ *    reload's whole sample (agx_chip_uncovered_tile_ms_reload_defect()).
+ *    A multiview pass has an eight-byte budget, so on a device with the
+ *    multiview feature 2x colour stays plain (hk_image.c). Input
+ *    attachments stay plain.
+ *  - Not R11G11B10F on M4 Pro: attachments store through the format's own
+ *    class (hk_eot_pbe_format()), and a compressed tile of that class reads
+ *    a NaN field back as zero, however it was written. Rendering NaN into an
+ *    R11G11B10F attachment has to keep it, so they stay plain.
  *  - Depth: D16_UNORM, D32_SFLOAT and both planes of D32_SFLOAT_S8_UINT,
- *    one level, one layer, one sample. The ZLS unit compresses the S8
+ *    one level, one layer, one sample; on M4 Pro also the depth plane at
+ *    2x, without input-attachment, feedback-loop or sample-location use
+ *    (its S8 plane stays plain). The ZLS unit compresses the S8
  *    stencil plane with the same metadata layout as depth (stencil
  *    load/store compression bits 4/8), it is read through its R8_UINT
  *    alias, and its clears are metadata fast clears. Zink stores GL Z24S8
@@ -89,7 +103,8 @@ hk_g17p_compression_color_format(VkFormat format)
    case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
    /* Not B10G11R11_UFLOAT: G17P packs it into one tile word and stores it
     * through an R32_UINT PBE (agx_g17p_rt0_pbe_format), a different
-    * compression class from the R11G11B10 texture that reads it back. */
+    * compression class from the R11G11B10 texture that reads it back. M4 Pro
+    * stores it through its own class, which loses NaN when compressed. */
    case VK_FORMAT_R16G16_UNORM:
    case VK_FORMAT_R16G16_SNORM:
    case VK_FORMAT_R16G16_UINT:
@@ -143,7 +158,11 @@ hk_hal200_compression_eligible(enum agx_chip chip, unsigned plane,
     * Admitting them at allocation makes legal commands fail at EndCommandBuffer.
     * Colour's layered/MSAA packet support is independent of this restriction.
     */
-   g16s = g16s && hk_g17p_compression_color_format(info->format);
+   const bool m4_pro = g16s;
+   /* Not B10G11R11_UFLOAT: a compressed tile of its class reads NaN back as
+    * zero, and a render or copy into the attachment must keep NaN. */
+   const bool color = hk_g17p_compression_color_format(info->format);
+   g16s = g16s && color;
 
    /* Shared images keep their plain layout contract. Read each header field
     * by copy: the chain's structures have other types, and Mesa builds with
@@ -200,9 +219,18 @@ hk_hal200_compression_eligible(enum agx_chip chip, unsigned plane,
 
    const bool multisampled = info->samples != VK_SAMPLE_COUNT_1_BIT;
    const bool three_d = info->imageType == VK_IMAGE_TYPE_3D;
+   /* 2x depth on M4 Pro, measured lossless through ZLS load/store, depth
+    * resolve and texture reads. */
+   const bool depth_2x =
+      m4_pro && plane == 0 && info->samples == VK_SAMPLE_COUNT_2_BIT &&
+      hk_g17p_compression_depth_format(info->format) &&
+      !(info->usage & (VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
+                       VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT)) &&
+      !(info->flags & VK_IMAGE_CREATE_SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_BIT_EXT);
    if (!g16s) {
       if (info->imageType != VK_IMAGE_TYPE_2D || info->extent.depth != 1 ||
-          info->arrayLayers != 1 || info->samples != VK_SAMPLE_COUNT_1_BIT ||
+          info->arrayLayers != 1 ||
+          (info->samples != VK_SAMPLE_COUNT_1_BIT && !depth_2x) ||
           info->tiling != VK_IMAGE_TILING_OPTIMAL || info->mipLevels < 1 ||
           (info->flags & ~allowed_flags) || (info->usage & ~allowed_usage) ||
           info->extent.width < 16 || info->extent.height < 16)
@@ -223,14 +251,18 @@ hk_hal200_compression_eligible(enum agx_chip chip, unsigned plane,
       return false;
    }
 
-   if (hk_g17p_compression_color_format(info->format)) {
+   if (color) {
       if (g16s && (three_d || info->arrayLayers > 1) && info->mipLevels != 1)
          return false;
-      /* #66: a legal MRT mix can spill any MSAA colour attachment. Keep
-       * those plain until transient backing has a measured performance case. */
+      /* #66: a legal MRT mix can spill any MSAA colour attachment, and G17P
+       * has no decompression for a spilled compressed one. Only a 2x
+       * single-layer attachment always stays in the tilebuffer (see the
+       * policy above); 4x and arrays stay plain. */
       if (g16s && multisampled &&
           (info->usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                         VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT)))
+                         VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT)) &&
+          (info->samples != VK_SAMPLE_COUNT_2_BIT || info->arrayLayers != 1 ||
+           (info->usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)))
          return false;
 
       /* An RGBA8/BGRA8 UNORM mip chain the application never renders to is

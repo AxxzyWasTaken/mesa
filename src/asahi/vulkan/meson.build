@@ -841,6 +841,24 @@ if with_tests
   )
 
   executable(
+    'vulkan-msaa-xfer',
+    files('tests/vulkan_msaa_xfer.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
+    'aurora-r11g11b10f',
+    files('tests/aurora_r11g11b10f.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
     'aurora-tile-visit',
     files('tests/aurora_tile_visit.c'),
     include_directories : [inc_include],

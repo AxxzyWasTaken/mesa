@@ -626,7 +626,8 @@ hk_m5_storage_compression_eligible(const struct agx_device *dev, unsigned plane,
 static bool
 hk_can_compress_create_info(const struct agx_device *dev, unsigned plane,
                             const VkImageCreateInfo *info,
-                            bool float_image_atomics, bool srgb_pair_views);
+                            bool float_image_atomics, bool srgb_pair_views,
+                            bool multiview);
 
 /* Whether shaders of this device may use atomics on R32_SFLOAT images. */
 static bool
@@ -640,15 +641,16 @@ hk_float_image_atomics(const struct hk_device *dev)
 
 /* Compressed data is only decodable through its own channel class. Every
  * G17P/M5 writer of a colour image is a PBE; the end-of-tile PBE may store a
- * different format from the image (agx_rt0_pbe_format: G17P packs
- * R11G11B10/RGB9E5 into R32_UINT words). Never compress an image whose store
- * class would differ from the class its textures read. */
+ * different format from the image (hk_eot_pbe_format(): G17P packs
+ * R11G11B10/RGB9E5 into R32_UINT words, M4 Pro and M5 store R11G11B10 in its
+ * own class). Never compress an image whose store class would differ from the
+ * class its textures read. */
 static bool
 hk_g17p_store_class_matches(const struct agx_device *dev, VkFormat format)
 {
    const enum pipe_format p_format = hk_format_to_pipe_format(format);
-   const enum pipe_format store = agx_rt0_pbe_format(
-      dev->chip, util_format_linear(hk_padded_image_format(p_format)));
+   const enum pipe_format store = hk_eot_pbe_format(
+      dev, util_format_linear(hk_padded_image_format(p_format)));
    if (ail_formats_compatible(p_format, store))
       return true;
 
@@ -1200,7 +1202,7 @@ hk_GetPhysicalDeviceImageFormatProperties2(
          if (pImageFormatInfo->tiling == VK_IMAGE_TILING_OPTIMAL) {
             for (unsigned plane = 0; plane < plane_count; ++plane) {
                can_compress |= hk_can_compress_create_info(
-                  &pdev->dev, plane, &device_copy_info, false, false);
+                  &pdev->dev, plane, &device_copy_info, false, false, false);
             }
          }
 
@@ -1299,10 +1301,23 @@ hk_GetPhysicalDeviceSparseImageFormatProperties2(
    }
 }
 
+/* A multiview pass keeps multisample colour to an eight-byte budget in the
+ * tilebuffer (the uncovered-tile defect), and G17P cannot spill a compressed
+ * target: with more compressed 2x colour than that, the pass could only fail.
+ * A 2x colour image cannot know whether it will meet such a pass, so it stays
+ * plain on a device that enabled multiview. Depth is not in that budget. */
+static bool
+hk_g17p_multiview_spill_risk(const VkImageCreateInfo *info, bool multiview)
+{
+   return multiview && info->samples != VK_SAMPLE_COUNT_1_BIT &&
+          !vk_format_is_depth_or_stencil(info->format);
+}
+
 static bool
 hk_can_compress_create_info(const struct agx_device *dev, unsigned plane,
                             const VkImageCreateInfo *info,
-                            bool float_image_atomics, bool srgb_pair_views)
+                            bool float_image_atomics, bool srgb_pair_views,
+                            bool multiview)
 {
    /* AGX3: G17P compresses every image hk_g17p_compression.h admits. Other
     * AGX3 chips stay plain until their packets are recovered. */
@@ -1319,8 +1334,10 @@ hk_can_compress_create_info(const struct agx_device *dev, unsigned plane,
          dev->chip, plane, info, dev->params.features,
          debug_get_option_m5_depth_msaa_compression(),
          debug_get_option_m5_depth_msaa_transfer()) ||
-      m5_storage || hk_hal200_compression_eligible(dev->chip, plane, info,
-                                                  agx_is_m4_pro(dev)) ||
+      m5_storage ||
+      (hk_hal200_compression_eligible(dev->chip, plane, info,
+                                      agx_is_m4_pro(dev)) &&
+       !hk_g17p_multiview_spill_risk(info, multiview)) ||
       hk_g17p_shared_compression_eligible(dev->chip, plane, info) ||
       hk_m5_color_compression_eligible(dev->chip, plane, info) ||
       hk_m5_depth_compression_eligible(dev->chip, plane, info);
@@ -1367,7 +1384,8 @@ hk_map_compression(struct hk_device *dev, const VkImageCreateInfo *info,
       return hk_can_compress_create_info(
          &dev->dev, plane, info, hk_float_image_atomics(dev),
          hk_physical_device_instance(hk_device_physical(dev))
-            ->drirc.misc.mutable_format_srgb_pair);
+            ->drirc.misc.mutable_format_srgb_pair,
+         dev->vk.enabled_features.multiview);
 
    case VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT:
       return ail_is_drm_modifier_compressed(modifier);
@@ -1418,7 +1436,8 @@ choose_drm_format_mod(struct hk_device *dev, uint8_t plane_count,
 
    for (uint8_t plane = 0; plane < plane_count; plane++) {
       if (!hk_can_compress_create_info(&dev->dev, plane, info,
-                                       hk_float_image_atomics(dev), false))
+                                       hk_float_image_atomics(dev), false,
+                                       dev->vk.enabled_features.multiview))
          can_compress = false;
    }
 
