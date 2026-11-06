@@ -2623,13 +2623,28 @@ agx3_emit_storage_image_write(struct util_dynarray *emission,
       I->src[4].size == AGX_SIZE_32 && agx_channels(I->src[4]) == 1 &&
       !(I->src[4].value & 1) && I->src[4].value <= 126 &&
       !(I->src[4].cache && (I->src[4].discard || I->src[4].kill));
+   /* Gallium on G17G names a statically bound image unit with an immediate
+    * state index: the image's PBE record follows its texture records in the
+    * stage table (image_records pairs), so that operand is the record, and
+    * the heap is the texture table pointer the G17G resource prefix carries
+    * at uniform half 0. agx3_tex_encode_image_write_agx3c() has the matching
+    * immediate kind: f79 0, f91 the record, f99/f100 immediate. */
+   const bool table_state =
+      m5 && agx3_tex_imm(I->src[3], 0) &&
+      I->src[4].type == AGX_INDEX_IMMEDIATE && !I->src[4].memory &&
+      !I->src[4].abs && !I->src[4].neg && I->src[4].value <= 15;
    /* Cube stores reach the packer as 2D arrays with the face folded into the
-    * layer, and 1D stores as 2D. */
-   const bool array = I->dim == AGX_DIM_2D_ARRAY;
-   const bool three_d = I->dim == AGX_DIM_3D;
+    * layer, and 1D stores as 2D. G17G writes a layered image as 3D, the layer
+    * staged like z: Gallium describes its PBE as 3D (agx_batch_upload_pbe), a
+    * single-level 3D slice being a 2D-array layer. The G17P PACK_IMGWIR layer
+    * did not reach the G17G write (every layer landed in layer 0). */
+   const bool array = I->dim == AGX_DIM_2D_ARRAY && !m5;
+   const bool three_d = I->dim == AGX_DIM_3D ||
+                        (m5 && I->dim == AGX_DIM_2D_ARRAY);
    const unsigned coords = (array || three_d) ? 3 : 2;
    if ((!m5 && enc != AGX_ISA_ENCODING_AGX3B) || I->nr_dests != 0 ||
-       (m5 && ((I->dim != AGX_DIM_2D && !array && !three_d) || !heap_state ||
+       (m5 && ((I->dim != AGX_DIM_2D && !array && !three_d) ||
+               (!heap_state && !table_state) ||
                ((array || three_d) && I->format != AGX_FORMAT_I8) ||
                (I->format != AGX_FORMAT_I8 && I->format != AGX_FORMAT_I32 &&
                 I->format != AGX_FORMAT_U8NORM))) ||
@@ -2642,7 +2657,7 @@ agx3_emit_storage_image_write(struct util_dynarray *emission,
        I->src[1].size != AGX_SIZE_32 || agx_channels(I->src[1]) != coords ||
        (I->src[1].value & 1) || I->src[1].value + 2 * (coords - 1) > (m5 ? 126 : 254) ||
        !agx3_tex_imm(I->src[2], 0) ||
-       (!immediate_state && !heap_state)) {
+       (!immediate_state && !heap_state && !table_state)) {
       if (agx_compiler_debug & AGX_DBG_SHADERS)
          fprintf(stderr, "G17P imgwci shape refusal: wait=0x%x data=%u/%u/%u coord=%u/%u/%u dim=%u coherent=%u\n",
                  wait_mask, I->src[0].value, I->src[0].size,

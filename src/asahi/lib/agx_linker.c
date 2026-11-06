@@ -50,7 +50,7 @@ agx_fs_epilog_apply_device_policy(enum agx_chip chip,
    /* G18 coverage also dirties color during depth-only or fully masked draws.
     * Preserve the previous tile value while executing the other side effects.
     */
-   key->preserve_zero_mask = g17p || chip == AGX_CHIP_G18G;
+   key->preserve_zero_mask = g17p || agx_chip_g17_m5(chip) || chip == AGX_CHIP_G18G;
    key->sample_loop_mrt = chip == AGX_CHIP_G18G && key->nr_samples > 1;
    /* G18G: both AGX3 tile interfaces move packed bytes. The RGB transfer
     * function belongs around blending; alpha remains linear. R11G11B10 is
