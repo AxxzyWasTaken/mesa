@@ -139,6 +139,8 @@ main(void)
    assert(can_direct_poll_query_result(&q));
    util_dynarray_append(&q.starts, split);
    assert(!can_direct_poll_query_result(&q));
+   /* Teardown also visits spare slots, as the production allocator permits. */
+   memset(q.starts.data, 0, q.starts.capacity);
    uint64_t values[] = {2048, 2048};
    union pipe_query_result result;
    util_query_clear_result(&result, q.type);
