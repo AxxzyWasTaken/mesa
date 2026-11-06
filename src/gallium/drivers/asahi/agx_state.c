@@ -1459,11 +1459,12 @@ agx_set_framebuffer_state(struct pipe_context *pctx,
    util_copy_framebuffer_state(&ctx->framebuffer, state);
 
    /* The frontend still reads and resolves the window's multisample colour
-    * attachment. G18's direct EOT resolve only writes the single-sample
+    * attachment. G17G/G18G's direct EOT resolve only writes the single-sample
     * target, losing that source. Preserve the samples and let the frontend's
     * normal blit perform the resolve, as for explicit framebuffer blits.
     */
-   if (agx_device(pctx->screen)->chip == AGX_CHIP_G18G)
+   if (agx_device(pctx->screen)->chip == AGX_CHIP_G17G ||
+       agx_device(pctx->screen)->chip == AGX_CHIP_G18G)
       pipe_resource_reference(&ctx->framebuffer.resolve, NULL);
 
    for (unsigned i = 0; i < state->nr_cbufs; ++i) {
