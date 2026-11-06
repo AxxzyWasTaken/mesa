@@ -221,7 +221,13 @@ agxdecode_chip_from_params(const decoder_params *params)
       switch (params->gpu_variant) {
       case 'P': return AGX_CHIP_G16P;
       case 'G': return AGX_CHIP_G16G;
-      case 'S': return AGX_CHIP_G16S;
+      case 'S':
+         /* As agx_chip_from_params(): the M4 Pro on the G17 runtime is G17P. */
+         if (params->chip_id == 0x6040 &&
+             params->usc_generation == AGX_ISA_AGX3 &&
+             params->gpu_hal_generation == DRM_ASAHI_GPU_HAL_200)
+            return AGX_CHIP_G17P;
+         return AGX_CHIP_G16S;
       case 'C': return AGX_CHIP_G16C;
       default: return AGX_CHIP_UNKNOWN;
       }
