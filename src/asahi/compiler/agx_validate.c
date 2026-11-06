@@ -446,12 +446,16 @@ agx_read_registers(const agx_context *ctx, const agx_instr *I, unsigned s)
                    agx_channels(I->src[s]) == 1);
             return 2;
          }
+         /* AGX3's integer-level PACK_SMPIR reads a 32-bit GPR on both
+          * encodings: generation 9 and 10 texture lowering restore txf's
+          * level to 32 bits (agx_nir_lower_texture.c), as does
+          * agx_emit_image_load() for a register image level. */
          if ((I->op == AGX_OPCODE_TEXTURE_LOAD ||
               I->op == AGX_OPCODE_IMAGE_LOAD) &&
-             ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3B &&
+             agx_isa_is_agx3(ctx->key->dev.encoding) &&
              I->lod_mode == AGX_LOD_MODE_LOD_MIN &&
              I->src[s].type != AGX_INDEX_IMMEDIATE)
-             return 2;
+            return 2;
 
          if (I->lod_mode == AGX_LOD_MODE_LOD_GRAD ||
              I->lod_mode == AGX_LOD_MODE_LOD_GRAD_MIN) {
