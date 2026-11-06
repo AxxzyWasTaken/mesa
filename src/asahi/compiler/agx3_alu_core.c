@@ -4040,9 +4040,14 @@ agx3_alu_asr_imm32_source(enum agx_isa_encoding enc, uint16_t dest,
                    uint8_t *length)
 {
    const bool gpu1 = enc == AGX_ISA_ENCODING_AGX3C;
+   /* AGX3B names word registers below 192. GPU1 (M5, and G18G, which packs
+    * through this form) addresses the whole 256-half file, as
+    * agx3_alu_asr_imm_m5() does with the same sra fields. */
+   const unsigned word_regs = gpu1 ? 256 : 192;
    if ((enc != AGX_ISA_ENCODING_AGX3B && !gpu1) || !out || !length ||
-       dest >= 192 || (dest & 1) ||
-       source >= (source_half ? 256 : 192) || (!source_half && (source & 1)) ||
+       dest >= word_regs || (dest & 1) ||
+       source >= (source_half ? 256 : word_regs) ||
+       (!source_half && (source & 1)) ||
        (source_half && !gpu1) ||
        shift < 1 || shift > (source_half ? 15 : 31) ||
        (unsigned)hint > AGX3_ALU_HINT_CACHE ||
