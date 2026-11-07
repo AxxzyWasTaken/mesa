@@ -2792,7 +2792,8 @@ agx_compile_variant(struct agx_device *dev, struct pipe_context *pctx,
       NIR_PASS(_, nir, agx_nir_lower_custom_border_g17g);
    } else if (custom_borders) {
       NIR_PASS(_, nir, agx_nir_lower_custom_border_native,
-               dev->chip == AGX_CHIP_G17P, dev->chip == AGX_CHIP_G18G,
+               agx_shadow_gather_custom_border(dev->chip),
+               dev->chip == AGX_CHIP_G18G,
                &custom_border_supported);
    }
    struct agx_unlinked_uvs_layout uvs = {0};
@@ -5958,7 +5959,7 @@ agx_upload_samplers(struct agx_batch *batch, struct agx_compiled_shader *cs,
       const bool query_lod = cs->so && cs->so->info.uses_query_lod;
       unsigned count = nr_samplers;
       if (custom_borders)
-         count = (dev->chip == AGX_CHIP_G17P
+         count = (agx_shadow_gather_custom_border(dev->chip)
                      ? AGX_GALLIUM_G17P_BORDER_NONCOMPARE_BASE
                      : AGX_GALLIUM_G17P_CUSTOM_BORDER_BASE) +
                  ctx->stage[stage].sampler_count;
@@ -6022,14 +6023,14 @@ agx_upload_samplers(struct agx_batch *batch, struct agx_compiled_shader *cs,
                                            !ctx->support_lod_bias);
                   continue;
                }
-               if (dev->chip == AGX_CHIP_G17P)
+               if (agx_shadow_gather_custom_border(dev->chip))
                   clamp_state.compare_enable = false;
                if (!agx_gallium_pack_native_sampler(dev->chip, (void *)clamp,
                                                     &clamp_state))
                   agx_native_descriptor_rejected(dev,
                                                  "custom-border sampler");
 
-               if (dev->chip == AGX_CHIP_G17P) {
+               if (agx_shadow_gather_custom_border(dev->chip)) {
                   clamp_state.border_colour = AGX_BORDER_COLOUR_OPAQUE_WHITE;
                   uint8_t *probe = (uint8_t *)T.cpu + sampler_length *
                      (AGX_GALLIUM_G17P_BORDER_NONCOMPARE_BASE + i);
@@ -6207,10 +6208,10 @@ agx_update_descriptors(struct agx_batch *batch, struct agx_compiled_shader *cs)
       agx_upload_samplers(batch, cs, stage);
 
    struct agx_stage_uniforms *unif = &batch->stage_uniforms[stage];
-   const size_t size = agx_device(ctx->base.screen)->chip == AGX_CHIP_G17P
-                          ? sizeof(*unif)
-                          : offsetof(struct agx_stage_uniforms,
-                                     custom_border_compare_func);
+   const size_t size =
+      agx_shadow_gather_custom_border(agx_device(ctx->base.screen)->chip)
+         ? sizeof(*unif)
+         : offsetof(struct agx_stage_uniforms, custom_border_compare_func);
 
    batch->uniforms.tables[AGX_SYSVAL_STAGE(stage)] =
       agx_pool_upload_aligned(&batch->pool, unif, size, 16);

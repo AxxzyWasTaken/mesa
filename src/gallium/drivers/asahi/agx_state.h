@@ -216,7 +216,8 @@ struct PACKED agx_stage_uniforms {
    /* LOD bias as float16 */
    uint16_t lod_bias[PIPE_MAX_SAMPLERS];
 
-   /* G17P shadow-gather border comparison, in pipe_compare_func order. Kept
+   /* G16G/G17P shadow-gather border comparison (see
+    * agx_shadow_gather_custom_border), in pipe_compare_func order. Kept
     * after the existing fields so classic shader bindings do not move. Each
     * halfword has padding for Ioto's dword upload, including sampler 31. */
    uint32_t custom_border_compare_func[PIPE_MAX_SAMPLERS];
@@ -1412,6 +1413,19 @@ bool agx_nir_lower_custom_border_native(nir_shader *shader, bool shadow_gather,
                                         bool g18, bool *fully_supported);
 bool agx_nir_lower_custom_border_g17g(nir_shader *shader);
 bool agx_nir_rebind_g17p_texture_crawls(nir_shader *shader);
+
+/* Chips whose shadow gathers rebuild the API border depth comparison: the
+ * native custom-border sampler returns one, so border taps would otherwise
+ * compare against 1.0. This selects the probe sampler bank, the comparison
+ * uniforms and the shadow-gather lowering together, and with them the
+ * recovery of native sampler indices (handle i+1) in custom-border
+ * lowering. */
+static inline bool
+agx_shadow_gather_custom_border(enum agx_chip chip)
+{
+   return chip == AGX_CHIP_G17P || chip == AGX_CHIP_G16G;
+}
+
 bool agx_nir_lower_g17p_storage_records(nir_shader *shader,
                                         unsigned record_size_B);
 bool agx_nir_rebind_g17g_image_loads(nir_shader *shader);
