@@ -814,6 +814,15 @@ if with_tests
   )
 
   executable(
+    'vulkan-tess-batch',
+    files('tests/vulkan_tess_batch.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
     'vulkan-ubo-record-loop',
     files('tests/vulkan_ubo_record_loop.c'),
     include_directories : [inc_include],

@@ -11090,9 +11090,18 @@ hk_flush_dynamic_state_slow(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
       }
    }
 
+   /* A software vertex prolog fetches the indices itself, so its key names
+    * the draw's index size (hk_fill_fast_link_key_vs()). That changes between
+    * an indexed and a non-indexed draw without any state becoming dirty. */
+   const struct agx_vs_prolog_key *linked_prolog = &gfx->fast_link_vs.key.prolog;
+   const bool sw_index_size_changed =
+      (linked_prolog->adjacency || !linked_prolog->hw) &&
+      linked_prolog->sw_index_size_B !=
+         (draw.indexed ? agx_index_size_to_B(draw.index_size) : 0);
+
    if (!native_mesh && (IS_DIRTY(VI) || IS_DIRTY(VI_BINDINGS_VALID) ||
         IS_DIRTY(VI_BINDING_STRIDES) || IS_DIRTY(IA_PRIMITIVE_TOPOLOGY) ||
-        vgt_dirty || !gfx->fast_link_vs.valid)) {
+        vgt_dirty || !gfx->fast_link_vs.valid || sw_index_size_changed)) {
       struct hk_fast_link_key_vs key;
       hk_fill_fast_link_key_vs(cmd, sw_vs, hw_vs, draw.indexed,
                                draw.index_size, draw.restart, &key);

@@ -15420,6 +15420,36 @@ agx_validate_scs_nir(nir_shader *nir, const struct agx_shader_key *key,
    return true;
 }
 
+/* Whether a fragment shader takes a derivative: ddx/ddy or a texture
+ * operation with an implicit one. */
+static bool
+agx_fs_takes_derivatives(nir_shader *nir)
+{
+   nir_foreach_function_impl(impl, nir) {
+      nir_foreach_block(block, impl) {
+         nir_foreach_instr(instr, block) {
+            if (instr->type == nir_instr_type_tex &&
+                nir_tex_instr_has_implicit_derivative(nir_instr_as_tex(instr)))
+               return true;
+            if (instr->type != nir_instr_type_intrinsic)
+               continue;
+            switch (nir_instr_as_intrinsic(instr)->intrinsic) {
+            case nir_intrinsic_ddx:
+            case nir_intrinsic_ddx_fine:
+            case nir_intrinsic_ddx_coarse:
+            case nir_intrinsic_ddy:
+            case nir_intrinsic_ddy_fine:
+            case nir_intrinsic_ddy_coarse:
+               return true;
+            default:
+               break;
+            }
+         }
+      }
+   }
+   return false;
+}
+
 bool
 agx_compile_shader_nir(nir_shader *nir, struct agx_shader_key *key,
                        struct agx_shader_part *out)
@@ -15970,9 +16000,14 @@ agx_compile_shader_nir(nir_shader *nir, struct agx_shader_key *key,
          nir->info.fs.needs_coarse_quad_helper_invocations ||
          nir->info.writes_memory;
 
+      /* Quad intrinsics alone do not count: they read another lane's own
+       * value, which stays correct when a merged quad holds two primitives,
+       * and a merged quad is still full. spirv_to_nir sets require_full_quads
+       * for every quad operation, so only QuadDerivativesKHR counts here. */
       info->needs_quad_derivatives =
-         nir->info.fs.needs_coarse_quad_helper_invocations ||
-         nir->info.fs.needs_full_quad_helper_invocations;
+         (nir->info.fs.needs_coarse_quad_helper_invocations ||
+          nir->info.fs.needs_full_quad_helper_invocations) &&
+         (nir->info.fs.quad_derivatives || agx_fs_takes_derivatives(nir));
 
       /* Writing the sample mask requires tag writes */
       info->tag_write_disable &= !info->writes_sample_mask;
