@@ -610,6 +610,7 @@ if with_tests
          'test/test-optimizer.cpp',
          'test/test-pressure-cse.cpp',
          'test/test-rte-fma.cpp',
+         'test/test-image-atomic-metadata.cpp',
          'test/test-border-index.cpp',
          'test/test-aligned-bounds.cpp',
          'test/test-agx2-image-acquire.cpp',
