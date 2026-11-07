@@ -3269,8 +3269,12 @@ agx_ra_impl(agx_context *ctx, bool disable_remat)
            I->op == AGX_OPCODE_DFDX || I->op == AGX_OPCODE_DFDY)) ||
           (ctx->key->dev.encoding == AGX_ISA_ENCODING_AGX3C &&
            I->op == AGX_OPCODE_SINC_AGX3)) {
-         agx_foreach_ssa_src(I, s)
+         agx_foreach_ssa_src(I, s) {
             BITSET_SET(texture_gpr, I->src[s].value);
+            /* A split channel takes its vector's register. */
+            if (split_source[I->src[s].value])
+               BITSET_SET(texture_gpr, split_source[I->src[s].value] - 1);
+         }
          agx_foreach_ssa_dest(I, d)
             BITSET_SET(texture_gpr, I->dest[d].value);
       }
