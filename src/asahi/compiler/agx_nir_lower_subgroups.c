@@ -20,7 +20,7 @@ nir_udiv_round_up(nir_builder *b, nir_def *n, nir_def *d)
 }
 
 struct agx_subgroup_lower_options {
-   bool g17p;
+   bool optimize_ballot_count;
    bool g17p_clustered_float;
 };
 
@@ -150,13 +150,12 @@ lower(nir_builder *b, nir_intrinsic_instr *intr, void *data)
    case nir_intrinsic_ballot: {
       /* Optimize popcount(ballot(true)) to load_active_subgroup_count_agx().
        *
-       * Not on G17P: Apple's compiler reads its active-count register (SR36)
-       * only inside the helper-guarded region of a uniform atomic, and
-       * compiles simd_sum(1u) to a reduction instead, so keep the ballot whose
-       * lane membership every other subgroup operation shares.
+       * Preserve ballot membership on G17P and in M5 fragment shaders. M5
+       * lowers the active count to a reduction, which also counts helper
+       * invocations after fragment termination.
        */
       const struct agx_subgroup_lower_options *agx_options = data;
-      if (agx_options->g17p || !nir_src_is_const(intr->src[0]) ||
+      if (!agx_options->optimize_ballot_count || !nir_src_is_const(intr->src[0]) ||
           !nir_src_as_bool(intr->src[0]) ||
           !list_is_singular(&intr->def.uses))
          return false;
@@ -234,10 +233,11 @@ lower_subgroup_filter(const nir_intrinsic_instr *intr, const void *data)
 }
 
 static bool
-agx_nir_lower_subgroups_internal(nir_shader *s, bool g17p_clustered_float)
+agx_nir_lower_subgroups_internal(nir_shader *s, bool g17p_clustered_float,
+                                bool optimize_ballot_count)
 {
    const struct agx_subgroup_lower_options agx_options = {
-      .g17p = g17p_clustered_float,
+      .optimize_ballot_count = optimize_ballot_count,
       .g17p_clustered_float = g17p_clustered_float,
    };
 
@@ -270,11 +270,18 @@ agx_nir_lower_subgroups_internal(nir_shader *s, bool g17p_clustered_float)
 bool
 agx_nir_lower_subgroups(nir_shader *s)
 {
-   return agx_nir_lower_subgroups_internal(s, false);
+   return agx_nir_lower_subgroups_internal(s, false, true);
 }
 
 bool
 agx_nir_lower_subgroups_g17p(nir_shader *s)
 {
-   return agx_nir_lower_subgroups_internal(s, true);
+   return agx_nir_lower_subgroups_internal(s, true, false);
+}
+
+bool
+agx_nir_lower_subgroups_m5(nir_shader *s)
+{
+   return agx_nir_lower_subgroups_internal(
+      s, false, s->info.stage != MESA_SHADER_FRAGMENT);
 }
