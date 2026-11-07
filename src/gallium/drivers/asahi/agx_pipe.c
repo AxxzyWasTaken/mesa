@@ -63,6 +63,7 @@
 uint64_t agx_best_modifiers[] = {
    DRM_FORMAT_MOD_APPLE_GPU_TILED_COMPRESSED,
    DRM_FORMAT_MOD_APPLE_GPU_TILED,
+   DRM_FORMAT_MOD_APPLE_INTERCHANGE,
    DRM_FORMAT_MOD_LINEAR,
 };
 
@@ -513,6 +514,33 @@ agx_compression_allowed(const struct agx_resource *pres)
    return true;
 }
 
+/* The compressed layout DCP scans out: one plain 32-bit 2D level. */
+static bool
+agx_interchange_allowed(const struct agx_resource *pres)
+{
+   struct agx_device *dev = agx_device(pres->base.screen);
+
+   if (dev->chip != AGX_CHIP_G17P || (dev->debug & AGX_DBG_NOCOMPRESS))
+      return false;
+   if (pres->base.target != PIPE_TEXTURE_2D || pres->base.last_level ||
+       pres->base.array_size > 1 || pres->base.nr_samples > 1 ||
+       pres->base.width0 < 16 || pres->base.height0 < 16)
+      return false;
+   if (pres->base.bind & (PIPE_BIND_SHADER_IMAGE | PIPE_BIND_LINEAR |
+                          PIPE_BIND_DISPLAY_TARGET))
+      return false;
+
+   switch (pres->base.format) {
+   case PIPE_FORMAT_B8G8R8A8_UNORM:
+   case PIPE_FORMAT_B8G8R8X8_UNORM:
+   case PIPE_FORMAT_R8G8B8A8_UNORM:
+   case PIPE_FORMAT_R8G8B8X8_UNORM:
+      return true;
+   default:
+      return false;
+   }
+}
+
 static uint64_t
 agx_select_modifier_from_list(const struct agx_resource *pres,
                               const uint64_t *modifiers, int count)
@@ -525,6 +553,12 @@ agx_select_modifier_from_list(const struct agx_resource *pres,
    if (agx_twiddled_allowed(pres) &&
        drm_find_modifier(DRM_FORMAT_MOD_APPLE_GPU_TILED, modifiers, count))
       return DRM_FORMAT_MOD_APPLE_GPU_TILED;
+
+   /* Only wins against LINEAR, in a display list that cannot take GPU tiling. */
+   if (agx_interchange_allowed(pres) &&
+       drm_find_modifier(DRM_FORMAT_MOD_APPLE_INTERCHANGE, modifiers,
+                         count))
+      return DRM_FORMAT_MOD_APPLE_INTERCHANGE;
 
    if (agx_linear_allowed(pres) &&
        drm_find_modifier(DRM_FORMAT_MOD_LINEAR, modifiers, count))
@@ -614,6 +648,17 @@ agx_resource_create_with_modifiers(struct pipe_screen *screen,
    pipe_reference_init(&nresource->base.reference, 1);
 
    ail_make_miptree(&nresource->layout);
+
+   /* appledrm sizes interchange metadata from power-of-two dimensions. */
+   if (nresource->layout.tiling == AIL_TILING_INTERCHANGE) {
+      uint64_t meta_B =
+         (uint64_t)DIV_ROUND_UP(util_next_power_of_two(templ->width0), 16) *
+         DIV_ROUND_UP(util_next_power_of_two(templ->height0), 16) * 8;
+
+      nresource->layout.size_B =
+         MAX2(nresource->layout.size_B,
+              ALIGN_POT(nresource->layout.metadata_offset_B + meta_B, AIL_CACHELINE));
+   }
 
    /* Fail Piglit's obnoxious allocations */
    if (nresource->layout.size_B >= (1ull << 32)) {

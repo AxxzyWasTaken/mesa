@@ -1047,6 +1047,9 @@ agx_pack_texture(enum agx_descriptor_generation descriptor_generation,
          cfg.stride = (cfg.width * util_format_get_blocksize(format)) - 16;
       } else if (rsrc->layout.tiling == AIL_TILING_LINEAR) {
          cfg.stride = ail_get_linear_stride_B(&rsrc->layout, 0) - 16;
+      } else if (rsrc->layout.tiling == AIL_TILING_INTERCHANGE) {
+         /* Macroblocks per row minus one in the linear stride field. */
+         cfg.stride = (rsrc->layout.stride_el[0] / 16 - 1) << 4;
       } else {
          cfg.page_aligned_layers = rsrc->layout.page_aligned_layers;
       }
@@ -2039,6 +2042,10 @@ agx_batch_upload_pbe_internal(struct agx_batch *batch,
 
          if (tex->layout.tiling == AIL_TILING_LINEAR) {
             cfg.stride = ail_get_linear_stride_B(&tex->layout, level) - 4;
+            cfg.levels = 1;
+         } else if (tex->layout.tiling == AIL_TILING_INTERCHANGE) {
+            /* The field encodes stride_B / 16 - 1, in macroblocks. */
+            cfg.stride = (tex->layout.stride_el[0] / 16) * 16 - 4;
             cfg.levels = 1;
          } else {
             cfg.page_aligned_layers = tex->layout.page_aligned_layers;
