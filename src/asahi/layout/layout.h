@@ -219,7 +219,9 @@ ail_get_wsi_stride_B(const struct ail_layout *layout, unsigned level)
    if (layout->tiling == AIL_TILING_LINEAR)
       return ail_get_linear_stride_B(layout, level);
    else if (layout->tiling == AIL_TILING_INTERCHANGE)
-      return ail_get_interchange_stride_B(layout);
+      /* Per pixel row: DRM core checks pitch * height against the buffer, and
+       * appledrm derives the macroblock layout itself. */
+      return ail_get_interchange_stride_B(layout) / 16;
    else
       return util_format_get_stride(layout->format, layout->width_px);
 }
