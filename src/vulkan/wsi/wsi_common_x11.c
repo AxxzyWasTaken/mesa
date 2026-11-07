@@ -42,6 +42,7 @@
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
+#include <poll.h>
 #include "drm-uapi/drm_fourcc.h"
 #include "util/libdrm.h"
 #include "util/cnd_monotonic.h"
@@ -1279,6 +1280,9 @@ struct x11_swapchain {
    uint64_t                                     send_sbc;
    uint64_t                                     last_present_msc;
    uint64_t                                     next_present_ust_lower_bound;
+   /* Estimated (X server UST) - (our CLOCK_MONOTONIC), in us; see x11_server_ust_to_local(). */
+   int64_t                                      server_ust_offset;
+   bool                                         server_ust_offset_valid;
    uint32_t                                     stamp;
    uint32_t                                     sent_image_count;
 
@@ -1419,6 +1423,47 @@ static void x11_present_update_refresh_cycle_estimate(struct x11_swapchain *swap
    entry = &swapchain->present_timing_window[swapchain->present_timing_window_index];
    entry->msc = msc;
    entry->ust = ust;
+}
+
+/* The X server stamps Present completions (UST) with its own CLOCK_MONOTONIC. That is ours only when it
+ * runs on the same machine: behind a VM's X11 bridge (muvm) or with a remote server the two clocks can be
+ * minutes apart, and present timing would hand the application server times as CLOCK_MONOTONIC (DXVK then
+ * slept ~80 s for a target present time and Chromium's GPU watchdog killed the process).
+ *
+ * A completion arrives after it happened, so (ust - now) never exceeds the true offset, and its maximum over
+ * all completions converges to the offset within the smallest delivery latency. With a shared clock that
+ * maximum stays just below zero: the server's values are only rewritten when its clock is clearly ahead
+ * (impossible with a shared clock) or far behind, so a native X server sees no change.
+ */
+static bool
+x11_server_ust_offset_is_local(int64_t offset)
+{
+   return offset <= 10000 && offset >= -1000000;
+}
+
+/* True until the first completion shows a shared clock, and whenever the
+ * server's clock is clearly not ours (a VM bridge or a remote server). */
+static bool
+x11_server_may_be_foreign(const struct x11_swapchain *chain)
+{
+   return !chain->server_ust_offset_valid ||
+          !x11_server_ust_offset_is_local(chain->server_ust_offset);
+}
+
+static uint64_t
+x11_server_ust_to_local(struct x11_swapchain *chain, uint64_t ust)
+{
+   const int64_t d = (int64_t)ust - (int64_t)(os_time_get_nano() / 1000);
+
+   if (!chain->server_ust_offset_valid || d > chain->server_ust_offset) {
+      chain->server_ust_offset = d;
+      chain->server_ust_offset_valid = true;
+   }
+
+   if (x11_server_ust_offset_is_local(chain->server_ust_offset))
+      return ust;
+
+   return (uint64_t)MAX2((int64_t)ust - chain->server_ust_offset, 0);
 }
 
 static void x11_present_complete(struct x11_swapchain *swapchain,
@@ -1687,7 +1732,8 @@ x11_handle_dri3_present_event(struct x11_swapchain *chain,
        *   presenting before targetTime (although the error is minimized to just 1 ms).
        * - For stable msc estimation on native X11, we intentionally add a bit of jitter,
        *   such that this clamping will never falsely claim a stable MSC rate. */
-      uint64_t ust = MAX2(complete->ust, chain->next_present_ust_lower_bound);
+      uint64_t ust = MAX2(x11_server_ust_to_local(chain, complete->ust),
+                          chain->next_present_ust_lower_bound);
 
       if (complete->kind == XCB_PRESENT_COMPLETE_KIND_PIXMAP) {
          unsigned i, j;
@@ -1839,6 +1885,16 @@ x11_present_to_x11_dri3(struct x11_swapchain *chain, uint32_t image_index,
    } else
 #endif
    {
+      /* muvm's X11 bridge hands the buffer to the host X server without the
+       * dma-buf's implicit fences, so it can scan out a half-rendered frame.
+       * Wait for rendering (the write fences) before presenting there. A
+       * server on our clock honours the implicit fences itself, so once the
+       * first completion shows a shared clock this wait stops. */
+      if (image->base.dma_buf_fd >= 0 && x11_server_may_be_foreign(chain)) {
+         struct pollfd pfd = { .fd = image->base.dma_buf_fd, .events = POLLIN };
+         while (poll(&pfd, 1, -1) < 0 && (errno == EINTR || errno == EAGAIN))
+            ;
+      }
       cookie = xcb_present_pixmap(chain->conn,
                                   chain->window,
                                   image->pixmap,

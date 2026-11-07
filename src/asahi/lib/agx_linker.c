@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "util/macros.h"
+#include "util/mesa-blake3.h"
 #include "util/ralloc.h"
 #include "agx_abi.h"
 #include "agx3_code_container_core.h"
@@ -46,7 +47,26 @@ agx_fs_epilog_apply_device_policy(enum agx_chip chip,
       return;
 
    const bool g17p = agx_chip_native_agx3(chip);
-   key->preserve_zero_mask = g17p;
+   /* G18 coverage also dirties color during depth-only or fully masked draws.
+    * Preserve the previous tile value while executing the other side effects.
+    */
+   key->preserve_zero_mask = g17p || agx_chip_g17_m5(chip) || chip == AGX_CHIP_G18G;
+   key->sample_loop_mrt = chip == AGX_CHIP_G18G && key->nr_samples > 1;
+   /* G18G: both AGX3 tile interfaces move packed bytes. The RGB transfer
+    * function belongs around blending; alpha remains linear. R11G11B10 is
+    * explicitly packed into one raw tile word, with a matching R32_UINT store
+    * PBE. */
+   key->lower_srgb = chip == AGX_CHIP_G18G;
+   key->lower_r11g11b10 = chip == AGX_CHIP_G18G;
+   key->native_epilog = chip == AGX_CHIP_G18G;
+   if (chip == AGX_CHIP_G18G &&
+       (key->nr_samples == 1 || key->nr_samples == 2 || key->nr_samples == 4)) {
+      /* Match the render-pass layout. Native G18's 48-byte MS samples
+       * retain 32x32 at 2x and 32x16 at 4x: 96 KiB and 2048 raster samples.
+       * Single-sample MRT keeps its previous byte and raster limits. */
+      key->max_bytes_per_tile = key->nr_samples == 1 ? 32768 : 98304;
+      key->max_samples_per_tile = key->nr_samples == 1 ? 1024 : 2048;
+   }
    key->m5_coverage = agx_chip_g17_m5(chip);
    key->g17p_tile_formats = g17p || agx_chip_g17_m5(chip);
 }
@@ -183,6 +203,10 @@ agx3_fill_helper_terminals(uint8_t *image, size_t from, size_t to)
 static size_t
 agx3_container_lead_size(const struct agx_device *dev)
 {
+   /* G18G's lead holds four agx3d helper tables. */
+   if (dev->chip == AGX_CHIP_G18G)
+      return AGX3_G18G_CONTAINER_LEAD_SIZE;
+
    return agx_chip_g17_m5(dev->chip)
       ? (size_t)dev->params.num_clusters_total * 0x300u + 0x40u
       : AGX3_CONTAINER_LEAD;
@@ -223,16 +247,18 @@ agx3_build_container_lead(uint8_t *image, enum agx_chip chip,
  * plain lead. */
 void
 agx3_build_usc_base_page(uint8_t *image, size_t size, enum agx_chip chip,
-                         unsigned cores_per_cluster)
+                         unsigned cores_per_cluster, unsigned num_clusters)
 {
    assert(size >= AGX3_CONTAINER_LEAD + 0x10);
 
    memset(image, 0, size);
    agx3_build_container_lead(image, chip, cores_per_cluster);
 
-   if (agx_chip_usc_base_page_fill_returns(chip)) {
-      assert(agx_chip_usc_helper_table_slots(chip, cores_per_cluster) == 10);
-      agx3_fill_helper_terminals(image, 0x2c0, AGX3_CONTAINER_LEAD);
+   if (agx_chip_usc_base_page_fill_returns_for(chip, num_clusters)) {
+      const unsigned slots =
+         agx_chip_usc_helper_table_slots(chip, cores_per_cluster);
+      agx3_fill_helper_terminals(image, 0x200 + (slots + 2) * 0x10,
+                                 AGX3_CONTAINER_LEAD);
       agx3_fill_helper_terminals(image, AGX3_CONTAINER_LEAD + 0x10, size);
    }
 }
@@ -244,7 +270,10 @@ agx3_build_container(const struct agx_device *dev, uint8_t *image,
    const bool m5 = agx_chip_g17_m5(dev->chip);
    const size_t lead_size = agx3_container_lead_size(dev);
    memset(image, 0, agx3_container_size(dev, code_size));
-   if (m5) {
+   if (dev->chip == AGX_CHIP_G18G) {
+      if (!agx3_build_g18g_container_lead(image, lead_size))
+         return false;
+   } else if (m5) {
       if (!agx3_build_m5_container_lead(image, lead_size,
                                        dev->params.num_clusters_total))
          return false;
@@ -255,6 +284,10 @@ agx3_build_container(const struct agx_device *dev, uint8_t *image,
                  AGX3_CONTAINER_BLOCK_HDR + AGX3_CONTAINER_CONST_PROG +
                     ALIGN_POT(code_size, 64));
    uint8_t *constant = image + lead_size + AGX3_CONTAINER_BLOCK_HDR;
+   if (dev->chip == AGX_CHIP_G18G) {
+      agx3_build_container_stop_program_agx3d(constant);
+      return true;
+   }
    agx3_build_container_constant_program(constant, fragment || m5,
                                          sampled_fragment && !m5);
    return true;
@@ -263,7 +296,8 @@ agx3_build_container(const struct agx_device *dev, uint8_t *image,
 static bool
 agx3_uses_code_container(const struct agx_device *dev)
 {
-   return agx_chip_native_agx3(dev->chip) || agx_chip_g17_m5(dev->chip);
+   return agx_chip_native_agx3(dev->chip) || agx_chip_g17_m5(dev->chip) ||
+          dev->chip == AGX_CHIP_G18G;
 }
 
 bool
@@ -275,7 +309,8 @@ agx_fast_link(struct agx_linked_shader *linked, struct agx_device *dev,
    /* These literal loop fragments are AGX2 machine code. G17P exposes only
     * one sample and its Vulkan path folds sample shading before split-FS
     * lowering; fail closed if a caller ever bypasses that canonicalization. */
-   if ((agx_chip_native_agx3(dev->chip) || agx_chip_g17_m5(dev->chip)) &&
+   if ((agx_chip_native_agx3(dev->chip) || agx_chip_g17_m5(dev->chip) ||
+        dev->chip == AGX_CHIP_G18G) &&
        nr_samples_shaded) {
       fprintf(stderr,
               "agx_fast_link: external sample loop is not AGX3 machine code\n");
@@ -301,7 +336,8 @@ agx_fast_link(struct agx_linked_shader *linked, struct agx_device *dev,
    bool nop_entry[ARRAY_SIZE(parts)] = {false};
    bool entry_seen = false;
    int kept_entry = -1;
-   if ((agx_chip_native_agx3(dev->chip) || agx_chip_g17_m5(dev->chip)) &&
+   if ((agx_chip_native_agx3(dev->chip) || agx_chip_g17_m5(dev->chip) ||
+        dev->chip == AGX_CHIP_G18G) &&
        fragment && !nr_samples_shaded && !colour_fused) {
       for (unsigned i = 0; i < ARRAY_SIZE(parts); ++i) {
          struct agx_shader_part *part = parts[i];
@@ -310,10 +346,15 @@ agx_fast_link(struct agx_linked_shader *linked, struct agx_device *dev,
 
          const uint32_t off = part->info.agx3_colour_link.entry_offset;
          if (entry_seen) {
-            if (off != 0 && !part->info.agx3_colour_link.entry_unspanned)
+            if (off != 0 && !part->info.agx3_colour_link.entry_unspanned) {
+               /* The NOP fill below is agx3b/agx3c bytes. G18G (agx3d)
+                * refuses a spanned later entry, as j873 did. */
+               if (dev->chip == AGX_CHIP_G18G)
+                  return false;
                nop_entry[i] = true;
-            else
+            } else {
                drop_entry[i] = true;
+            }
          } else {
             entry_seen = true;
             kept_entry = i;
@@ -326,12 +367,20 @@ agx_fast_link(struct agx_linked_shader *linked, struct agx_device *dev,
          struct agx_shader_part *part = parts[i];
          const uint32_t off = part->info.agx3_colour_link.entry_offset;
          uint8_t gate[AGX3_PIXEL_MAX_LENGTH], gate_size;
+         if (dev->chip == AGX_CHIP_G18G) {
+            /* Native G18 pixwait512 (native330). The compiler relocated
+             * entry_offset with the instruction-boundary transcode map. */
+            static const uint8_t g18_gate[] = {0x07,0x30,0x00,0x05,0x00,0x00};
+            memcpy(gate, g18_gate, sizeof(g18_gate));
+            gate_size = sizeof(g18_gate);
+         }
          if ((off & 1) || off > part->info.main_size ||
              part->info.main_size - off < AGX3_PIXEL_MAX_LENGTH ||
-             !agx3_pixel_colour_entry(agx_chip_g17_m5(dev->chip)
-                                         ? AGX_ISA_ENCODING_AGX3C
-                                         : AGX_ISA_ENCODING_AGX3B,
-                                      gate, &gate_size) ||
+             (dev->chip != AGX_CHIP_G18G &&
+              !agx3_pixel_colour_entry(agx_chip_g17_m5(dev->chip)
+                                          ? AGX_ISA_ENCODING_AGX3C
+                                          : AGX_ISA_ENCODING_AGX3B,
+                                       gate, &gate_size)) ||
              gate_size != AGX3_PIXEL_MAX_LENGTH ||
              memcmp((const uint8_t *)part->binary + part->info.main_offset +
                        off,
@@ -399,7 +448,8 @@ agx_fast_link(struct agx_linked_shader *linked, struct agx_device *dev,
    /* The staging accounting is per instruction, so a linked software vertex
     * shader (a compute-stage main behind the vertex prolog) is described the
     * same way as a hardware vertex or fragment program. */
-   if ((agx_chip_native_agx3(dev->chip) || agx_chip_g17_m5(dev->chip)) &&
+   if ((agx_chip_native_agx3(dev->chip) || agx_chip_g17_m5(dev->chip) ||
+        dev->chip == AGX_CHIP_G18G) &&
        (main->info.stage == MESA_SHADER_VERTEX ||
         main->info.stage == MESA_SHADER_FRAGMENT ||
         main->info.stage == MESA_SHADER_COMPUTE ||
@@ -507,7 +557,9 @@ agx_fast_link(struct agx_linked_shader *linked, struct agx_device *dev,
             }
          }
       }
-      if (i == 2 && main && main->info.agx3_colour_link.rt_query_write_acquired) {
+      /* agx3b/agx3c bytes; G18G (agx3d) keeps the epilog's own wait. */
+      if (i == 2 && main && dev->chip != AGX_CHIP_G18G &&
+          main->info.agx3_colour_link.rt_query_write_acquired) {
          const struct agx3_colour_link_info *link = &part->info.agx3_colour_link;
          if (link->rt_query_wait_count != 1 || link->rt_query_wait_unsupported)
             goto invalid_start_marker;
@@ -620,6 +672,29 @@ agx_fast_link(struct agx_linked_shader *linked, struct agx_device *dev,
    linked->agx3_spectpr_scratch_size = agx3_spectpr_scratch_size;
    linked->nr_gprs = nr_gprs;
    linked->g17p_colour_classes = colour_classes;
+
+   if (dev->chip == AGX_CHIP_G18G && getenv("ASAHI_G18_RESOURCE_TRACE") &&
+       (scratch_size || agx3_spectpr_scratch_size) && size <= (SIZE_MAX - 1) / 2) {
+      /* Once per linked executable, rather than once per dispatch. Preserve
+       * the final bytes, including prolog/epilog and link-time patches. */
+      char *hex = malloc(size * 2 + 1);
+      if (hex) {
+         static const char digits[] = "0123456789abcdef";
+         blake3_hash digest;
+         char hash[BLAKE3_HEX_LEN];
+         _mesa_blake3_compute(linked_map, size, digest);
+         _mesa_blake3_format(hash, digest);
+         for (size_t i = 0; i < size; ++i) {
+            hex[2 * i] = digits[linked_map[i] >> 4];
+            hex[2 * i + 1] = digits[linked_map[i] & 15];
+         }
+         hex[size * 2] = 0;
+         fprintf(stderr,
+                 "G18_LINKED_SHADER size=%zu scratch=%u spectpr=%u blake3=%s hex=%s\n",
+                 size, scratch_size, agx3_spectpr_scratch_size, hash, hex);
+         free(hex);
+      }
+   }
 
    agx_bo_assert_range(linked->bo, code_offset, alloc_size);
 

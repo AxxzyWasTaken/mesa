@@ -146,6 +146,26 @@ write_g17p_sampler_bias(struct hk_sampled_image_descriptor_sw *sw,
  * sampler without a custom border: exactly the bytes the general path below
  * writes for that case, built directly instead of through its three-plane
  * staging.  Returns false for every other case. */
+/* A custom border follows the view's component mapping. An image without its
+ * sampler has no use for its border words, so its first one carries the mapping
+ * for the shader: three bits per channel, 0-3 for a source channel, 4 for zero,
+ * 5 for one, and the top bit to say it is there. */
+static uint32_t
+hk_border_swizzle_word(const struct hk_image_view *view)
+{
+   const VkComponentSwizzle swizzle[4] = {view->vk.swizzle.r, view->vk.swizzle.g,
+                                          view->vk.swizzle.b, view->vk.swizzle.a};
+   uint32_t word = BITFIELD_BIT(31);
+
+   for (unsigned c = 0; c < 4; ++c) {
+      const unsigned code = swizzle[c] == VK_COMPONENT_SWIZZLE_ZERO ? 4
+                            : swizzle[c] == VK_COMPONENT_SWIZZLE_ONE ? 5
+                            : swizzle[c] - VK_COMPONENT_SWIZZLE_R;
+      word |= code << (3 * c);
+   }
+   return word;
+}
+
 static inline bool
 write_sampled_image_view_desc_g17p_single(struct hk_descriptor_set *set,
                                           const VkDescriptorImageInfo *info,
@@ -227,6 +247,8 @@ write_sampled_image_view_desc_g17p_single(struct hk_descriptor_set *set,
    };
    if (sampler)
       write_g17p_sampler_bias(&desc.sw, sampler, 0);
+   else
+      desc.sw.border[0] = hk_border_swizzle_word(view);
 
    write_desc(set, binding, elem, &desc, sizeof(desc));
    return true;
@@ -279,6 +301,9 @@ write_sampled_image_view_desc(struct hk_descriptor_set *set,
 
          desc[plane].sw.min_lod_fp16 = view->sampled_min_lod_fp16;
          desc[plane].sw.min_lod_uint16 = view->sampled_min_lod_uint16;
+         if (generation == 9 &&
+             descriptor_type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+            desc[plane].sw.border[0] = hk_border_swizzle_word(view);
          const enum pipe_format logical = hk_format_to_pipe_format(view->vk.format);
          const enum pipe_format integer = hk_scaled_texture_format(logical);
          if (generation == 9 && integer != PIPE_FORMAT_NONE)
@@ -371,6 +396,22 @@ write_sampled_image_view_desc(struct hk_descriptor_set *set,
 
          memcpy(desc[0].sw.border, sampler->custom_border.uint32,
                 sizeof(sampler->custom_border));
+
+         if (generation == 9 &&
+             descriptor_type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER &&
+             info->imageView != VK_NULL_HANDLE) {
+            VK_FROM_HANDLE(hk_image_view, view, info->imageView);
+            const uint32_t word = hk_border_swizzle_word(view);
+
+            for (unsigned c = 0; c < 4; ++c) {
+               const unsigned code = (word >> (3 * c)) & 7;
+               desc[0].sw.border[c] =
+                  code < 4
+                     ? sampler->custom_border.uint32[code]
+                     : code == 4 ? 0
+                     : sampler->border_is_int ? 1 : fui(1.0f);
+            }
+         }
       }
    }
 
@@ -484,8 +525,12 @@ get_buffer_address(const VkDescriptorBufferInfo *const info, bool read_only)
       hk_buffer_addr_range(buffer, info->offset, info->range, read_only);
    assert(addr_range.range <= UINT32_MAX);
 
+   /* Only M5 lowers storage loads through this word. Elsewhere the word is the
+    * address format's byte offset and must stay zero. */
    uint32_t sparse_map_page = 0;
-   if (!read_only && buffer && buffer->sparse_map) {
+   if (!read_only && buffer && buffer->sparse_map &&
+       agx_chip_g17_m5(
+          ((const struct hk_device *)buffer->vk.base.device)->dev.chip)) {
       const uint64_t map_addr = buffer->sparse_map->va->addr;
       assert((map_addr % AIL_PAGESIZE) == 0);
       assert((map_addr / AIL_PAGESIZE) <= UINT32_MAX);
@@ -505,6 +550,18 @@ write_buffer_desc(struct hk_descriptor_set *set,
                   uint32_t elem, bool read_only)
 {
    const struct hk_buffer_address desc = get_buffer_address(info, read_only);
+
+   /* A null descriptor in a mutable slot reads as null through any type, so it
+    * must not keep the previous descriptor's heap index past the buffer
+    * record. All zero is the null of every type on G17P. */
+   const uint32_t stride = set->layout->binding[binding].stride;
+   if (info->buffer == VK_NULL_HANDLE && stride > sizeof(desc) &&
+       set->layout->descriptor_generation == 9) {
+      uint8_t packed[HK_MAX_DESCRIPTOR_SIZE] = {0};
+      memcpy(packed, &desc, sizeof(desc));
+      write_desc(set, binding, elem, packed, MIN2(stride, sizeof(packed)));
+      return;
+   }
 
    write_desc(set, binding, elem, &desc, sizeof(desc));
 }
@@ -579,7 +636,13 @@ write_buffer_view_desc(struct hk_descriptor_set *set,
          desc.pbe = view->pbe;
       heap_index = view->sampled_heap_index;
    } else {
-      hk_set_null_native_texture(generation, &desc.tex);
+      /* A mutable slot can be read as any type, and vkd3d-proton nulls it with
+       * a null texel buffer. G17P finds a texture by heap index and index 0 is
+       * the null texture, so keep the bytes zero: read as a storage or uniform
+       * buffer they are then the null buffer, not a size taken from a packed
+       * texture word. */
+      if (generation != 9)
+         hk_set_null_native_texture(generation, &desc.tex);
       hk_set_null_native_pbe(generation, &desc.pbe);
    }
 

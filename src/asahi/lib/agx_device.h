@@ -76,6 +76,7 @@ enum agx_dbg {
    AGX_DBG_NOMERGE = BITFIELD_BIT(22),
    /* Track BOs without serializing submissions, then decode only a failed
     * submit while its command stream and referenced allocations are live. */
+   AGX_DBG_FAULTTRACE = BITFIELD_BIT(23),
    /* Decode every command stream at submit time without waiting for the GPU. */
    AGX_DBG_ASYNCTRACE = BITFIELD_BIT(24),
 };
@@ -193,6 +194,7 @@ struct agx_device {
    uint32_t queue_id;
    /* AGX_DBG_1QUEUE: render SCS layouts the shared queue was created with. */
    uint64_t queue_layouts[2];
+   enum drm_asahi_priority queue_priority;
 
    /* VMA heaps */
    simple_mtx_t vma_lock;
@@ -317,7 +319,7 @@ agx_bo_sync_for_device(struct agx_bo *bo, size_t offset, size_t size)
  * for sparse_ro_offset.
  */
 static inline bool
-agx_addr_is_ro(struct agx_device *dev, uint64_t addr)
+agx_addr_is_ro(const struct agx_device *dev, uint64_t addr)
 {
    return (addr & dev->sparse_ro_offset);
 }
@@ -342,7 +344,7 @@ agx_fill_bind_flags(const struct agx_device *dev)
 }
 
 static inline uint64_t
-agx_rw_addr_to_ro(struct agx_device *dev, uint64_t addr)
+agx_rw_addr_to_ro(const struct agx_device *dev, uint64_t addr)
 {
    assert(!agx_addr_is_ro(dev, addr));
    return addr + dev->sparse_ro_offset;
@@ -433,7 +435,7 @@ agx_bo_unmap_owned(struct agx_bo *bo, void *map, size_t size)
 }
 
 static inline bool
-agx_has_soft_fault(struct agx_device *dev)
+agx_has_soft_fault(const struct agx_device *dev)
 {
    return (dev->params.features & DRM_ASAHI_FEATURE_SOFT_FAULTS) &&
           !(dev->debug & AGX_DBG_NOSOFT);
@@ -509,6 +511,7 @@ uint32_t agx_create_command_queue(struct agx_device *dev,
 uint32_t agx_create_command_queue_with_render_scs(struct agx_device *dev,
    enum drm_asahi_priority priority, const uint64_t layouts[2]);
 int agx_destroy_command_queue(struct agx_device *dev, uint32_t queue_id);
+bool agx_probe_high_priority(struct agx_device *dev);
 
 int agx_import_sync_file(struct agx_device *dev, struct agx_bo *bo, int fd);
 int agx_export_sync_file(struct agx_device *dev, struct agx_bo *bo);

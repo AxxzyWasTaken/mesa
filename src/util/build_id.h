@@ -38,9 +38,9 @@ extern "C" {
 
 #include "mesa-blake3.h"
 
-#if HAVE_BUILD_ID
-
 #define BUILD_ID_EXPECTED_HASH_LENGTH 20 /* sha1 */
+
+#if HAVE_BUILD_ID
 
 struct build_id_note;
 
@@ -59,6 +59,7 @@ copy_build_id_to_sha1(uint8_t sha1[BLAKE3_KEY_LEN],
 
 #endif
 
+/* Format a 20-byte SHA1 build ID into 40 hex digits plus a terminating NUL. */
 void
 _mesa_sha1_format(char *buf, const unsigned char *sha1);
 

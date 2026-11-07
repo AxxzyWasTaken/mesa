@@ -133,6 +133,13 @@ struct hk_device {
    uint32_t va_alias_resources;
    /* One bit per main-heap page: only unbound sparse buffer pages are set. */
    struct agx_bo *physical_sparse_map;
+   /* The zeroed page every unbound sparse page maps, read-write (the
+    * read-only shadow maps the zero page). It is no write sink of the
+    * driver's, unlike the scratch page, so it stays zero for strict
+    * residency. shortcut: an application store to an unbound page lands
+    * here and later reads of unbound pages see it; guard stores with the
+    * residency map if that ever matters. */
+   struct agx_bo *sparse_fill;
    struct agxdecode_ctx *decode_ctx;
    /* Opt-in frame anatomy profiler (hk_frame_anatomy.h); NULL unless the
     * HK_FRAME_ANATOMY environment variable is set. */
@@ -284,11 +291,16 @@ struct hk_device {
          *entries[HK_SHADER_BINARY_CACHE_MAX];
    } shader_binary_cache;
 
-   /* Device-wide compact VDM backing. Command buffers from different pools
-    * suballocate immutable spans from the same finite G17P aperture. */
+   /* Device-wide command memory. Command buffers from different pools
+    * suballocate immutable spans: compact VDM backing from the same finite
+    * G17P aperture, and the first span of each uploader. A slab that refused
+    * an allocation waits on full until one of its spans is freed. */
    struct {
       simple_mtx_t lock;
-      struct list_head slabs;
+      struct list_head slabs[HK_CMD_SLAB_COUNT];
+      struct list_head full[HK_CMD_SLAB_COUNT];
+      /* The next slab's size: a process that records little pins little. */
+      uint32_t next_size[HK_CMD_SLAB_COUNT];
    } vdm;
 
    /* Native G17P indirect compute grid helper.  A compact indirect helper
@@ -368,15 +380,23 @@ enum hk_perftest {
  * and only when that stream already holds work
  * (hk_cdm_visibility_flush_needed()). It writes back every dirty line, so
  * the writes it covers include those of earlier streams and earlier
- * command buffers. A barrier recorded before any work in a command buffer
- * has no such stream and records no flush: a write in an earlier command
- * buffer, read through another address by the first work after that
- * barrier, has no memory-scope flush between them. Whether the hardware
- * returns stale data in that case has not been tested. Not covered: a
+ * command buffers. A barrier recorded with no open compute stream holding
+ * work records no flush. This includes the first barrier of a command
+ * buffer and barriers after the stream was closed, for example by a
+ * timestamp or query copy. Earlier writes read through another address
+ * after such a barrier have no memory-scope flush between them. Whether
+ * the hardware returns stale data in that case has not been tested. When
+ * the open stream holds work unrelated to the source, the flush goes at its
+ * end, but a graphics destination is still ordered only after the source's
+ * stream, so it can start before the flush. Not covered: a
  * resource created after the command buffer was recorded and reached
  * through a path recording did not see, that is a device address the
  * command buffer reads indirectly, or a descriptor set bound at recording
- * and updated after it (descriptorBinding*UpdateAfterBind). */
+ * and updated after it (descriptorBinding*UpdateAfterBind). Graphics-only
+ * sources also do not request memory scope: attachment or shader writes
+ * through a sparse image followed by transfer or compute reads through a
+ * plain alias receive the ordinary post-graphics strong flush. That case
+ * has not been hardware-tested. */
 static inline bool
 hk_cdm_alias_scope(const struct hk_device *dev)
 {

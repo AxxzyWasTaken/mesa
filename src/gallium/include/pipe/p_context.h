@@ -107,6 +107,12 @@ struct pipe_context {
    struct pipe_screen *screen;
 
    void *priv;  /**< context private data (for DRI for example) */
+
+   /** Effective PIPE_CONTEXT_PRIORITY_* bit after creation; zero if unreported.
+    * Immutable for the lifetime of the context, including through wrappers.
+    */
+   unsigned context_priority;
+
    void *draw;  /**< private, for draw module (temporary?) */
    struct u_vbuf *vbuf; /**< for cso_context, don't use in drivers */
 

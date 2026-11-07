@@ -1318,6 +1318,24 @@ dri2_create_context(_EGLDisplay *disp, _EGLConfig *conf,
    if (!dri2_ctx->dri_context)
       goto cleanup;
 
+   /* EGL priority is a hint; report the priority actually selected by Gallium,
+    * including a fallback after credentials or DRM master changed.
+    */
+   switch (driGetContextPriority(dri2_ctx->dri_context)) {
+   case PIPE_CONTEXT_PRIORITY_LOW:
+      dri2_ctx->base.ContextPriority = EGL_CONTEXT_PRIORITY_LOW_IMG;
+      break;
+   case PIPE_CONTEXT_PRIORITY_MEDIUM:
+      dri2_ctx->base.ContextPriority = EGL_CONTEXT_PRIORITY_MEDIUM_IMG;
+      break;
+   case PIPE_CONTEXT_PRIORITY_HIGH:
+      dri2_ctx->base.ContextPriority = EGL_CONTEXT_PRIORITY_HIGH_IMG;
+      break;
+   case PIPE_CONTEXT_PRIORITY_REALTIME:
+      dri2_ctx->base.ContextPriority = EGL_CONTEXT_PRIORITY_REALTIME_NV;
+      break;
+   }
+
    mtx_unlock(&dri2_dpy->lock);
 
    return &dri2_ctx->base;

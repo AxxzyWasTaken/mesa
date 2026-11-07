@@ -5645,6 +5645,7 @@ threaded_context_create(struct pipe_context *pipe,
       MAX2(pipe->screen->caps.constant_buffer_offset_alignment, 64);
    tc->base.priv = pipe; /* priv points to the wrapped driver context */
    tc->base.screen = pipe->screen;
+   tc->base.context_priority = pipe->context_priority;
    tc->base.destroy = tc_destroy;
    tc->base.callback = tc_callback;
 

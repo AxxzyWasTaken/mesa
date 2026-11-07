@@ -9,8 +9,8 @@
 
 /* Fragment shaders with side effects require special handling to ensure the
  * side effects execute as intended. By default, they require late depth
- * testing, to ensure the side effects happen even for killed pixels. G17P's
- * native late-memory shaders provide pass-through depth feedback after the
+ * testing, to ensure the side effects happen even for killed pixels. G17P and
+ * G18 native late-memory shaders provide pass-through depth feedback after the
  * side effects. MOVMSK is its explicit early-test path and does not by itself
  * defer hardware depth rejection. Keep the existing all-live sample test on
  * other devices.

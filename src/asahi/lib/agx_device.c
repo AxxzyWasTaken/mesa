@@ -113,6 +113,7 @@ static const struct debug_named_value agx_debug_options[] = {
    {"1queue",    AGX_DBG_1QUEUE,   "Force usage of a single queue for multiple contexts"},
    {"nosoft",    AGX_DBG_NOSOFT,   "Disable soft fault optimizations"},
    {"nomerge",   AGX_DBG_NOMERGE,  "Disable control stream merging"},
+   {"faulttrace",AGX_DBG_FAULTTRACE,"Retain G18 failure diagnostics"},
    {"asynctrace",AGX_DBG_ASYNCTRACE,"Trace command streams without waiting"},
    {"bodumpverbose", AGX_DBG_BODUMPVERBOSE,   "Include extra info with dumps"},
    DEBUG_NAMED_VALUE_END
@@ -569,7 +570,7 @@ agx_bo_import(struct agx_device *dev, int fd)
    assert(bo->dev != NULL && "post-condition");
 
    if (dev->debug &
-       (AGX_DBG_TRACE | AGX_DBG_ASYNCTRACE)) {
+       (AGX_DBG_TRACE | AGX_DBG_FAULTTRACE | AGX_DBG_ASYNCTRACE)) {
       agx_bo_map(bo);
       agxdecode_track_alloc(dev->agxdecode, bo);
    }
@@ -903,6 +904,14 @@ agx_open_device(void *memctx, struct agx_device *dev)
       goto fail;
    }
 
+   if (agx_params_fixup_upstream_uapi(&dev->params) &&
+       (dev->debug & AGX_DBG_PERF))
+      fprintf(stderr,
+              "AGX: kernel publishes the upstream UAPI parameters; features "
+              "masked to %#llx, USC %u, HAL %u\n",
+              (unsigned long long)dev->params.features,
+              dev->params.usc_generation, dev->params.gpu_hal_generation);
+
    dev->chip = agx_chip_from_params(&dev->params);
 
    /*
@@ -911,12 +920,22 @@ agx_open_device(void *memctx, struct agx_device *dev)
     * is implemented; otherwise a newly-recognised chip can silently reach an
     * encoder from the wrong generation.
     */
+   const bool m5 = agx_params_m5_supported(&dev->params);
    const bool m5_bringup =
-      debug_get_bool_option("ASAHI_M5_BRINGUP", false) &&
+      !m5 && debug_get_bool_option("ASAHI_M5_BRINGUP", false) &&
       agx_params_m5_bringup_supported(&dev->params);
    if (m5_bringup)
       fprintf(stderr, "Experimental M5 HAL300 integration enabled; general rendering is unqualified\n");
-   if (!agx_params_driver_supported(&dev->params) && !m5_bringup) {
+   /* M6: the G18G records are the M5 ones (agx_chip_hal300_records) and its
+    * code is G17G-family (agx3c) code re-encoded as agx3d
+    * (agx_gather_device_key). */
+   const bool g18g_bringup =
+      debug_get_bool_option("ASAHI_G18G_BRINGUP", true) &&
+      agx_params_g18g_bringup_supported(&dev->params);
+   if (g18g_bringup)
+      fprintf(stderr, "Experimental M6 G18G integration enabled (M5 paths, agx3d code); rendering is unqualified\n");
+   if (!agx_params_driver_supported(&dev->params) && !m5 && !m5_bringup &&
+       !g18g_bringup) {
       if (dev->chip == AGX_CHIP_UNKNOWN) {
          fprintf(stderr,
                  "Unsupported Apple GPU architecture G%u (variant 0x%x, %u "
@@ -979,6 +998,10 @@ agx_open_device(void *memctx, struct agx_device *dev)
          break;
       case 'C':
          variant = " Max";
+         break;
+      case 'X':
+         if (dev->params.chip_id == 0x6041)
+            variant = " Max";
          break;
       case 'D':
          variant = " Ultra";
@@ -1061,7 +1084,7 @@ agx_open_device(void *memctx, struct agx_device *dev)
     * a practical limit. */
    if (agx_chip_native_agx3(dev->chip))
       dev->shader_base = AGX_G17P_USC_WINDOW_BASE;
-   else if (agx_chip_g17_m5(dev->chip))
+   else if (agx_chip_g17_m5(dev->chip) || dev->chip == AGX_CHIP_G18G)
       dev->shader_base = AGX_M5_SHADER_BASE;
 
    if (dev->shader_base < reservation) {
@@ -1097,7 +1120,8 @@ agx_open_device(void *memctx, struct agx_device *dev)
     * directly representable, with no per-run alias option.
     */
    const bool heap_below_usc = agx_chip_native_agx3(dev->chip) ||
-                               agx_chip_g17_m5(dev->chip);
+                               agx_chip_g17_m5(dev->chip) ||
+                               dev->chip == AGX_CHIP_G18G;
 
    /*
     * Start the low heap as high as it can go rather than at the reservation.
@@ -1151,7 +1175,7 @@ agx_open_device(void *memctx, struct agx_device *dev)
    /* G17P is bounded by the narrower of the compact VDM aperture and the
     * absolute USC texture/sampler table pointer, both of which sit below the
     * USC window. Other chips retain the kernel-reported user limit. */
-   if (agx_chip_g17_m5(dev->chip)) {
+   if (agx_chip_g17_m5(dev->chip) || dev->chip == AGX_CHIP_G18G) {
       struct agx_m5_va_layout layout;
       if (!agx_m5_va_layout(dev->params.vm_start, dev->params.vm_end,
                             dev->params.vm_kernel_min_size, dev->shader_base,
@@ -1163,9 +1187,10 @@ agx_open_device(void *memctx, struct agx_device *dev)
       vm_create.kernel_end = layout.driver_end;
       user_start = layout.data_start;
    }
-   const uint64_t user_limit = agx_chip_g17_m5(dev->chip)
-      ? AGX_M5_DATA_END
-      : heap_below_usc ? AGX_G17P_USER_LIMIT : vm_create.kernel_start;
+   const uint64_t user_limit =
+      agx_chip_g17_m5(dev->chip) || dev->chip == AGX_CHIP_G18G
+         ? AGX_M5_DATA_END
+         : heap_below_usc ? AGX_G17P_USER_LIMIT : vm_create.kernel_start;
    uint64_t user_size = user_limit - user_start;
 
    int ret = dev->ops.simple_ioctl(dev, DRM_IOCTL_ASAHI_VM_CREATE, &vm_create);
@@ -1286,6 +1311,10 @@ agx_open_device(void *memctx, struct agx_device *dev)
          dev->libagx_programs = libagx_g13g;
    } else if (dev->chip == AGX_CHIP_G17P) {
       dev->libagx_programs = libagx_g17p;
+   } else if (dev->chip == AGX_CHIP_G18G) {
+      /* Compiled as G17G and re-encoded as agx3d (asahi_clc), launched
+       * through the M5 compute profile (agx_launch_precomp). */
+      dev->libagx_programs = libagx_g18g;
    } else if (dev->chip == AGX_CHIP_G15S || dev->chip == AGX_CHIP_G15C) {
       /* G15C executes the same AGX3B encoding as G15S with no extra
        * scheduling rules, so it runs the G15S build of the programs. */
@@ -1327,6 +1356,7 @@ agx_open_device(void *memctx, struct agx_device *dev)
 
       /* The contents of the scratch page are undefined, but making them nonzero
        * helps fuzz for bugs where we incorrectly read from the write section.
+       * Unbound sparse pages map hk's own zeroed fill page instead.
        */
       void *map = agx_bo_map(dev->scratch_bo);
       if (!map)
@@ -1365,7 +1395,8 @@ agx_open_device(void *memctx, struct agx_device *dev)
    }
 
    const bool dynamic_printf = agx_chip_native_agx3(dev->chip) ||
-                               agx_chip_g17_m5(dev->chip);
+                               agx_chip_g17_m5(dev->chip) ||
+                               dev->chip == AGX_CHIP_G18G;
    struct agx_bo *bo =
       dynamic_printf
          ? agx_bo_create(dev, LIBAGX_PRINTF_BUFFER_SIZE, 0, AGX_BO_WRITEBACK,
@@ -1401,7 +1432,8 @@ agx_open_device(void *memctx, struct agx_device *dev)
    initialized |= AGX_INIT_PRINTF;
 
    /* Map the stage helper tables at the USC execution-window base. */
-   if (agx_chip_native_agx3(dev->chip) || agx_chip_g17_m5(dev->chip)) {
+   if (agx_chip_native_agx3(dev->chip) || agx_chip_g17_m5(dev->chip) ||
+       dev->chip == AGX_CHIP_G18G) {
       const size_t usc_base_size = AIL_PAGESIZE;
 
       simple_mtx_lock(&dev->vma_lock);
@@ -1429,13 +1461,19 @@ agx_open_device(void *memctx, struct agx_device *dev)
          goto fail;
       }
 
-      if (agx_chip_g17_m5(dev->chip)) {
+      if (dev->chip == AGX_CHIP_G18G) {
+         memset(map, 0, usc_base_size);
+         if (!agx3_build_g18g_container_lead(map, usc_base_size))
+            goto fail;
+      } else if (agx_chip_g17_m5(dev->chip)) {
          memset(map, 0, usc_base_size);
          if (!agx3_build_m5_container_lead(map, usc_base_size,
                                           dev->params.num_clusters_total))
             goto fail;
       } else {
-         agx3_build_usc_base_page(map, usc_base_size, dev->chip, dev->params.num_cores_per_cluster);
+         agx3_build_usc_base_page(map, usc_base_size, dev->chip,
+                                  dev->params.num_cores_per_cluster,
+                                  dev->params.num_clusters_total);
       }
       agx_bo_assert_range(usc_base, 0, usc_base_size);
 
@@ -1477,6 +1515,27 @@ agx_close_device(struct agx_device *dev)
 
    close(dev->fd);
    dev->fd = -1;
+}
+
+bool
+agx_probe_high_priority(struct agx_device *dev)
+{
+   /* Bypass the debug shared-queue cache: it could be MEDIUM and cannot be
+    * destroyed through agx_destroy_command_queue in 1queue mode.
+    */
+   struct drm_asahi_queue_create create = {
+      .vm_id = dev->vm_id,
+      .priority = DRM_ASAHI_PRIORITY_HIGH,
+      .usc_exec_base = dev->shader_base,
+   };
+   unsigned request = DRM_IOCTL_ASAHI_QUEUE_CREATE;
+   request = _IOC(_IOC_DIR(request), _IOC_TYPE(request), _IOC_NR(request),
+                  offsetof(struct drm_asahi_queue_create, render_scs_layout));
+   if (dev->ops.simple_ioctl(dev, request, &create))
+      return false;
+
+   struct drm_asahi_queue_destroy destroy = {.queue_id = create.queue_id};
+   return dev->ops.simple_ioctl(dev, DRM_IOCTL_ASAHI_QUEUE_DESTROY, &destroy) == 0;
 }
 
 uint32_t
@@ -1532,6 +1591,7 @@ agx_create_command_queue_with_render_scs(struct agx_device *dev,
 
    if (dev->debug & AGX_DBG_1QUEUE) {
       dev->queue_id = queue_create.queue_id;
+      dev->queue_priority = priority;
       dev->queue_layouts[0] = layouts[0];
       dev->queue_layouts[1] = layouts[1];
       simple_mtx_unlock(&dev->vma_lock);
@@ -1731,11 +1791,16 @@ agx_gather_device_key(struct agx_device *dev)
                     dev->params.num_clusters_total > 1) ||
                    dev->params.num_dies > 1;
 
+   /* G18G compiles as G17G and re-encodes as agx3d; see emit_agx3d. */
+   const bool g18g = dev->chip == AGX_CHIP_G18G;
+   const enum agx_chip chip = g18g ? AGX_CHIP_G17G : dev->chip;
+
    return (struct agx_device_key){
-      .chip = dev->chip,
-      .encoding = agx_chip_isa_encoding(dev->chip),
+      .chip = chip,
+      .encoding = agx_chip_isa_encoding(chip),
       .needs_g13x_coherency = u_tristate_make(g13x_coh),
       .soft_fault = agx_has_soft_fault(dev),
-      .shader_quad_control = agx_is_a18_pro(dev),
+      .emit_agx3d = g18g,
+      .shader_quad_control = dev->chip == AGX_CHIP_G17P,
    };
 }

@@ -53,6 +53,7 @@ hk_files = files(
   'hk_agx3_ioto_program_core.h',
   'hk_agx3_vdm_decode.c',
   'hk_agx3_vdm_decode.h',
+  'hk_ppp_state.h',
   'hk_image.c',
   'hk_image.h',
   'hk_image_layout_core.c',
@@ -312,6 +313,99 @@ if with_tests
   )
 
   test(
+    'hk_drm_render_core',
+    executable(
+      'hk_drm_render_core_test',
+      files('tests/test-hk-drm-render-core.c',
+            'hk_drm_render_core.c'),
+      include_directories : [inc_include, inc_src],
+      c_args : [c_msvc_compat_args],
+      gnu_symbol_visibility : 'hidden',
+    ),
+    suite : ['asahi'],
+  )
+
+  test(
+    'hk_agx3_ioto_program_core',
+    executable(
+      'hk_agx3_ioto_program_core_test',
+      files('tests/test-hk-agx3-ioto-program-core.c',
+            'hk_agx3_ioto_program_core.c',
+            '../compiler/agx_g18_gates.c',
+            '../compiler/agx3_compute_program.c',
+            '../compiler/agx3_graphics_program.c',
+            '../compiler/agx3_m5_graphics_program.c',
+            '../compiler/agx3_copy_core.c',
+            '../compiler/agx3_ioto_uniform_program.c',
+            '../compiler/agx3_ioto_load_packer.c',
+            '../compiler/agx3_cprog_input.c',
+            '../compiler/agx3_static_spill_core.c',
+            '../compiler/agx3_mem_core.c',
+            '../compiler/agx3_binder.c',
+            '../compiler/agx3_compose/agx3_compose.c',
+            '../compiler/agx3_compose/agx3b_tables.c',
+            '../compiler/agx3_compose/agx3c_tables.c'),
+      include_directories : [
+        include_directories('.'), inc_include, inc_src, inc_asahi,
+      ],
+      dependencies : [idep_mesautil],
+      link_with : [libasahi_lib, libasahi_layout],
+      c_args : [c_msvc_compat_args],
+      gnu_symbol_visibility : 'hidden',
+    ),
+    suite : ['asahi'],
+  )
+
+  test(
+    'hk_agx3_vdm_decode',
+    executable(
+      'hk_agx3_vdm_decode_test',
+      files('tests/test-hk-agx3-vdm-decode.c',
+            'hk_agx3_vdm_decode.c'),
+      include_directories : [
+        include_directories('.'), inc_include, inc_src, inc_asahi,
+      ],
+      dependencies : [idep_agx_pack, idep_mesautil],
+      link_with : [libasahi_lib],
+      c_args : [c_msvc_compat_args],
+      gnu_symbol_visibility : 'hidden',
+    ),
+    suite : ['asahi'],
+  )
+
+  test(
+    'hk_zls_stride',
+    executable(
+      'hk_zls_stride_test',
+      files('tests/test-hk-zls-stride.c'),
+      include_directories : [include_directories('.')],
+      c_args : [c_msvc_compat_args],
+      gnu_symbol_visibility : 'hidden',
+    ),
+    suite : ['asahi'],
+  )
+
+  test(
+    'hk_sampler_index',
+    executable(
+      'hk_sampler_index_test',
+      files('tests/test-hk-sampler-index.c'),
+      include_directories : [include_directories('.')],
+      c_args : [c_msvc_compat_args],
+      gnu_symbol_visibility : 'hidden',
+    ),
+    suite : ['asahi'],
+  )
+
+    executable(
+      'g17p-render-only',
+      files('tests/g17p_render_only.c'),
+      include_directories : [inc_include],
+      dependencies : [dep_dl],
+      c_args : [c_msvc_compat_args],
+      gnu_symbol_visibility : 'hidden',
+    )
+  test(
     'hk_g17p_compression',
     executable(
       'hk_g17p_compression_test',
@@ -496,7 +590,8 @@ if with_tests
     include_directories : [inc_gallium, inc_gallium_aux, inc_include, inc_src,
       inc_asahi, inc_virtio_gpu, inc_virtio_vdrm, include_directories('.')],
     dependencies : [hk_deps], link_with : [libhk],
-    link_args : [ld_args_gc_sections, '-Wl,--wrap=__vk_errorf']),
+    link_args : [ld_args_gc_sections, hk_wrap_test_link_args,
+      '-Wl,--wrap=__vk_errorf']),
     suite : ['asahi'])
   test('hk_rt_inlining', executable('hk_rt_inlining_test',
     files('tests/test-hk-rt-inlining.c'),
@@ -719,6 +814,15 @@ if with_tests
   )
 
   executable(
+    'vulkan-tess-batch',
+    files('tests/vulkan_tess_batch.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
     'vulkan-ubo-record-loop',
     files('tests/vulkan_ubo_record_loop.c'),
     include_directories : [inc_include],
@@ -746,8 +850,53 @@ if with_tests
   )
 
   executable(
+    'vulkan-msaa-xfer',
+    files('tests/vulkan_msaa_xfer.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
+    'aurora-r11g11b10f',
+    files('tests/aurora_r11g11b10f.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
+    'aurora-tile-visit',
+    files('tests/aurora_tile_visit.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
+    'vulkan-msaa-mrt',
+    files('tests/vulkan_msaa_mrt.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
     'g17p-vulkan-multiview-clear',
     files('tests/g17p_vulkan_multiview_clear.c'),
+    include_directories : [inc_include],
+    dependencies : [cc.find_library('vulkan')],
+    c_args : [c_msvc_compat_args],
+    gnu_symbol_visibility : 'hidden',
+  )
+
+  executable(
+    'aurora-tilesubmit',
+    files('tests/aurora_tilesubmit.c'),
     include_directories : [inc_include],
     dependencies : [cc.find_library('vulkan')],
     c_args : [c_msvc_compat_args],

@@ -1,0 +1,13 @@
+{
+  "pipelines": {
+    "render_pipelines": [
+      {"vertex_function": "rgb_vertex", "fragment_function": "rgb_registers", "color_attachments": [{"pixel_format": "RGB10A2Unorm"}]},
+      {"vertex_function": "rgb_vertex", "fragment_function": "rgb_alpha_one", "color_attachments": [{"pixel_format": "RGB10A2Unorm"}]},
+      {"vertex_function": "rgb_vertex", "fragment_function": "rgb_alpha_zero", "color_attachments": [{"pixel_format": "RGB10A2Unorm"}]},
+      {"vertex_function": "rgb_vertex", "fragment_function": "rgb_modifiers", "color_attachments": [{"pixel_format": "RGB10A2Unorm"}]},
+      {"vertex_function": "rgb_vertex", "fragment_function": "rgb_retained", "color_attachments": [{"pixel_format": "RGB10A2Unorm"}, {"pixel_format": "RGBA32Float"}]},
+      {"vertex_function": "rgb_vertex", "fragment_function": "rgb_texture", "color_attachments": [{"pixel_format": "RGB10A2Unorm"}]},
+      {"vertex_function": "rgb_vertex", "fragment_function": "rgb_constant", "color_attachments": [{"pixel_format": "RGB10A2Unorm"}]}
+    ]
+  }
+}

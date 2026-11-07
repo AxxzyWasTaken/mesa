@@ -147,6 +147,7 @@ PUBLIC int
 driCopyContext(struct dri_context *dest, struct dri_context *src, unsigned long mask);
 PUBLIC void
 driDestroyContext(struct dri_context *ctx);
+PUBLIC unsigned driGetContextPriority(struct dri_context *ctx);
 PUBLIC int driBindContext(struct dri_context *ctx, struct dri_drawable *draw, struct dri_drawable *read);
 PUBLIC int driUnbindContext(struct dri_context *ctx);
 

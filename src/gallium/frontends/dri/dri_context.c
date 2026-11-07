@@ -351,3 +351,10 @@ dri_get_current(void)
 }
 
 /* vim: set sw=3 ts=8 sts=3 expandtab: */
+
+/* Zero preserves the historical hint for drivers without effective reporting. */
+unsigned
+driGetContextPriority(struct dri_context *ctx)
+{
+   return ctx->st->pipe->context_priority;
+}

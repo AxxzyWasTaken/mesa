@@ -17,7 +17,7 @@
 static bool
 agx_vdm_decode_is_hal300(enum agx_chip chip)
 {
-   return chip == AGX_CHIP_G17G || chip == AGX_CHIP_G17S ||
+   return agx_chip_hal300_records(chip) || chip == AGX_CHIP_G17S ||
           chip == AGX_CHIP_G17C;
 }
 
@@ -100,7 +100,8 @@ agx_vdm_decode_one(enum agx_chip chip, const void *bytes, size_t available,
       const bool is_indirect_indexed =
          available >= indirect_indexed_length &&
          agx_vdm_index_list_indirect_indexed_unpack(
-            chip, bytes, indirect_indexed_length, &indirect_indexed);
+            agx_vdm_index_list_record_chip(chip), bytes,
+            indirect_indexed_length, &indirect_indexed);
 
       const bool is_tessellation_state =
          available >= AGX_VDM_TESSELLATION_STATE_LENGTH &&
@@ -136,7 +137,8 @@ agx_vdm_decode_one(enum agx_chip chip, const void *bytes, size_t available,
    case 3: {
       const bool hal300 = agx_vdm_decode_is_hal300(chip);
       const size_t indexed_length = hal300 ? 32 : 28;
-      const size_t nonindexed_length = hal300 ? 20 : 16;
+      const size_t nonindexed_length =
+         agx_vdm_index_list_nonindexed_has_tail(chip) ? 20 : 16;
       const size_t indirect_nonindexed_length =
          hal300 ? AGX_VDM_INDEX_LIST_INDIRECT_NONINDEXED_MAX_LENGTH
                 : AGX_VDM_INDEX_LIST_INDIRECT_NONINDEXED_MAX_LENGTH - 4;
@@ -145,16 +147,19 @@ agx_vdm_decode_one(enum agx_chip chip, const void *bytes, size_t available,
       struct agx_vdm_index_list_indirect_nonindexed_info indirect_nonindexed;
       const bool is_indexed =
          available >= indexed_length &&
-         agx_vdm_index_list_direct_indexed_unpack(chip, bytes, indexed_length,
-                                                  &indexed);
+         agx_vdm_index_list_direct_indexed_unpack(
+            agx_vdm_index_list_record_chip(chip), bytes, indexed_length,
+            &indexed);
       const bool is_nonindexed =
          available >= nonindexed_length &&
          agx_vdm_index_list_direct_nonindexed_unpack(
-            chip, bytes, nonindexed_length, &nonindexed);
+            agx_vdm_index_list_record_chip(chip), bytes, nonindexed_length,
+            &nonindexed);
       const bool is_indirect_nonindexed =
          available >= indirect_nonindexed_length &&
          agx_vdm_index_list_indirect_nonindexed_unpack(
-            chip, bytes, indirect_nonindexed_length, &indirect_nonindexed);
+            agx_vdm_index_list_record_chip(chip), bytes,
+            indirect_nonindexed_length, &indirect_nonindexed);
 
       if ((unsigned)is_indexed + (unsigned)is_nonindexed +
              (unsigned)is_indirect_nonindexed !=

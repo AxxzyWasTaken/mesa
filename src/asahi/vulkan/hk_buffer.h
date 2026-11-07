@@ -98,8 +98,20 @@ hk_buffer_addr_range(const struct hk_buffer *buffer, uint64_t offset,
 VkResult hk_reserve_sparse_scratch(struct hk_device *dev, uint64_t size_B);
 void hk_release_sparse_scratch(struct hk_device *dev, uint64_t size_B);
 
+/* On M5, the writable alias of an unbound sparse buffer page is left
+ * unmapped: soft faults read it as zero and drop stores. The shared scratch
+ * page would instead return whatever any other unbound page received. The
+ * read-only alias still maps the zero page. */
+static inline bool
+hk_sparse_buffer_unmapped(const struct agx_device *dev)
+{
+   return agx_chip_g17_m5(dev->chip) && agx_has_soft_fault(dev);
+}
+
 VkResult hk_bind_scratch(struct hk_device *dev, struct agx_va *va,
                          unsigned offs_B, size_t size_B);
+VkResult hk_bind_unbound_sparse_buffer(struct hk_device *dev,
+                                       struct agx_va *va, size_t size_B);
 
 /* Publish a bound/unbound sparse buffer range to physical pointer reads. */
 VkResult hk_update_physical_sparse_map(struct hk_device *dev, uint64_t address,

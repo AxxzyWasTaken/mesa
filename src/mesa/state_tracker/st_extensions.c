@@ -380,8 +380,16 @@ void st_init_limits(struct pipe_screen *screen,
     *
     * It will fail for driver with max 16 per shader texture image
     * units (i.e. freedreno) if we use the GL way for GLES.
+    *
+    * A driver may ask for the same all-stage count on desktop GL, which is
+    * also what this function reported for every driver before the GL/GLES
+    * split. The value is still the sum of real per-stage tables: each stage
+    * binds at most its own MaxTextureImageUnits, and the extra units are API
+    * binding points that the state tracker maps onto those per-stage slots.
     */
-   c->MaxCombinedTextureImageUnits = _mesa_is_api_gles2(api) ?
+   c->MaxCombinedTextureImageUnits =
+      (_mesa_is_api_gles2(api) ||
+       screen->caps.combined_texture_units_all_stages) ?
       vertex_pipeline_max_combined_texture_image_units +
       compute_pipeline_max_combined_texture_image_units :
       MAX2(vertex_pipeline_max_combined_texture_image_units,

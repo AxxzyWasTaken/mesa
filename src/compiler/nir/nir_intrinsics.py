@@ -2542,6 +2542,13 @@ intrinsic("load_image_descriptor_word_agx", [1], 1, [],
           flags=[CAN_ELIMINATE, CAN_REORDER],
           bit_sizes=[32])
 
+# Byte size of a texel in the actual bound Gallium image view (source 0 is
+# the API image index). Lowered from validated software layout metadata,
+# before native descriptor lowering; it is not a hardware descriptor field.
+intrinsic("load_image_block_size_agx", [1], 1, [],
+          flags=[CAN_ELIMINATE, CAN_REORDER],
+          bit_sizes=[32])
+
 # Load descriptor set address
 intrinsic("load_descriptor_set_agx", [], 1, [DESC_SET],
           flags=[CAN_ELIMINATE, CAN_REORDER],

@@ -127,6 +127,17 @@ bool agx3_cf_icmp_imm16_runtime(enum agx_isa_encoding enc,
                                 uint16_t wait_mask,
                                 uint8_t out[AGX3_CF_MAX_LENGTH], uint8_t *len);
 
+/* G18G only: agx3_cf_icmp_imm16_runtime() as the G18G layer emits it on
+ * AGX_ISA_ENCODING_AGX3C (re-encoded as agx3d afterwards). */
+bool
+agx3_cf_icmp_imm16_runtime_g18g(enum agx_isa_encoding enc,
+                                enum agx3_cf_icond cond, unsigned slot,
+                                uint16_t src, uint8_t imm,
+                                struct agx3_cf_source_hints hint,
+                                uint16_t wait_mask,
+                                uint8_t out[AGX3_CF_MAX_LENGTH],
+                                uint8_t *len);
+
 bool agx3_cf_fcmp_reg(enum agx_isa_encoding enc, enum agx3_cf_fcond cond,
                       bool or_nan, unsigned slot, uint16_t src0, uint16_t src1,
                       uint8_t out[AGX3_CF_MAX_LENGTH], uint8_t *len);
@@ -245,6 +256,13 @@ bool agx3_cf_branch(enum agx_isa_encoding enc, bool is_bn,
  * displacement. */
 bool agx3_cf_patch_branch(enum agx_isa_encoding enc, bool is_bn,
                           uint8_t *branch, int64_t displacement);
+
+#define AGX3_CF_BRANCH_LENGTH 10u
+
+bool agx3_cf_icmp_zero16_runtime(enum agx_isa_encoding enc, enum agx3_cf_icond cond,
+                                 unsigned slot, uint16_t src,
+                                 struct agx3_cf_source_hints hint, uint16_t wait_mask,
+                                 uint8_t out[AGX3_CF_MAX_LENGTH], uint8_t *len);
 
 #ifdef __cplusplus
 }

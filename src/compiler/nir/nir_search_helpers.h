@@ -170,6 +170,32 @@ MULTIPLE(16)
 MULTIPLE(32)
 MULTIPLE(64)
 
+/* A constant multiple of test below 2^31, so that it is the same value whether
+ * it is read as signed or as unsigned. */
+#define MULTIPLE_BELOW_2G(test)                                              \
+   static inline bool                                                        \
+      is_unsigned_multiple_of_##test##_below_2g(                             \
+         const nir_search_state *state, const nir_alu_instr *instr,          \
+         unsigned src, unsigned num_components, const uint8_t *swizzle)      \
+   {                                                                         \
+      if (!nir_src_is_const(instr->src[src].src) ||                          \
+          !is_unsigned_multiple_of_##test(state, instr, src, num_components, \
+                                          swizzle))                          \
+         return false;                                                       \
+      for (unsigned i = 0; i < num_components; i++) {                        \
+         if (nir_src_comp_as_uint(instr->src[src].src, swizzle[i]) >=        \
+             0x80000000u)                                                    \
+            return false;                                                    \
+      }                                                                      \
+      return true;                                                           \
+   }
+
+MULTIPLE_BELOW_2G(2)
+MULTIPLE_BELOW_2G(4)
+MULTIPLE_BELOW_2G(8)
+MULTIPLE_BELOW_2G(16)
+MULTIPLE_BELOW_2G(32)
+
 /**
  * x & 1 != 0
  */

@@ -26,6 +26,8 @@ struct agx_vdm_stream_link_core {
    uint8_t length;
 };
 
+bool agx_vdm_stream_link_core_supported(enum agx_chip chip);
+
 bool agx_vdm_stream_link_core_pack(enum agx_chip chip, uint64_t target,
                                    struct agx_vdm_stream_link_core *out);
 

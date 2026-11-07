@@ -100,17 +100,32 @@ struct agx3_iadd_desc {
     *   a - int(short b)       1f 01 56 00 02 00 10 28 17 0d  f39=1 f43=1
     *   int(short a) - b       1f 01 56 00 02 08 00 88 17 07  f24=1 f28=1
     *   16 - int(short b)      1f 01 56 00 02 20 00 08 15 0c  f15=16
-    */
-   bool subtract;
-   /*
+    *
     * AGX3b register slot A only: saturate (f53). With 32-bit operands the
     * slot sign fields select signed saturation, set together:
     *
     *   addsat(int, int)       9f 01 56 00 02 00 10 e8 17 0f  f28 f43 f53
     *   addsat(uint, uint)     9f 01 56 00 02 00 10 e8 17 05  f53
     *   subsat(int, int)       1f 01 56 00 02 00 10 e8 17 0f
+    *
+    * G17G, both slots 32-bit registers, no shift. `subtract` is Apple's
+    * `isub32` (root f45=100 instead of 80): slot B is subtracted. `saturate`
+    * is f54=1 in place of the shift field. With saturation the 32-bit
+    * operands carry their own signedness in f28 (slot A) and f43 (slot B):
+    * `addsat`/`subsat` over int set both, over uint neither, and the plain
+    * `a - b` sets none. Witnessed byte-exactly against applegpu_g17g
+    * (gpu/m5-xfb-alu-reference.metal, -alu2-, -alu3-):
+    *
+    *   subsat(uint)   2f 00 04 1a 25 00 a2 02 18 81 20 00   f45=100 f54=1
+    *   subsat(int)    2f 00 04 1a 25 08 a2 02 18 81 60 00   + f28=1 f43=1
+    *   addsat(uint)   2f 00 04 1a 21 00 a3 02 38 81 20 00   f45=80 f54=1
+    *   addsat(int)    2f 00 04 1a 21 00 a3 02 38 81 e0 00   + f28=1 f43=1
+    *   a - b          2f 00 04 1a 25 00 a2 02 08 81 21 00   f45=100
     */
+   bool subtract;
    bool saturate;
+   bool src_a_sign_extend_32; /* f28 on a 32-bit slot A (saturating only) */
+   bool sign_extend_32;       /* f43 on a 32-bit slot B (saturating only) */
    /* AGX3b register slot A only: operand-cache hints f25 (A) and f40 (B). */
    bool src_a_cache;
    bool src_cache;
@@ -119,6 +134,13 @@ struct agx3_iadd_desc {
 bool agx3_iadd_encode(enum agx_isa_encoding encoding,
                       const struct agx3_iadd_desc *desc,
                       uint8_t out[AGX3_IADD_MAX_LENGTH], uint8_t *len);
+
+/* G18G (M6) compiles as agx3c: the G17G/G18G iadd32/isub32 encoder as
+ * qualified on the M6 (agx3_iadd_core.c). agx3_iadd_encode keeps the
+ * G17G-family (agx3c) admission for every other GPU. */
+bool agx3_iadd_encode_g18g(enum agx_isa_encoding encoding,
+                           const struct agx3_iadd_desc *d,
+                           uint8_t out[AGX3_IADD_MAX_LENGTH], uint8_t *len);
 
 /* Native G17P register minus an 8-bit unsigned immediate. Subtraction is
  * not commuted: the register occupies slot A, immediate slot B. */
@@ -248,6 +270,13 @@ struct agx3_imad_desc {
 bool agx3_imad_encode(enum agx_isa_encoding encoding,
                       const struct agx3_imad_desc *desc,
                       uint8_t out[AGX3_IADD_MAX_LENGTH], uint8_t *len);
+
+/* G18G (M6) compiles as agx3c: the G17G/G18G imadd32/imadd64 encoder as
+ * qualified on the M6 (agx3_iadd_core.c). agx3_imad_encode keeps the
+ * G17G-family (agx3c) admission for every other GPU. */
+bool agx3_imad_encode_g18g(enum agx_isa_encoding encoding,
+                           const struct agx3_imad_desc *d,
+                           uint8_t out[AGX3_IADD_MAX_LENGTH], uint8_t *len);
 
 #ifdef __cplusplus
 }

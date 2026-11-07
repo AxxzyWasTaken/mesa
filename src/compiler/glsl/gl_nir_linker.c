@@ -1553,6 +1553,20 @@ gl_nir_lower_optimize_varyings(const struct gl_constants *consts,
 
    nir_opt_varyings_bulk(shaders, num_shaders, spirv, max_uniform_comps,
                          max_ubos, optimize_varyings_opts, NULL);
+
+   /* A program that is not separable and holds only a pre-rasterization
+    * stage never acquires a fragment consumer: its user varyings feed only
+    * transform feedback, so how they would be interpolated is known
+    * vacuously and every slot is trivially flat. That is the conclusion
+    * nir_opt_varyings_bulk already draws for a multi-stage program that ends
+    * before rasterization; its single-shader path cannot, because it does
+    * not know whether the program is separable. */
+   if (num_shaders == 1 && !prog->SeparateShader &&
+       shaders[0]->info.stage != MESA_SHADER_FRAGMENT) {
+      shaders[0]->info.known_interpolation_qualifiers = true;
+      shaders[0]->info.linear_varyings = 0;
+      shaders[0]->info.perspective_varyings = 0;
+   }
 }
 
 bool

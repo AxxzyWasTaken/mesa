@@ -22,7 +22,8 @@ extern "C" {
 /* This is intentionally the subset whose complete byte geometry is recovered:
  * ordinary non-sparse 2D images in Gen9/10 linear or twiddled/GPU
  * memory, Gen9/10 GPU-tiled compressed 2D images, and Gen9's exact uncompressed
- * tiled 2D-array extension.
+ * tiled 2D-array extension. The dedicated G18G multisample entry points also
+ * encode Gen10 tiled 2D/array targets, including GPU-tiled compression.
  * Gen9's ordinary single-layer packet has no layer-mode bit regardless of
  * allocation padding; the inherited page-aligned-layer input is ignored on
  * scalar pack and canonicalized to false on unpack. Gen10 keeps its existing
@@ -69,6 +70,10 @@ bool agx_pbe_agx3_2d_array_pack(
    uint32_t generation, const struct agx_pbe_agx3_2d_fields *fields,
    uint32_t layers, struct agx_pbe_agx3_descriptor *out);
 
+bool agx_pbe_agx3_3d_pack(
+   uint32_t generation, const struct agx_pbe_agx3_2d_fields *fields,
+   uint32_t depth, struct agx_pbe_agx3_descriptor *out);
+
 /* The layered packets with the native mip extension of
  * agx_pbe_agx3_2d_mip_pack(). Layers or depth, width, height and buffer
  * describe the whole chain; level selects the addressed level. */
@@ -106,11 +111,51 @@ bool agx_pbe_agx3_2d_array_multisample_pack(
    uint32_t layers, uint32_t samples,
    struct agx_pbe_agx3_descriptor *out);
 
+/* G18G multisample colour targets, Gen10 descriptors. The native G18
+ * StateFields geometry: sample selector at word0[59:58], compression at
+ * word0 bit61 and extension at word1 bit63. The scalar packet has no
+ * page-aligned-layer flag. A supplied compression metadata address is
+ * encoded, not derived; storage/layout qualification remains the caller's
+ * responsibility. Gen10 tiled image addresses require 64-byte alignment;
+ * compression metadata requires 16-byte alignment. 2x and 4x only. G18G
+ * callers use these in place of the generic entry points above, whose Gen10
+ * form is the G17G-family (agx3c) one. */
+bool agx_pbe_g18_2d_multisample_pack(
+   const struct agx_pbe_agx3_2d_fields *fields, uint32_t samples,
+   struct agx_pbe_agx3_descriptor *out);
+
+/* The array form keeps the layered geometry with its own sample/compression
+ * placement, including a one-layer array. */
+bool agx_pbe_g18_2d_array_multisample_pack(
+   const struct agx_pbe_agx3_2d_fields *fields, uint32_t layers,
+   uint32_t samples, struct agx_pbe_agx3_descriptor *out);
+
 /* Gen9 native mip extension: the existing descriptor is unchanged for
  * level=0, levels=1. Width/height and buffer describe the complete mip chain. */
 bool agx_pbe_agx3_2d_mip_pack(
    uint32_t generation, const struct agx_pbe_agx3_2d_fields *fields,
    uint32_t level, uint32_t levels, struct agx_pbe_agx3_descriptor *out);
+
+/* G18 StateFields (26A428) ordinary tiled 2D mip chain. G17G is not
+ * admitted by this entry point's evidence. Width/height/buffer describe
+ * the base allocation, not the selected level. */
+bool agx_pbe_g18_2d_mip_pack(
+   const struct agx_pbe_agx3_2d_fields *fields, uint32_t level,
+   uint32_t levels, struct agx_pbe_agx3_descriptor *out);
+
+/* G18 StateFields (26A428), storage-write mode: one-level uncompressed
+ * tiled array (dimension3) or 3D (dimension5). Buffer is already rebased to
+ * the first addressed slice; layers is the remaining layer/depth count. */
+bool agx_pbe_g18_layered_pack(
+   const struct agx_pbe_agx3_2d_fields *fields, uint32_t dimension,
+   uint32_t layers, struct agx_pbe_agx3_descriptor *out);
+
+/* The same storage-write profile with native mip selection. Base allocation
+ * dimensions/address and the independently supplied page flag are preserved. */
+bool agx_pbe_g18_layered_mip_pack(
+   const struct agx_pbe_agx3_2d_fields *fields, uint32_t dimension,
+   uint32_t layers, uint32_t level, uint32_t levels,
+   struct agx_pbe_agx3_descriptor *out);
 
 bool agx_pbe_agx3_2d_unpack(
    uint32_t generation, const void *bytes, size_t size,

@@ -11,8 +11,8 @@ static inline bool
 hk_lower_g17p_sampler_bias(nir_builder *b, nir_tex_instr *tex, void *data)
 {
    (void)data;
-   if (tex->op != nir_texop_txb || tex->is_shadow ||
-       (tex->backend_flags & HK_TEXTURE_FLAG_COMBINED_BIAS))
+   if ((tex->op != nir_texop_txb && tex->op != nir_texop_txl) ||
+       tex->is_shadow || (tex->backend_flags & HK_TEXTURE_FLAG_COMBINED_BIAS))
       return false;
 
    /* The sampler and instruction each truncate to signed 5:6 fixed point.
@@ -24,8 +24,12 @@ hk_lower_g17p_sampler_bias(nir_builder *b, nir_tex_instr *tex, void *data)
                                           nir_type_float32, false, false);
    nir_instr_as_tex(nir_def_instr(bias))->backend_flags |=
       HK_TEXTURE_FLAG_COMBINED_BIAS;
+   /* An explicit LOD takes the sampler's bias too, and the sum has to clamp as
+    * one value: the hardware would clamp a negative LOD before biasing it. */
    nir_src *shader_bias =
-      &tex->src[nir_tex_instr_src_index(tex, nir_tex_src_bias)].src;
+      &tex->src[nir_tex_instr_src_index(tex, tex->op == nir_texop_txl
+                                                ? nir_tex_src_lod
+                                                : nir_tex_src_bias)].src;
    nir_src_rewrite(shader_bias,
                    nir_fadd(b, nir_f2f32(b, shader_bias->ssa),
                             nir_f2f32(b, bias)));

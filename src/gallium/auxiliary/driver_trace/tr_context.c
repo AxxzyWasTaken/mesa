@@ -2543,6 +2543,7 @@ trace_context_create(struct trace_screen *tr_scr,
 
    tr_ctx->base.priv = pipe->priv; /* expose wrapped priv data */
    tr_ctx->base.screen = &tr_scr->base;
+   tr_ctx->base.context_priority = pipe->context_priority;
    tr_ctx->base.stream_uploader = pipe->stream_uploader;
    tr_ctx->base.const_uploader = pipe->const_uploader;
 

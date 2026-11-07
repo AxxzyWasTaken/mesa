@@ -141,6 +141,8 @@ bool agx_ppp_hal200_fragment_ti_resources(
    enum agx_chip chip, uint32_t spill_bytes, uint32_t largest_ipr_bytes,
    struct agx_ppp_hal200_fragment_fields *fields);
 
+bool agx_ppp_hal200_graphics_core_supported(enum agx_chip chip);
+
 bool agx_ppp_hal200_graphics_core_pack(
    enum agx_chip chip, enum agx_ppp_hal200_graphics_bundle bundle,
    const struct agx_ppp_hal200_graphics_fields *fields,

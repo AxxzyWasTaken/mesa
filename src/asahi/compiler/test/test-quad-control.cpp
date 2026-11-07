@@ -52,7 +52,9 @@ TEST(QuadControl, ExecutionModesSurviveInfoRegather)
          agx_shader_part part = {};
          ASSERT_TRUE(agx_compile_shader_nir(b.shader, &key, &part));
          EXPECT_GT(part.info.main_size, 0u);
-         EXPECT_EQ(part.info.needs_quad_derivatives, quad_control && mode != 0);
+         /* RequireFullQuads keeps triangle merging (a merged quad is full);
+          * QuadDerivatives disables it. */
+         EXPECT_EQ(part.info.needs_quad_derivatives, quad_control && (mode & 2));
          EXPECT_EQ(part.info.disable_tri_merging, quad_control && mode != 0);
          free(part.binary);
          ralloc_free(b.shader);
@@ -166,6 +168,36 @@ TEST(QuadControl, G17PDivergentQuadInstructions)
          free(part.binary);
          ralloc_free(b.shader);
       }
+   }
+}
+
+TEST(QuadControl, OnlyDerivativesDisableG17PTriangleMerging)
+{
+   /* A quad broadcast (which spirv_to_nir marks require_full_quads) keeps
+    * merging, so a clipped primitive's pieces stay in whole quads; ddx does
+    * not, because a derivative across a merged seam is meaningless. */
+   for (bool derivative : {false, true}) {
+      SCOPED_TRACE(derivative);
+      nir_builder b = nir_builder_init_simple_shader(
+         MESA_SHADER_FRAGMENT, &agx_nir_options, "quad merge");
+      b.shader->info.fs.require_full_quads = true;
+      nir_def *v = nir_u2f32(&b, nir_load_subgroup_invocation(&b));
+      v = derivative ? nir_ddx(&b, v)
+                     : nir_quad_broadcast(&b, v, nir_imm_int(&b, 1));
+      store_result(&b, nir_f2u32(&b, v));
+      agx_preprocess_nir_g17p(b.shader);
+      agx_shader_key key = {};
+      key.dev.chip = AGX_CHIP_G17P;
+      key.dev.shader_quad_control = true;
+      key.dev.encoding = AGX_ISA_ENCODING_AGX3B;
+      key.no_preamble = true;
+      key.reserved_preamble = 8;
+      key.fs.nr_samples = 1;
+      agx_shader_part part = {};
+      ASSERT_TRUE(agx_compile_shader_nir(b.shader, &key, &part));
+      EXPECT_EQ(part.info.needs_quad_derivatives, derivative);
+      free(part.binary);
+      ralloc_free(b.shader);
    }
 }
 

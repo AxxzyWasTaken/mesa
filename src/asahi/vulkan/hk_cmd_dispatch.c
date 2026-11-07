@@ -15,6 +15,7 @@
 #include "hk_acceleration_structure.h"
 #include "hk_cmd_buffer.h"
 #include "hk_frame_anatomy.h"
+#include "hk_sampler_index.h"
 #include "hk_g17p_patch.h"
 #include "hk_descriptor_set.h"
 #include "hk_device.h"
@@ -23,6 +24,7 @@
 #include "hk_agx3_ioto_program_core.h"
 #include "asahi/compiler/agx3_compute_program.h"
 #include "asahi/compiler/agx3_graphics_program.h"
+#include "asahi/compiler/agx3_transcode.h"
 #include "hk_physical_device.h"
 #include "hk_shader.h"
 #include "libagx_dgc.h"
@@ -590,6 +592,16 @@ hk_cdm_flush(struct hk_device *dev, struct hk_cs *cs, bool memory)
       if (upgrade_strong &&
           (!memory_scope || agx_chip_g17_m5(dev->dev.chip) ||
            cs->current == cs->memory_flush_end))
+         return;
+
+      /* G18G grounds exactly one CDM barrier word, the flag-free 0x60000160
+       * (agx3_cdm_barrier_flags_grounded); every native 26A434 capture holds
+       * only that word (2 occurrences, both launch tails), and flags=5 is
+       * witnessed on G15-G17 only. Every native launch already ends in that
+       * record, so there is nothing to strengthen and no grounded strong record
+       * to append: leave the stream as is. This does not claim write
+       * visibility beyond what the weak tail gives; see the rel16 notes. */
+      if (dev->dev.chip == AGX_CHIP_G18G)
          return;
 
       /* Apple's CommandEncodingNext emitter uses flags=5 for its strong
@@ -2385,6 +2397,10 @@ hk_dispatch_g17p_native(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
                 (const uint8_t *)texture_set->mapped_ptr +
                    binding->sampler_index_offset_B,
                 sizeof(sampler_index));
+         /* G18G publishes AGX2-biased sampler indices (native_sampler_indices
+          * in hk_descriptor_set_layout.c). */
+         if (dev->dev.chip == AGX_CHIP_G18G)
+            sampler_index = hk_sampler_heap_index(false, sampler_index);
          const uint64_t write_control = hk_pool_upload(
             cmd, hk_g17p_native_write_control,
             sizeof(hk_g17p_native_write_control), 32);
@@ -2464,6 +2480,10 @@ hk_dispatch_g17p_native(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
                 (const uint8_t *)set->mapped_ptr +
                    binding->sampler_index_offset_B,
                 sizeof(sampler_index));
+         /* G18G publishes AGX2-biased sampler indices (native_sampler_indices
+          * in hk_descriptor_set_layout.c). */
+         if (dev->dev.chip == AGX_CHIP_G18G)
+            sampler_index = hk_sampler_heap_index(false, sampler_index);
          if (!dev->samplers.table.bo || !dev->samplers.table.bo->va) {
             vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
             return;
@@ -2678,6 +2698,261 @@ hk_dispatch_g17p_native(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
    cs->stats.cmds++;
 }
 
+void
+hk_dispatch_g17g_native(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
+                        struct hk_shader *s, struct agx_grid grid,
+                        struct agx_workgroup local_size)
+{
+   struct hk_device *dev = hk_cmd_buffer_device(cmd);
+   struct hk_linked_shader *linked = s ? s->only_linked : NULL;
+   const bool g18 = dev->dev.chip == AGX_CHIP_G18G;
+   if ((!g18 && dev->dev.chip != AGX_CHIP_G17G) || cs->type != HK_CS_CDM ||
+       !hk_g17p_compute_shader_supported(dev->dev.chip, s, linked,
+                                         AGX3_G17P_MAX_SPILL_B) ||
+       s->info.stage != MESA_SHADER_COMPUTE || agx_is_indirect(grid) ||
+      (!g18 && s->b.info.local_size) || s->b.info.uses_ray_traversal ||
+       (g18 && (s->b.info.scratch_size || linked->b.scratch_size ||
+                s->b.info.agx3_spectpr_scratch_size ||
+                s->b.info.nr_preamble_gprs)) ||
+       s->info.agx3_txf_texture_valid || s->info.agx3_storage_image_valid ||
+       s->info.agx3_sampled_storage_valid || s->info.agx3_indexed_storage_valid ||
+       !local_size.x || !local_size.y || !local_size.z ||
+       (uint64_t)local_size.x * local_size.y * local_size.z > 1024) {
+      mesa_loge("AGX3 native compute: unsupported shader or indirect/shared-memory launch");
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+      return;
+   }
+   if (!grid.count[0] || !grid.count[1] || !grid.count[2])
+      return;
+
+   struct hk_descriptor_state *descriptors = &cmd->state.cs.descriptors;
+   descriptors->root.cs.constant_data_addr = s->data_size
+      ? hk_pool_upload(cmd, s->data_ptr, s->data_size, HK_MIN_UBO_ALIGNMENT) : 0;
+   if (s->data_size && !descriptors->root.cs.constant_data_addr) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+      return;
+   }
+   const uint64_t root = hk_cmd_buffer_upload_root(cmd, VK_PIPELINE_BIND_POINT_COMPUTE);
+   uint64_t texture_pointers = 0;
+   if (s->info.agx3_indexed_sampler_valid) {
+      if (!dev->sampled_images.bo || !dev->sampled_images.bo->va ||
+          !dev->samplers.table.bo || !dev->samplers.table.bo->va) {
+         vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+         return;
+      }
+      const uint64_t pointers[] = {
+         dev->sampled_images.bo->va->addr, dev->samplers.table.bo->va->addr,
+      };
+      texture_pointers = hk_pool_upload(cmd, pointers, sizeof(pointers), 8);
+      hk_cmd_buffer_retain_bo(cmd, dev->sampled_images.bo);
+      hk_cmd_buffer_retain_bo(cmd, dev->samplers.table.bo);
+   }
+   if (!root || (s->info.agx3_indexed_sampler_valid && !texture_pointers)) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+      return;
+   }
+   struct agx3_ioto_uniform_range ranges[HK_G17P_COMPUTE_MAX_RANGES];
+   size_t range_count;
+   if (!hk_g17p_compute_uniform_ranges(dev->dev.chip, cmd, s, root,
+                                       texture_pointers, ranges, &range_count)) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+      return;
+   }
+   /* Pool the Ioto program: the command buffer's USC pool sub-allocates
+    * (bump pointer, no kernel ioctl) instead of creating a BO per dispatch.
+    * The per-dispatch agx_bo_create is the dominant per-op cost (~5ms of
+    * ~10ms per op in the 200-op chain); the pool makes it a pointer bump. */
+   struct agx_ptr program_t = hk_pool_usc_alloc(
+      cmd, AGX3_G17P_GRAPHICS_PROGRAM_MAX_SIZE,
+      AGX_IOTO_PROGRAM_ALIGNMENT);
+   if (!program_t.cpu) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+      return;
+   }
+   const uint64_t shader_va = linked->b.bo->va->addr + linked->b.entry_offset;
+   if (!agx_va_in_usc_window(&dev->dev, program_t.gpu) ||
+       !agx_va_in_usc_window(&dev->dev, shader_va) ||
+       linked->b.size > AGX_USC_WINDOW_SIZE - (shader_va - dev->dev.shader_base)) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+      return;
+   }
+   if (hk_g17p_launch_trace_enabled()) {
+      for (size_t i = 0; i < range_count; ++i)
+         fprintf(stderr, "M5_COMPUTE_UNIFORMS program=%" PRIx64
+                 " start=%u count=%u address=%" PRIx64 "\n",
+                program_t.gpu, ranges[i].start_halfs,
+                 ranges[i].size_halfs, ranges[i].address);
+   }
+
+   const uint32_t threadgroup_bytes =
+      s->b.info.local_size
+         ? MAX2(256u, ALIGN_POT(s->b.info.local_size, 64u))
+         : 0;
+   const struct agx3_g17p_graphics_program_desc desc = {
+      .program_va = program_t.gpu, .shader_va = shader_va,
+      .uniform_ranges = ranges, .uniform_range_count = range_count,
+      .shader_binary_size = linked->b.size, .nr_gprs = linked->b.nr_gprs,
+      .compiler_d_valid = s->b.info.agx3_staging_known,
+      .compiler_d = (uint32_t)s->b.info.agx3_staging_halfs * 2,
+      .threadgroup_memory_size_B = threadgroup_bytes,
+   };
+   struct agx3_g17p_graphics_program program;
+   /* The launch record is G17G's (agx3_g17g_native_compute_program_bind
+    * binds it as G17G); name that chip for the shared native bind. */
+   struct agx3_g17p_native_compute_program_desc launch_desc = {
+      .chip = AGX_CHIP_G17G,
+      .program_va = program_t.gpu, .shader_va = shader_va,
+   };
+   struct agx3_compute_program launch;
+   const bool generated = g18
+      ? agx3_g18g_compute_program_generate(&desc, &program)
+      : agx3_g17g_compute_program_generate(dev->dev.chip, &desc, &program);
+   if (!generated ||
+       !agx3_cdm_direct_template_sources_compute(s->b.info.uses_resource_info_query,
+                                                 false, false, &launch_desc.launch_sources) ||
+       !agx3_g17g_native_compute_program_bind(&launch_desc, &launch)) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+      return;
+   }
+   if (g18) {
+      struct util_dynarray code;
+      util_dynarray_init(&code, NULL);
+      memcpy(util_dynarray_grow_bytes(&code, 1, program.length),
+             program.bytes, program.length);
+      const struct agx3_transcode_ioto ioto = {
+         .api_program = true,
+         .shader_gprs = linked->b.nr_gprs,
+      };
+      const char *why = NULL;
+      unsigned at = 0;
+      const bool ok = agx3_transcode_agx3d_ioto(&code, 0, &ioto, &why, &at) &&
+                      code.size <= sizeof(program.bytes);
+      if (ok) {
+         memcpy(program.bytes, code.data, code.size);
+         program.length = code.size;
+      }
+      util_dynarray_fini(&code);
+      if (!ok) {
+         mesa_loge("G18G compute Ioto not re-encoded: %s at +0x%x",
+                   why ? why : "too long", at);
+         vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+         return;
+      }
+   }
+   memcpy(program_t.cpu, program.bytes, program.length);
+   hk_cmd_buffer_retain_bo(cmd, linked->b.bo);
+   if (s->b.info.rodata.size_16)
+      hk_cmd_buffer_retain_bo(cmd, s->bo);
+
+   /* (rel28b: the native-path homogeneity seal is REVERTED — batching mixed
+ * descriptors is where the 3.4x came from; only the precomp helper is
+ * sealed away now, in hk_dispatch_precomp.) */
+   hk_ensure_cs_has_space(cmd, cs, 0x2000);
+   struct agx3_compute_dispatch_sink sink = {
+      .data = (uint8_t *)cs->current,
+      .capacity = (uint8_t *)cs->end - (uint8_t *)cs->current,
+   };
+   const struct agx3_compute_direct_grid direct = {
+      .source = AGX3_CDM_DIRECT_GRID_GLOBAL_THREADS,
+      .size = {grid.count[0], grid.count[1], grid.count[2]},
+      .local_size = {local_size.x, local_size.y, local_size.z},
+      .dimensions = grid.count[2] != 1 || local_size.z != 1 ? 3
+                  : grid.count[1] != 1 || local_size.y != 1 ? 2 : 1,
+   };
+   /* flags=5 (strong flush) between dependent launches: the weak 0x60000160
+    * tail barrier does not give write visibility on G18G (hk_cdm_cache_flush
+    * notes), and flag-free chained launches hung the CDM (rel24 run 1).
+    * The flags=5 chaining is grounded on hardware (rel24b+), unlike the
+    * standalone flush word in hk_cdm_cache_flush, whose only grounded G18G
+    * encoding is the flag-free tail. */
+   if (!agx3_g17g_native_compute_dispatch_append(&launch, &direct, 5, &sink)) {
+      vk_command_buffer_set_error(&cmd->vk, VK_ERROR_FEATURE_NOT_PRESENT);
+      return;
+   }
+   if (g18) {
+      /* Dependent dispatches share one stream (the strong barrier between
+       * launches orders them) and hk_EndCommandBuffer appends the final
+       * terminate: N dispatches become 1 submit + 1 fence. The stream is
+       * capped at HK_G18_BATCH launches so it stays under the kernel's
+       * g18_compute_stream_max (64 KiB with the G18 admission patch); at
+       * the cap the stream terminates and seals, and the next dispatch
+       * rotates to a fresh stream (dispatch_grid's g18_dispatch_sealed
+       * check). The default 8 is the validated ceiling for real-model
+       * graphs: larger flat grids stall the firmware's multi-launch
+       * completion accounting above 9 launches per stream
+       * (G18_RECOVERY_PB restart loop -> G18_APP_JOB_FAILED EIO), while
+       * small grids survive any batch. Raise the default only after that
+       * stall is root-caused. */
+      /* Clamped to 1400 so the stream stays under the kernel's 64 KiB
+       * g18_compute_stream_max even with an oversized user value
+       * (w7Q PR-10 smaller finding). */
+      const uint32_t batch_limit =
+         MIN2(debug_get_num_option("HK_G18_BATCH", 8), 1400);
+      /* rel31 (w7C's plan rule + w7P's validator semantics): the kernel
+       * sizes the stream's compute plan (pool/SMA/counters) from these
+       * resource words alone, and last-wins under-sizes a stream whose
+       * big launches precede a small last launch (job 131: 1024-thread
+       * launches + the small helper last = small plan = stall). Every
+       * scalar field takes the running max; local dims and local_bytes
+       * come from the launch with the LARGEST x*y*z product (a per-axis
+       * max can exceed the validator's 1024-thread bound, w7P check c). */
+      const uint32_t prod =
+         local_size.x * local_size.y * local_size.z;
+      const uint32_t prev_prod = cs->g18_compute_resources.local_size[0] *
+                                 cs->g18_compute_resources.local_size[1] *
+                                 cs->g18_compute_resources.local_size[2];
+      const uint32_t regs = MAX2(cs->g18_compute_resources.registers_16,
+                                 linked->b.nr_gprs);
+      const uint32_t staging =
+         MAX2(cs->g18_compute_resources.staging_16,
+              s->b.info.agx3_staging_halfs);
+      const uint32_t stride =
+         MAX2(cs->g18_compute_resources.imageblock_stride,
+              s->b.info.imageblock_stride);
+      if (prod >= prev_prod || cs->stats.cmds == 0) {
+         cs->g18_compute_resources = (struct drm_asahi_g18_compute_resources){
+            .version = 1,
+            .flags = 1,
+            .registers_16 = regs,
+            .staging_16 = staging,
+            .imageblock_stride = stride,
+            .local_size = {local_size.x, local_size.y, local_size.z},
+         };
+      } else {
+         cs->g18_compute_resources.registers_16 = regs;
+         cs->g18_compute_resources.staging_16 = staging;
+         cs->g18_compute_resources.imageblock_stride = stride;
+      }
+      /* Launch-count cap only (the rel30 code cap is retired: the gate
+       * showed generation streams never approach the code boundary). */
+      if (cs->stats.cmds + 1 >= batch_limit) {
+         uint8_t terminate[AGX3_CDM_STREAM_TERMINATE_SIZE];
+         if (!agx3_cdm_stream_terminate_pack(dev->dev.chip, terminate) ||
+             sink.capacity - sink.length < sizeof(terminate)) {
+            vk_command_buffer_set_error(&cmd->vk,
+                                        VK_ERROR_FEATURE_NOT_PRESENT);
+            return;
+         }
+         memcpy(sink.data + sink.length, terminate, sizeof(terminate));
+         sink.length += sizeof(terminate);
+         cs->g18_dispatch_sealed = true;
+      }
+   }
+   if (hk_g17p_launch_trace_enabled()) {
+      fprintf(stderr, "%s native compute recorded: program=%" PRIx64
+              " bytes=%u shader=%" PRIx64 " size=%u ranges=%zu grid=%ux%ux%u local=%ux%ux%u\n",
+              agx_chip_name(dev->dev.chip), program_t.gpu,
+              program.length, shader_va, (unsigned)linked->b.size,
+              range_count, grid.count[0], grid.count[1], grid.count[2],
+              local_size.x, local_size.y, local_size.z);
+      hk_g17p_trace_hexdump("AGX3-compute-ioto", program_t.gpu,
+                            program.bytes, program.length);
+      hk_g17p_trace_hexdump("AGX3-compute-stream", cs->addr, sink.data, sink.length);
+   }
+   cs->current = (uint32_t *)((uint8_t *)cs->current + sink.length);
+   cs->stats.cmds++;
+}
+
 static void
 dispatch_grid(struct hk_cmd_buffer *cmd, struct agx_grid grid, bool in_threads)
 {
@@ -2733,6 +3008,11 @@ dispatch_grid(struct hk_cmd_buffer *cmd, struct agx_grid grid, bool in_threads)
       grid.count[2] *= local_size.z;
    }
 
+   if (cs->g18_dispatch_sealed) {
+      cs = hk_cmd_buffer_get_cs(cmd, true);
+      if (!cs)
+         return;
+   }
    hk_dispatch_with_local_size(cmd, cs, s, grid, local_size);
    if (unlikely(hk_cmd_buffer_device(cmd)->frame_anatomy)) {
       hk_frame_anatomy_note_fs(cs, s);

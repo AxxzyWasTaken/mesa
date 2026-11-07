@@ -61,3 +61,8 @@ void
 kopper_destroy_drawable(struct dri_drawable *drawable)
 {
 }
+
+void
+kopper_release_drawable(struct dri_drawable *drawable)
+{
+}

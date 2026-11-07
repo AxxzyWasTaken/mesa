@@ -10,7 +10,7 @@
  *               linear iterator.
  *   at-sample -> itrcoords + f32interp : compute an explicit sample's
  *               coordinate token once, then consume it for each coefficient.
- *   centroid -> itrcoords + f32interp : the same token chain on G17P, with
+ *   centroid -> itrcoords + f32interp : the same token chain, with
  *               ITRCOORDS deriving the centroid from the coverage word.
  *   ldcf     -> ldcfr     : raw <A,B,C> coefficient load.
  *   st_vary  -> uvsw      : unified-vertex-store write of one 32-bit component.
@@ -60,7 +60,7 @@ bool agx3_vary_projective_rhw(enum agx_isa_encoding enc, uint16_t dest,
                              uint16_t coef_index, bool first,
                              uint8_t out[AGX3_VARY_MAX_LENGTH], uint8_t *len);
 
-/* Explicit at-sample interpolation is witnessed on G17P only. ITRCOORDS
+/* Explicit at-sample interpolation is witnessed on G17P/G17G/G18G. ITRCOORDS
  * consumes a 16-bit sample index and produces an even-aligned 32-bit
  * coordinate token. `sample_index_kill` selects the native last-use bit and
  * `wait_mask` waits for asynchronous producers of the sample index. */
@@ -69,7 +69,7 @@ bool agx3_vary_sample_coords(enum agx_isa_encoding enc, uint16_t dest,
                              uint16_t wait_mask,
                              uint8_t out[AGX3_VARY_MAX_LENGTH], uint8_t *len);
 
-/* Centroid interpolation on G17P computes the centroid of the covered samples
+/* Centroid interpolation computes the centroid of the covered samples
  * with ITRCOORDS from the native 16-bit SR39 coverage word, then consumes the
  * token through the same leaves as explicit sample interpolation. */
 bool agx3_vary_centroid_coords(enum agx_isa_encoding enc, uint16_t dest,
@@ -118,8 +118,8 @@ bool agx3_vary_uvsw(enum agx_isa_encoding enc, uint16_t value,
                     uint8_t *len);
 
 /* The same write with the unified-vertex-store index read from the 16-bit
- * register half `index`, as an unlinked vertex shader computes it. AGX3b
- * only. */
+ * register half `index`, as an unlinked vertex shader computes it. Apple's
+ * AGX3b/c/d tables define this operand form; AGX3d accepts at most one wait. */
 bool agx3_vary_uvsw_register_index(enum agx_isa_encoding enc, uint16_t value,
                                    uint16_t index, uint8_t slot,
                                    bool value_kill, uint16_t wait_mask,
@@ -134,6 +134,10 @@ bool agx3_vary_uvsw_uniform_index(enum agx_isa_encoding enc, uint16_t value,
                                   bool value_kill, uint16_t wait_mask,
                                   uint8_t out[AGX3_VARY_MAX_LENGTH],
                                   uint8_t *len);
+
+bool agx3_vary_interp(enum agx_isa_encoding enc, uint16_t dest,
+                      uint16_t coef_index, bool perspective,
+                      uint8_t out[AGX3_VARY_MAX_LENGTH], uint8_t *len);
 
 #ifdef __cplusplus
 }

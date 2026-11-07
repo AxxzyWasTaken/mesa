@@ -27,6 +27,9 @@ extern "C" {
 /* G17G/S native allocation ends at r125; r126/r127 are not GPRs. */
 #define AGX3C_NUM_REGS (252)
 
+/* G18G's ordinary register file ends at r125 (half 251). */
+#define AGX3D_NUM_REGS (252)
+
 /* u0-u255 inclusive, as pairs of 16-bits */
 #define AGX_NUM_UNIFORMS (512)
 
@@ -453,6 +456,8 @@ typedef struct {
    /* Raw subword memory elements use packed payloads (device loads use
     * 32-bit SSA words; byte stores and shared loads use 16-bit halves). */
    bool memory_is_packed : 1;
+   /* AGX3C device memory: signed byte offset added after scaling the index. */
+   int16_t memory_byte_offset;
 
    /* Explicit AGX3 SCS load semantics.  These stay on the internal SCS pseudo
     * and are never inferred from generic memory IR. */
@@ -475,6 +480,10 @@ typedef struct {
 
    /* NIR permits either sign for a zero result of this floating add. */
    bool no_signed_zero : 1;
+
+   /* M5 FCMPSEL: a selected immediate is a minifloat (native fself32), not
+    * raw integer bits. */
+   bool fcmpsel_minifloat_select : 1;
 
    /* Output modifiers */
    bool saturate : 1;
@@ -593,7 +602,15 @@ typedef struct {
    mesa_shader_stage stage;
    struct util_dynarray collect_split_hints;
    bool is_preamble;
+
+   /* G17G second attempt after a packer refusal: keep float constants in
+    * registers instead of inlining them as minifloat immediates. The
+    * register forms of the float ALU, compare-select and compare-branch are
+    * grounded; many immediate shapes are not. */
+   bool agx3_reg_float_consts;
    bool uniforms_written;
+   /* The spiller reloaded a value by repeating its device load */
+   bool spilled_by_load;
    unsigned scratch_size_B;
    /* The input mask/compact ranks are frozen before native import selection.
     * Later DCE may remove a read without changing this external interface. */
@@ -703,6 +720,10 @@ typedef struct {
    bool agx3_staging_known;
    bool agx3_fltnorm_start;
    bool agx3_mrt_tile_ops_ordered;
+   /* The packer emitted this fragment's tile accesses through the native1130
+    * mixed-format protocol, inside its 0x200 entry and final release (run
+    * 1139); its reads then take the long LLDCol form. */
+   bool agx3_g18_mixed_protocol;
    struct agx3_colour_link_info agx3_colour_link;
 
    /* Promoted constants. These will be appended to the binary at the end. */
@@ -1212,6 +1233,9 @@ bool agx3_lower_scalar_cube_coordinates(agx_context *ctx);
 bool agx3_split_texture_coordinates(agx_context *ctx);
 bool agx3_reserve_cube_scratch(agx_context *ctx);
 void agx_lower_uniform_sources(agx_context *ctx);
+void agx_lower_agx3_fma_sources(agx_context *ctx);
+void agx_lower_agx3_immediates(agx_context *ctx);
+void agx_materialize_agx3_cf_constants(agx_context *ctx);
 void agx_opt_cse(agx_context *ctx);
 bool agx_opt_collect_split(agx_context *ctx);
 void agx_opt_cse_pressure(agx_context *ctx);
@@ -1416,7 +1440,8 @@ bool agx_nir_coalesce_preamble_half_exports(nir_shader *s, unsigned reserved,
 
 bool agx_nir_place_preamble_handles_low(nir_shader *s, unsigned reserved,
                                          unsigned exports_end,
-                                         unsigned *allocated);
+                                         unsigned *allocated,
+                                        bool load_bases);
 agx_block *agx_reconverged_mrt_tail(agx_context *ctx);
 bool agx_nir_lower_load_mask(nir_shader *shader);
 bool agx_nir_lower_ubo(nir_shader *shader);
@@ -1425,6 +1450,7 @@ bool agx_nir_lower_frag_sidefx(nir_shader *s, bool g17p);
 void agx_lower_agx3_fma_sources(agx_context *ctx);
 void agx_materialize_agx3_alu_constants(agx_context *ctx);
 void agx_lower_agx3_mixed_width_unary(agx_context *ctx);
+bool agx_lower_g17g_retry_float_operands(agx_context *ctx);
 
 struct agx_cycle_estimate {
    /* ALU throughput */
@@ -1444,6 +1470,14 @@ struct agx_cycle_estimate agx_estimate_cycles(agx_context *ctx);
 bool agx_is_alu(const agx_instr *I);
 
 extern int agx_compiler_debug;
+
+bool agx_instrs_equal_for_cse(const agx_instr *i1, const agx_instr *i2);
+
+bool agx3_sink_vertex_outputs(agx_context *ctx);
+
+bool agx3_coalesce_uniform_half_stores(agx_context *ctx);
+
+bool agx_lower_agx3_device_atomic_sources(agx_context *ctx);
 
 #ifdef __cplusplus
 } /* extern C */

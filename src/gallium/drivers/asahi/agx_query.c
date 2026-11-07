@@ -145,6 +145,10 @@ agx_get_occlusion_heap(struct agx_batch *batch)
 static struct pipe_query *
 agx_create_query(struct pipe_context *ctx, unsigned query_type, unsigned index)
 {
+   if ((query_type == PIPE_QUERY_TIMESTAMP && !ctx->screen->caps.query_timestamp) ||
+       (query_type == PIPE_QUERY_TIME_ELAPSED && !ctx->screen->caps.query_time_elapsed))
+      return NULL;
+
    struct agx_query *query = calloc(1, sizeof(struct agx_query));
 
    query->type = query_type;

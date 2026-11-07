@@ -1298,6 +1298,12 @@ enum gl_access_qualifier
     * is valid for image views but not for linear buffer-view descriptors.
     */
    ACCESS_BUFFER_AGX = (1 << 23),
+
+   /**
+    * On Asahi, this load reads a valid buffer descriptor: its vec4 is the
+    * address and the bound size in bytes, whatever path the program takes.
+    */
+   ACCESS_BUFFER_DESCRIPTOR_AGX = (1 << 24),
 };
 
 enum gl_tess_spacing

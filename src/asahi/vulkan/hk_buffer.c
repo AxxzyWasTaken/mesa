@@ -80,6 +80,11 @@ hk_get_buffer_alignment(const struct hk_physical_device *pdev,
                        VK_BUFFER_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT))
       alignment = MAX2(alignment, 16384);
 
+   /* D3D12 heaps and tiles sit on 64 KiB boundaries, and vkd3d-proton backs
+    * its heaps with sparse-capable buffers. */
+   if (create_flags & VK_BUFFER_CREATE_SPARSE_BINDING_BIT)
+      alignment = MAX2(alignment, 64 * 1024);
+
    return alignment;
 }
 
@@ -133,7 +138,7 @@ hk_bind_scratch(struct hk_device *dev, struct agx_va *va, unsigned offset_B,
    /* The kernel refuses a fill it cannot back (ENOMEM; on M5 also its
     * hypervisor page-table budget): that is device memory exhaustion. */
    /* Map read-write scratch to the primary (bottom half) VA range */
-   int ret = agx_bo_bind(&dev->dev, dev->dev.scratch_bo, addr, size_B, 0,
+   int ret = agx_bo_bind(&dev->dev, dev->sparse_fill, addr, size_B, 0,
                          flags | DRM_ASAHI_BIND_WRITE);
    if (ret)
       return errno == ENOMEM ? VK_ERROR_OUT_OF_DEVICE_MEMORY : VK_ERROR_UNKNOWN;
@@ -141,6 +146,22 @@ hk_bind_scratch(struct hk_device *dev, struct agx_va *va, unsigned offset_B,
    /* Map read-only scratch to the secondary (top half) VA range */
    ret = agx_bo_bind(&dev->dev, dev->dev.zero_bo,
                      addr + dev->dev.sparse_ro_offset, size_B, 0, flags);
+   if (ret)
+      return errno == ENOMEM ? VK_ERROR_OUT_OF_DEVICE_MEMORY : VK_ERROR_UNKNOWN;
+
+   return VK_SUCCESS;
+}
+
+VkResult
+hk_bind_unbound_sparse_buffer(struct hk_device *dev, struct agx_va *va,
+                              size_t size_B)
+{
+   if (!hk_sparse_buffer_unmapped(&dev->dev))
+      return hk_bind_scratch(dev, va, 0, size_B);
+
+   int ret = agx_bo_bind(&dev->dev, dev->dev.zero_bo,
+                         va->addr + dev->dev.sparse_ro_offset, size_B, 0,
+                         DRM_ASAHI_BIND_READ | agx_fill_bind_flags(&dev->dev));
    if (ret)
       return errno == ENOMEM ? VK_ERROR_OUT_OF_DEVICE_MEMORY : VK_ERROR_UNKNOWN;
 
@@ -242,7 +263,7 @@ hk_CreateBuffer(VkDevice device, const VkBufferCreateInfo *pCreateInfo,
          }
          buffer->sparse_scratch_B =
             agx_chip_g17_m5(dev->dev.chip) ? vma_size_B : 0;
-         result = hk_bind_scratch(dev, buffer->va, 0, vma_size_B);
+         result = hk_bind_unbound_sparse_buffer(dev, buffer->va, vma_size_B);
          if (result != VK_SUCCESS) {
             hk_release_sparse_scratch(dev, buffer->sparse_scratch_B);
             agx_va_free(&dev->dev, buffer->va, true);

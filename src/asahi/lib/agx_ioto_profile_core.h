@@ -30,6 +30,8 @@ struct agx_ioto_profile_control {
    uint16_t payload1;
 };
 
+bool agx_ioto_profile_control_supported(enum agx_chip chip);
+
 size_t agx_ioto_profile_control_size(enum agx_chip chip);
 
 bool

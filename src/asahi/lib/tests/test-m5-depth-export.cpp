@@ -14,6 +14,7 @@
  *    per-sample blend.
  */
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <stdio.h>
 #include <string>
 #include <vector>
@@ -402,5 +403,66 @@ TEST_F(M5DepthExport, BlendedDepthWritesPrecedeTheBlend)
          free(part.binary);
          ralloc_free(s);
       }
+   }
+}
+
+TEST_F(M5DepthExport, UniformBlendPublishesCompletePixelProtocol)
+{
+   epilog_shape shape = {AGX_CHIP_G17S, 1, false, false, false};
+   shape.blend = true;
+   nir_shader *s = build_epilog(shape);
+   agx_preprocess_nir(s);
+   agx_shader_key key = {};
+   key.dev.encoding = AGX_ISA_ENCODING_AGX3C;
+   key.dev.chip = AGX_CHIP_G17S;
+   key.no_preamble = true;
+   key.m5_uniform_blend = true;
+   key.fs.nr_samples = 1;
+   BITSET_SET(key.g17p_tile_partitions, 0);
+   agx_shader_part part = {};
+   ASSERT_TRUE(agx_compile_shader_nir(s, &key, &part))
+      << agx_last_compile_refusal();
+   EXPECT_TRUE(part.info.agx3_colour_link.entry_emitted);
+   EXPECT_TRUE(part.info.agx3_colour_link.rt_query_wait_unsupported);
+   EXPECT_FALSE(part.info.agx3_colour_link.rt_query_write_acquired);
+   EXPECT_EQ(part.info.agx3_colour_link.colour_classes, 1u);
+   const uint8_t entry[] = {0x07, 0x30, 0x00, 0x05, 0x00, 0x00};
+   const uint8_t release[] = {0x67, 0x10, 0x00, 0x04, 0x00, 0x00};
+   const uint8_t *begin = (uint8_t *)part.binary + part.info.main_offset;
+   const uint8_t *end = begin + part.info.main_size;
+   auto first = std::search(begin, end, std::begin(entry), std::end(entry));
+   auto last = std::search(begin, end, std::begin(release), std::end(release));
+   EXPECT_NE(first, end);
+   EXPECT_NE(last, end);
+   EXPECT_LT(first, last);
+   auto ops = mnemonics(part);
+   EXPECT_EQ(count_of(ops, "lldcol"), 1u);
+   EXPECT_EQ(count_of(ops, "lstcol"), 1u);
+   free(part.binary);
+   ralloc_free(s);
+}
+
+TEST_F(M5DepthExport, UniformBlendRejectsOtherTransactions)
+{
+   for (unsigned test = 0; test < 4; ++test) {
+      SCOPED_TRACE(test);
+      epilog_shape shape = {AGX_CHIP_G17S, test == 0 ? 2u : 1u,
+                            test == 1, false, false};
+      shape.blend = true;
+      nir_shader *s = build_epilog(shape);
+      agx_preprocess_nir(s);
+      agx_shader_key key = {};
+      key.dev.encoding = AGX_ISA_ENCODING_AGX3C;
+      key.dev.chip = AGX_CHIP_G17S;
+      key.no_preamble = true;
+      key.m5_uniform_blend = true;
+      key.fs.nr_samples = shape.samples;
+      key.secondary = test == 2;
+      key.no_stop = test == 3;
+      BITSET_SET(key.g17p_tile_partitions, 0);
+      agx_shader_part part = {};
+      EXPECT_FALSE(agx_compile_shader_nir(s, &key, &part));
+      free(part.binary);
+      ralloc_free(s);
    }
 }

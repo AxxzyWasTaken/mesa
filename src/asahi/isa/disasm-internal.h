@@ -37,19 +37,25 @@ bits(BITSET_WORD *word, unsigned start, unsigned size, unsigned shift)
 
 typedef void (*disasm_instr)(struct disasm_ctx *ctx, BITSET_WORD *code);
 
+/* Words of instruction a decoder sees. The longest encodings are 24 bytes --
+ * AGX3d's smp, msg, nop and brk forms, which common G18G code uses -- i.e.
+ * 192 bits = 6 words (AGX3c tops out at 22 bytes, AGX3b at 20). Every array
+ * holding an instruction or a per-form mask must be this wide: at 5 words
+ * BITSET_FOREACH_SET over n * 8 bits and the print callbacks for fields above
+ * bit 159 read one word past the end, and bytes 20-23 were never matched.
+ * gen-disasm.py emits mask/exact/known rows with this many words; brace-
+ * initialised rows zero-fill any word it trims. */
+#define AGX_DISASM_WORDS 6
+
 struct disasm_spec {
    const char *display;
    disasm_instr disassemble;
    unsigned length_bit;
    unsigned length_short;
    unsigned length_long;
-   /* AGX3 instructions reach 20 bytes, i.e. 160 bits = 5 words. These were
-    * 4 words, so every field of a 20-byte instruction living above bit 127
-    * was matched and printed out of bounds. Brace-initialised table rows
-    * zero-fill the added word. */
-   BITSET_WORD mask[5];
-   BITSET_WORD exact[5];
-   BITSET_WORD known[5];
+   BITSET_WORD mask[AGX_DISASM_WORDS];
+   BITSET_WORD exact[AGX_DISASM_WORDS];
+   BITSET_WORD known[AGX_DISASM_WORDS];
 };
 
 static void
@@ -194,22 +200,57 @@ print_modifier(struct disasm_ctx *ctx, const char *display, unsigned value)
    }
 }
 
+/* The length and display name of the instruction at code, by exactly the
+ * matching rule _disassemble_instr uses, without printing. -1 if no form
+ * matches within `available` bytes. The display name may carry trailing
+ * padding spaces. */
+static signed
+_instr_length(const uint8_t *code, struct disasm_spec *specs,
+              unsigned nr_specs, size_t available, const char **display)
+{
+   BITSET_WORD tmp[AGX_DISASM_WORDS] = {0};
+   memcpy(tmp, code, MIN2(available, sizeof(tmp)));
+
+   for (unsigned i = 0; i < nr_specs; ++i) {
+      const struct disasm_spec *spec = &specs[i];
+      const unsigned n = BITSET_TEST(tmp, spec->length_bit) ? spec->length_long
+                                                            : spec->length_short;
+      if (n > available)
+         continue;
+
+      bool match = true;
+      for (unsigned w = 0; w < AGX_DISASM_WORDS && match; ++w) {
+         BITSET_WORD masked = tmp[w];
+         const unsigned base = w * 4;
+         if (base >= n)
+            masked = 0;
+         else if (n - base < 4)
+            masked &= (UINT32_C(1) << ((n - base) * 8)) - 1;
+         match = (masked & spec->mask[w]) == spec->exact[w];
+      }
+      if (match) {
+         if (display)
+            *display = spec->display;
+         return n;
+      }
+   }
+   return -1;
+}
+
 static signed
 _disassemble_instr(BITSET_WORD *code, FILE *fp, struct disasm_spec *specs,
                    unsigned nr_specs, size_t available, unsigned offset,
                    bool verbose)
 {
-   /* 5 words: a 20-byte instruction is 160 bits. At 4 words the print
-    * callbacks for smp_ep4 and nop_ep9 read masked[4], one past the end of
-    * the array, which is why decoding a 20-byte smp was non-deterministic. */
-   BITSET_WORD tmp[5] = {0};
+   /* AGX_DISASM_WORDS covers the longest (24-byte) instruction. */
+   BITSET_WORD tmp[AGX_DISASM_WORDS] = {0};
    size_t copy_size = MIN2(available, sizeof(tmp));
 
    memcpy(tmp, code, copy_size);
    struct disasm_spec *spec = NULL;
    unsigned n = 0;
    bool match = false;
-   BITSET_WORD masked[5] = {0};
+   BITSET_WORD masked[AGX_DISASM_WORDS] = {0};
 
    for (unsigned i = 0; i < nr_specs; ++i) {
       spec = &specs[i];
@@ -253,7 +294,7 @@ _disassemble_instr(BITSET_WORD *code, FILE *fp, struct disasm_spec *specs,
    struct disasm_ctx ctx = {.fp = fp};
 
    if (match) {
-      BITSET_WORD unknown[5];
+      BITSET_WORD unknown[AGX_DISASM_WORDS];
       __bitset_andnot(unknown, masked, spec->known, ARRAY_SIZE(masked));
       int i;
       BITSET_FOREACH_SET(i, unknown, n * 8) {
