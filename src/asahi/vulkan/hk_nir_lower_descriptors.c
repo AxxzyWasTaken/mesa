@@ -6,6 +6,8 @@
  */
 #include "pipe/p_defines.h"
 #include "util/u_debug.h"
+#include "util/set.h"
+#include "util/u_dynarray.h"
 #include "vulkan/vulkan_core.h"
 #include "agx_abi.h"
 #include "agx_nir.h"
@@ -14,6 +16,7 @@
 #include "hk_cmd_buffer.h"
 #include "hk_descriptor_set.h"
 #include "hk_descriptor_set_layout.h"
+#include "hk_sampler.h"
 #include "hk_native_descriptor.h"
 #include "hk_shader.h"
 #include "hk_nir_sampler_bias.h"
@@ -33,6 +36,12 @@ struct lower_descriptors_ctx {
 
    bool clamp_desc_array_bounds;
    bool sparse_buffer_residency;
+   /* Unbound pages are unmapped and soft faults read them as zero, so only
+    * stores and atomics consult the residency map. */
+   bool sparse_soft_unmapped;
+   /* With sparse_soft_unmapped: the stores whose binding the shader also
+    * reads. */
+   struct set *sparse_guarded_stores;
    nir_address_format ubo_addr_format;
    nir_address_format ssbo_addr_format;
    uint64_t sparse_ro_offset;
@@ -40,6 +49,7 @@ struct lower_descriptors_ctx {
    bool scaled_sampling;
    /* Whether the hardware sampler word applies the API LOD bias. */
    bool sampler_has_lod_bias;
+   bool d3d_nearest_mip;
    mesa_shader_stage stage;
 };
 
@@ -162,9 +172,14 @@ load_descriptor(nir_builder *b, unsigned num_components, unsigned bit_size,
 {
    const struct hk_descriptor_set_binding_layout *binding_layout =
       get_binding_layout(set, binding, ctx);
+   /* A mutable descriptor read as a storage buffer holds the same record as a
+    * storage buffer descriptor; past it are the bytes of whatever it held
+    * before. */
    const bool map_address = storage_address_has_map(ctx) &&
       (binding_layout->type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ||
-       binding_layout->type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC);
+       binding_layout->type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC ||
+       (binding_layout->type == VK_DESCRIPTOR_TYPE_MUTABLE_EXT &&
+        num_components == 5));
    const unsigned load_components = map_address ? 4 : num_components;
 
    if (ctx->clamp_desc_array_bounds)
@@ -245,6 +260,10 @@ load_descriptor(nir_builder *b, unsigned num_components, unsigned bit_size,
          .align_mul = desc_align_mul, .align_offset = desc_align_offset,
          .access = ACCESS_CAN_SPECULATE |
                    (always_valid ? ACCESS_BUFFER_DESCRIPTOR_AGX : 0));
+
+      if (binding_layout->type == VK_DESCRIPTOR_TYPE_MUTABLE_EXT &&
+          map_address)
+         return storage_address(b, desc, ctx);
 
       if (binding_layout->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
           binding_layout->type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
@@ -961,6 +980,13 @@ lower_compute_lod_query(nir_builder *b, nir_tex_instr *tex,
    nir_def *last = nir_i2f32(b, nir_iadd_imm(b, levels, -1));
    level = nir_fclamp(b, level, nir_imm_float(b, 0.0), last);
 
+   /* The nearest-mip rounding bias picks the level but is not API bias. */
+   if (ctx->d3d_nearest_mip) {
+      lambda = nir_bcsel(b, nir_ieq_imm(b, mip_filter, AGX_MIP_FILTER_NEAREST),
+                         nir_fadd_imm(b, lambda, -HK_D3D_NEAREST_MIP_BIAS),
+                         lambda);
+   }
+
    nir_def *result = nir_vec2(b, level, lambda);
    if (tex->def.bit_size != 32)
       result = nir_f2fN(b, result, tex->def.bit_size);
@@ -1180,6 +1206,30 @@ lower_tex(nir_builder *b, nir_tex_instr *tex,
          }
          border = nir_vec(b, channels, 4);
       }
+      /* See hk_border_swizzle_word(). A combined image sampler applied the
+       * mapping when it was written. */
+      if (ctx->descriptor_generation == 9 && texture != sampler) {
+         nir_def *word = load_resource_deref_desc(
+            b, 1, 32, nir_src_as_deref(nir_src_for_ssa(texture)),
+            plane_offset_B + native.texture + 32 +
+               offsetof(struct hk_sampled_image_descriptor_sw, border), ctx);
+         nir_def *known = nir_ine_imm(b, nir_iand_imm(b, word, BITFIELD_BIT(31)), 0);
+         nir_def *one = T == nir_type_float ? nir_imm_float(b, 1.0f)
+                                            : nir_imm_int(b, 1);
+         nir_def *channels[4];
+         for (unsigned c = 0; c < 4; ++c) {
+            nir_def *code = nir_iand_imm(b, nir_ushr_imm(b, word, 3 * c), 7);
+            nir_def *value = nir_bcsel(b, nir_ieq_imm(b, code, 5), one,
+                                       nir_imm_int(b, 0));
+            for (unsigned i = 0; i < 4; ++i) {
+               value = nir_bcsel(b, nir_ieq_imm(b, code, i),
+                                 nir_channel(b, border, i), value);
+            }
+            channels[c] = nir_bcsel(b, known, value, nir_channel(b, border, c));
+         }
+         border = nir_vec(b, channels, 4);
+      }
+
       border = nir_convert_to_bit_size(b, border, T, tex->def.bit_size);
 
       nir_def_replace(&tex->def, border);
@@ -1456,12 +1506,109 @@ is_buffer_deref_atomic(nir_intrinsic_op op)
           op == nir_intrinsic_deref_atomic_swap;
 }
 
+/* The (set, binding) of a storage-buffer deref before descriptor lowering,
+ * or -1 if it cannot be identified. */
+static int64_t
+ssbo_deref_binding(nir_deref_instr *deref)
+{
+   while (deref->deref_type != nir_deref_type_cast) {
+      deref = nir_deref_instr_parent(deref);
+      if (!deref)
+         return -1;
+   }
+
+   nir_intrinsic_instr *desc = nir_src_as_intrinsic(deref->parent);
+   if (!desc || desc->intrinsic != nir_intrinsic_load_vulkan_descriptor)
+      return -1;
+
+   nir_intrinsic_instr *index = nir_src_as_intrinsic(desc->src[0]);
+   while (index && index->intrinsic == nir_intrinsic_vulkan_resource_reindex)
+      index = nir_src_as_intrinsic(index->src[0]);
+   if (!index || index->intrinsic != nir_intrinsic_vulkan_resource_index)
+      return -1;
+
+   return ((int64_t)nir_intrinsic_desc_set(index) << 32) |
+          nir_intrinsic_binding(index);
+}
+
+static bool
+binding_in(const struct util_dynarray *bindings, int64_t binding)
+{
+   util_dynarray_foreach(bindings, int64_t, b) {
+      if (*b == binding)
+         return true;
+   }
+   return false;
+}
+
+/* A store dropped by an unmapped page stays visible in the cache to later
+ * reads of the same address, so a store needs a residency guard when the
+ * shader can read its binding back. Collect those stores before descriptor
+ * lowering hides the binding. */
+static void
+collect_sparse_guarded_stores(nir_shader *nir, struct set *stores)
+{
+   struct util_dynarray read = UTIL_DYNARRAY_INIT;
+   bool read_unknown = false;
+
+   for (unsigned pass = 0; pass < 2; ++pass) {
+      nir_foreach_function_impl(impl, nir) {
+         nir_foreach_block(block, impl) {
+            nir_foreach_instr(instr, block) {
+               if (instr->type != nir_instr_type_intrinsic)
+                  continue;
+
+               nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+               const bool load =
+                  intr->intrinsic == nir_intrinsic_load_deref ||
+                  intr->intrinsic == nir_intrinsic_load_deref_block_intel ||
+                  intr->intrinsic == nir_intrinsic_deref_atomic ||
+                  intr->intrinsic == nir_intrinsic_deref_atomic_swap;
+               const bool store =
+                  intr->intrinsic == nir_intrinsic_store_deref ||
+                  intr->intrinsic == nir_intrinsic_store_deref_block_intel;
+               if (!load && !store)
+                  continue;
+
+               nir_deref_instr *deref = nir_src_as_deref(intr->src[0]);
+               if (!deref || !(deref->modes & nir_var_mem_ssbo))
+                  continue;
+
+               const int64_t binding = ssbo_deref_binding(deref);
+               if (pass == 0 && load) {
+                  if (binding < 0)
+                     read_unknown = true;
+                  else if (!binding_in(&read, binding))
+                     util_dynarray_append(&read, binding);
+               } else if (pass == 1 && store &&
+                          (read_unknown || binding < 0 ||
+                           binding_in(&read, binding))) {
+                  _mesa_set_add(stores, intr);
+               }
+            }
+         }
+      }
+   }
+
+   util_dynarray_fini(&read);
+}
+
 static bool
 lower_sparse_buffer_deref(nir_builder *b, nir_intrinsic_instr *intr,
                           void *_data)
 {
    const struct lower_descriptors_ctx *ctx = _data;
    if (!is_buffer_deref_access(intr->intrinsic))
+      return false;
+
+   const bool is_load = intr->intrinsic == nir_intrinsic_load_deref ||
+                        intr->intrinsic == nir_intrinsic_load_deref_block_intel;
+   const bool is_store =
+      intr->intrinsic == nir_intrinsic_store_deref ||
+      intr->intrinsic == nir_intrinsic_store_deref_block_intel;
+   if (ctx->sparse_soft_unmapped &&
+       (is_load ||
+        (is_store && !_mesa_set_search(ctx->sparse_guarded_stores, intr))))
       return false;
 
    nir_deref_instr *leaf = nir_src_as_deref(intr->src[0]);
@@ -1484,9 +1631,8 @@ lower_sparse_buffer_deref(nir_builder *b, nir_intrinsic_instr *intr,
    nir_def *base = nir_pack_64_2x32(b, nir_trim_vector(b, addr, 2));
    nir_def *resident = NULL;
 
-   if (intr->intrinsic == nir_intrinsic_load_deref ||
-       intr->intrinsic == nir_intrinsic_load_deref_block_intel ||
-       is_buffer_deref_atomic(intr->intrinsic)) {
+   if (is_load || is_buffer_deref_atomic(intr->intrinsic) ||
+       (is_store && ctx->sparse_soft_unmapped)) {
       static_assert(AIL_PAGESIZE == (1u << 14), "update shader lookup");
 
       nir_def *map_page = nir_channel(b, addr, storage_address_has_map(ctx) ? 4 : 3);
@@ -1548,7 +1694,7 @@ lower_sparse_buffer_deref(nir_builder *b, nir_intrinsic_instr *intr,
          b, nir_inot(b, has_map),
          nir_iand(b, page_in_range, nir_ine_imm(b, resident_bit, 0)));
 
-      if (!is_buffer_deref_atomic(intr->intrinsic)) {
+      if (is_load) {
          nir_def *zero_base = nir_ior_imm(b, base, ctx->sparse_ro_offset);
          base = nir_bcsel(b, resident, base, zero_base);
       }
@@ -1583,6 +1729,13 @@ lower_sparse_buffer_deref(nir_builder *b, nir_intrinsic_instr *intr,
 
    nir_src_rewrite(&intr->src[0], &lowered->def);
    nir_deref_path_finish(&path);
+
+   if (is_store && resident) {
+      nir_if *nif = nir_push_if(b, resident);
+      nir_instr_remove(&intr->instr);
+      nir_builder_instr_insert(b, &intr->instr);
+      nir_pop_if(b, nif);
+   }
 
    if (is_buffer_deref_atomic(intr->intrinsic)) {
       assert(resident != NULL);
@@ -1622,14 +1775,17 @@ hk_nir_lower_descriptors(nir_shader *nir,
                          uint32_t set_layout_count,
                          struct vk_descriptor_set_layout *const *set_layouts,
                          bool sparse_buffer_residency,
+                         bool sparse_soft_unmapped,
                          uint64_t sparse_ro_offset, bool scaled_sampling,
-                         bool sampler_has_lod_bias)
+                         bool sampler_has_lod_bias, bool d3d_nearest_mip)
 {
    struct lower_descriptors_ctx ctx = {
       .stage = nir->info.stage,
       .scaled_sampling = scaled_sampling,
       .sampler_has_lod_bias = sampler_has_lod_bias,
+      .d3d_nearest_mip = d3d_nearest_mip,
       .sparse_buffer_residency = sparse_buffer_residency,
+      .sparse_soft_unmapped = sparse_soft_unmapped,
       .sparse_ro_offset = sparse_ro_offset,
       .clamp_desc_array_bounds =
          rs->storage_buffers !=
@@ -1670,6 +1826,21 @@ hk_nir_lower_descriptors(nir_shader *nir,
       ctx.descriptor_generation == 9 &&
       debug_get_bool_option("ASAHI_G17P_R32_3D_ADDRESS_DIAGNOSTIC", false)
          ? nir_metadata_none : nir_metadata_control_flow;
+   const bool lower_sparse =
+      ctx.sparse_buffer_residency &&
+      (ctx.descriptor_generation == 9 || ctx.descriptor_generation == 10);
+   bool pass_sparse_opt = false;
+   if (lower_sparse && ctx.sparse_soft_unmapped) {
+      /* Loads that only feed a partial store back, and dead loads, must not
+       * make their binding look read. */
+      pass_sparse_opt |= nir_opt_copy_prop_vars(nir);
+      pass_sparse_opt |= nir_opt_dead_write_vars(nir);
+      pass_sparse_opt |= nir_opt_copy_prop(nir);
+      pass_sparse_opt |= nir_opt_dce(nir);
+      ctx.sparse_guarded_stores = _mesa_pointer_set_create(NULL);
+      collect_sparse_guarded_stores(nir, ctx.sparse_guarded_stores);
+   }
+
    bool pass_lower_descriptors = nir_shader_instructions_pass(
       nir, try_lower_descriptors_instr, preserved, &ctx);
 
@@ -1677,11 +1848,13 @@ hk_nir_lower_descriptors(nir_shader *nir,
       nir, lower_ssbo_descriptor, nir_metadata_control_flow, &ctx);
 
    bool pass_sparse_buffers = false;
-   if (ctx.sparse_buffer_residency &&
-       (ctx.descriptor_generation == 9 || ctx.descriptor_generation == 10)) {
+   if (lower_sparse) {
       pass_sparse_buffers = nir_shader_intrinsics_pass(
          nir, lower_sparse_buffer_deref, nir_metadata_none, &ctx);
    }
+   if (ctx.sparse_guarded_stores)
+      _mesa_set_destroy(ctx.sparse_guarded_stores, NULL);
 
-   return pass_lower_descriptors || pass_lower_ssbo || pass_sparse_buffers;
+   return pass_sparse_opt || pass_lower_descriptors || pass_lower_ssbo ||
+          pass_sparse_buffers;
 }

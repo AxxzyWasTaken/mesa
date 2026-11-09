@@ -13,16 +13,29 @@
  * also ended in VK_ERROR_FEATURE_NOT_PRESENT: `... load a2c` reproduces that.
  *
  * Pass 1 clears each attachment (loadOp CLEAR, storeOp STORE). Pass 2 reloads
- * them (loadOp LOAD), writes the left half with vkCmdClearAttachments or a
+ * them (loadOp LOAD), writes a band with vkCmdClearAttachments or a
  * pipeline draw (opaque colours, optionally with alpha-to-coverage) and
  * resolves them. Each resolved image must equal a single-sample reference
- * given the same colours.
+ * given the same colours. `none` writes nothing in pass 2, so every tile is
+ * one the application did not draw to.
+ *
+ * On M4 Pro the single-layer 2x attachments of formats up to eight bytes are
+ * compressed. G17P cannot spill a compressed target: in
+ * `rgba16f,rgba32f,rgba32f,rgba32f,rgba32f,rgba16f 1 2` the compressed
+ * RGBA16F targets must stay in the tilebuffer and an RGBA32F target spill
+ * instead (the plain order spilled both RGBA16F and failed the pass);
+ * `r8,rgba32f,rgba32f,rgba32f,rgba32f,rg8 1 2` pads between the groups.
+ *
+ * With `layers` above one the images are arrays and both passes are layered;
+ * vkCmdClearAttachments writes every layer, or with `layer0` only layer 0,
+ * which leaves the other layers without any geometry.
  *
  *   vulkan-msaa-mrt [formats=rgba8,r11g11b10f,none] [attachments=3] [samples=4]
- *                   [pass2=load|clear] [write=clear|draw|a2c]
+ *                   [pass2=load|clear] [write=clear|layer0|draw|a2c|none] [layers=1]
  *   formats: one name repeated `attachments` times, or a comma-separated list
  *   with one name per attachment ("none" = VK_NULL_HANDLE view):
- *   rgba16f rgba8 rg16f r32f rg32f rgba32f rgb10a2 r11g11b10f none
+ *   rgba16f rgba8 rg16f r32f rg32f rgba32f rgb10a2 bgr10a2 r11g11b10f r8 rg8
+ *   none
  * Exit 0 = PASS, 1 = FAIL. */
 #include <stdbool.h>
 #include <stdio.h>
@@ -44,6 +57,8 @@
 #define W 64
 #define H 64
 #define MAX_ATT 8
+/* Pass 2 writes columns 5..36: tiles partly written lie on both edges. */
+#define WRITE_RECT ((VkRect2D){{5, 0}, {W / 2, H}})
 
 static const struct { const char *name; VkFormat fmt; unsigned bpp; } formats[] = {
    {"rgba16f", VK_FORMAT_R16G16B16A16_SFLOAT, 8},
@@ -53,12 +68,16 @@ static const struct { const char *name; VkFormat fmt; unsigned bpp; } formats[] 
    {"rg32f", VK_FORMAT_R32G32_SFLOAT, 8},
    {"rgba32f", VK_FORMAT_R32G32B32A32_SFLOAT, 16},
    {"rgb10a2", VK_FORMAT_A2B10G10R10_UNORM_PACK32, 4},
+   {"bgr10a2", VK_FORMAT_A2R10G10B10_UNORM_PACK32, 4},
    {"r11g11b10f", VK_FORMAT_B10G11R11_UFLOAT_PACK32, 4},
+   {"r8", VK_FORMAT_R8_UNORM, 1},
+   {"rg8", VK_FORMAT_R8G8_UNORM, 2},
    {"none", VK_FORMAT_UNDEFINED, 0},
 };
 
 static VkDevice dev;
 static VkPhysicalDeviceMemoryProperties memprops;
+static unsigned layers = 1;
 
 static VkDeviceMemory
 bind_memory(VkMemoryRequirements req, VkMemoryPropertyFlags flags)
@@ -86,7 +105,7 @@ make_image(VkFormat fmt, VkSampleCountFlagBits samples, VkImageView *view)
       .format = fmt,
       .extent = {W, H, 1},
       .mipLevels = 1,
-      .arrayLayers = 1,
+      .arrayLayers = layers,
       .samples = samples,
       .tiling = VK_IMAGE_TILING_OPTIMAL,
       .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
@@ -102,9 +121,9 @@ make_image(VkFormat fmt, VkSampleCountFlagBits samples, VkImageView *view)
       VkImageViewCreateInfo vi = {
          .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
          .image = img,
-         .viewType = VK_IMAGE_VIEW_TYPE_2D,
+         .viewType = layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D,
          .format = fmt,
-         .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+         .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, layers},
       };
       CHECK(vkCreateImageView(dev, &vi, NULL, view));
    }
@@ -139,7 +158,7 @@ to_general(VkCommandBuffer cb, VkImage img)
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .image = img,
-      .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+      .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, layers},
    };
    VkDependencyInfo di = {.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
                           .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &ib};
@@ -154,8 +173,10 @@ colour(unsigned att, unsigned pass)
    VkClearColorValue c = {{0, 0, 0, 1}};
    c.float32[att % 3] = 1.0f;
    c.float32[(att + pass + 1) % 3] = pass ? 0.5f : 0.0f;
-   /* Pass 2 is opaque, so alpha-to-coverage keeps every sample. */
-   c.float32[3] = pass ? 1.0f : 0.0f;
+   /* Pass 2 is opaque, so alpha-to-coverage keeps every sample. Pass 1 alpha
+    * is non-zero too: the upper eight bytes of a wide sample must not be all
+    * zero, or losing them goes unseen. */
+   c.float32[3] = 1.0f;
    return c;
 }
 
@@ -193,7 +214,7 @@ make_pipeline(const VkFormat *fmt, unsigned count, unsigned samples, bool a2c,
       .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
       .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST};
    VkViewport vp = {0, 0, W, H, 0, 1};
-   VkRect2D scissor = {{0, 0}, {W / 2, H}};
+   VkRect2D scissor = WRITE_RECT;
    VkPipelineViewportStateCreateInfo vps = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
       .viewportCount = 1, .pViewports = &vp, .scissorCount = 1, .pScissors = &scissor};
@@ -233,7 +254,12 @@ main(int argc, char **argv)
    bool pass2_load = !(argc > 4 && !strcmp(argv[4], "clear"));
    const char *write = argc > 5 ? argv[5] : "clear";
    const bool draw = !strcmp(write, "draw") || !strcmp(write, "a2c");
-   if (!draw && strcmp(write, "clear"))
+   const bool none = !strcmp(write, "none");
+   const bool layer0 = !strcmp(write, "layer0");
+   layers = argc > 6 ? atoi(argv[6]) : 1;
+   /* The draw writes layer 0 only. */
+   if ((!draw && !none && !layer0 && strcmp(write, "clear")) || !layers ||
+       (draw && layers > 1))
       goto usage;
    VkFormat fmt[MAX_ATT];
    unsigned bpp[MAX_ATT];
@@ -254,7 +280,7 @@ main(int argc, char **argv)
    if (!listed || !count || count > MAX_ATT) {
    usage:
       fprintf(stderr, "usage: %s [format[,format...]] [attachments<=8] [samples] [load|clear] "
-                      "[clear|draw|a2c]\n",
+                      "[clear|layer0|draw|a2c|none] [layers (not draw|a2c)]\n",
               argv[0]);
       return 2;
    }
@@ -262,10 +288,10 @@ main(int argc, char **argv)
       fmt[i] = fmt[0];
       bpp[i] = bpp[0];
    }
-   printf("%u attachments (%s), %ux, pass 2 loadOp %s, %s\n", count, list, samples,
-          pass2_load ? "LOAD" : "CLEAR",
+   printf("%u attachments (%s), %ux, %u layers, pass 2 loadOp %s, %s\n", count, list,
+          samples, layers, pass2_load ? "LOAD" : "CLEAR",
           draw ? (strcmp(write, "a2c") ? "draw" : "draw with alpha-to-coverage")
-               : "vkCmdClearAttachments");
+          : none ? "no writes" : "vkCmdClearAttachments");
 
    VkApplicationInfo app = {.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
                             .apiVersion = VK_API_VERSION_1_3};
@@ -314,7 +340,7 @@ main(int argc, char **argv)
       ref[i] = make_image(fmt[i], VK_SAMPLE_COUNT_1_BIT, &ref_view[i]);
    }
 
-   const VkDeviceSize img_size = (VkDeviceSize)W * H * 16;
+   const VkDeviceSize img_size = (VkDeviceSize)W * H * 16 * layers;
    VkBufferCreateInfo bci = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                              .size = img_size * count * 2,
                              .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT};
@@ -346,20 +372,20 @@ main(int argc, char **argv)
       to_general(cb, ref[i]);
    }
 
-   /* Reference: pass-1 colour everywhere; the left half gets the pass-2
+   /* Reference: pass-1 colour everywhere; the band gets the pass-2
     * colour below. */
    for (unsigned i = 0; i < count; i++) {
       if (!fmt[i])
          continue;
       VkClearColorValue c = colour(i, 0);
-      VkImageSubresourceRange range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+      VkImageSubresourceRange range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, layers};
       vkCmdClearColorImage(cb, ref[i], VK_IMAGE_LAYOUT_GENERAL, &c, 1, &range);
    }
 
    VkRenderingAttachmentInfo att[MAX_ATT];
    VkRenderingInfo ri = {.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
                          .renderArea = {{0, 0}, {W, H}},
-                         .layerCount = 1,
+                         .layerCount = layers,
                          .colorAttachmentCount = count,
                          .pColorAttachments = att};
    for (unsigned pass = 0; pass < 2; pass++) {
@@ -373,7 +399,8 @@ main(int argc, char **argv)
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
             .clearValue.color = colour(i, 0),
          };
-         if (pass && fmt[i]) {
+         /* A single-sample pass has nothing to resolve: read it back. */
+         if (pass && fmt[i] && samples > 1) {
             att[i].resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
             att[i].resolveImageView = res_view[i];
             att[i].resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -389,21 +416,21 @@ main(int argc, char **argv)
          vkCmdPushConstants(cb, layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                             sizeof(pc), pc);
          vkCmdDraw(cb, 3, 1, 0, 0);
-      } else if (pass) {
+      } else if (pass && !none) {
          VkClearAttachment ca[MAX_ATT];
          for (unsigned i = 0; i < count; i++)
             ca[i] = (VkClearAttachment){VK_IMAGE_ASPECT_COLOR_BIT, i,
                                         {.color = colour(i, 1)}};
-         VkClearRect rect = {{{0, 0}, {W / 2, H}}, 0, 1};
+         VkClearRect rect = {WRITE_RECT, 0, layer0 ? 1 : layers};
          vkCmdClearAttachments(cb, count, ca, 1, &rect);
       }
       vkCmdEndRendering(cb);
    }
    barrier(cb);
 
-   /* Left half of the reference: render a single-sample pass with the same
+   /* The band of the reference: render a single-sample pass with the same
     * vkCmdClearAttachments call, which takes no tilebuffer path under test. */
-   {
+   if (!none) {
       VkRenderingAttachmentInfo ra[MAX_ATT];
       for (unsigned i = 0; i < count; i++) {
          ra[i] = (VkRenderingAttachmentInfo){
@@ -419,7 +446,7 @@ main(int argc, char **argv)
       for (unsigned i = 0; i < count; i++)
          ca[i] = (VkClearAttachment){VK_IMAGE_ASPECT_COLOR_BIT, i,
                                      {.color = colour(i, 1)}};
-      VkClearRect rect = {{{0, 0}, {W / 2, H}}, 0, 1};
+      VkClearRect rect = {WRITE_RECT, 0, layer0 ? 1 : layers};
       vkCmdClearAttachments(cb, count, ca, 1, &rect);
       vkCmdEndRendering(cb);
    }
@@ -428,10 +455,11 @@ main(int argc, char **argv)
    for (unsigned i = 0; i < count; i++) {
       if (!fmt[i])
          continue;
-      VkBufferImageCopy copy = {.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+      VkBufferImageCopy copy = {.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, layers},
                                 .imageExtent = {W, H, 1}};
       copy.bufferOffset = img_size * (2 * i);
-      vkCmdCopyImageToBuffer(cb, res[i], VK_IMAGE_LAYOUT_GENERAL, buf, 1, &copy);
+      vkCmdCopyImageToBuffer(cb, samples > 1 ? res[i] : ms[i], VK_IMAGE_LAYOUT_GENERAL,
+                             buf, 1, &copy);
       copy.bufferOffset = img_size * (2 * i + 1);
       vkCmdCopyImageToBuffer(cb, ref[i], VK_IMAGE_LAYOUT_GENERAL, buf, 1, &copy);
    }
@@ -460,15 +488,16 @@ main(int argc, char **argv)
       const uint8_t *got = map + img_size * (2 * i);
       const uint8_t *want = map + img_size * (2 * i + 1);
       unsigned bad_px = 0;
-      for (unsigned px = 0; px < W * H; px++) {
+      for (unsigned px = 0; px < W * H * layers; px++) {
          if (memcmp(got + px * bpp_i, want + px * bpp_i, bpp_i)) {
             if (!bad_px)
-               printf("attachment %u: first mismatch at (%u,%u)\n", i, px % W, px / W);
+               printf("attachment %u: first mismatch at (%u,%u) layer %u\n", i, px % W,
+                      px / W % H, px / (W * H));
             bad_px++;
          }
       }
       if (bad_px)
-         printf("attachment %u: %u/%u pixels wrong\n", i, bad_px, W * H);
+         printf("attachment %u: %u/%u pixels wrong\n", i, bad_px, W * H * layers);
       bad += bad_px;
    }
    printf("%s\n", bad ? "FAIL (contents)" : "PASS");

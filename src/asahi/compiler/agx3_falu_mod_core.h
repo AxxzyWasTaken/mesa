@@ -94,6 +94,42 @@ bool agx3_falu_add_mod_runtime(enum agx_isa_encoding enc, uint16_t dest,
                               uint8_t out[AGX3_FALU_MOD_MAX_LENGTH],
                               uint8_t *len);
 
+/* G17G only: dest = srcmods(src0) + minifloat. The same long form with the
+ * immediate-operand alternative (f25=1, the constant in f17). Witnessed
+ * byte-exactly against applegpu_g17g (gpu/m5-xfb-alu4-reference.metal):
+ *
+ *   a + 2.0         29 00 04 0a 22 20 ac 02 01 08 11 00   f17 = 0x40
+ *   fabs(a) + 0.5   29 00 04 4a 22 20 ac 02 01 08 10 40   f17 = 0x20, f47
+ *   0.5 - a         29 00 24 4a 22 20 ac 02 01 08 10 00   f48
+ *   -fabs(a) + 0.5  29 00 24 4a 22 20 ac 02 01 08 10 40   f47, f48
+ *
+ * all with a dead source waiting for the load in slot 8. These are the forms
+ * Mesa's fabs and fneg take (fmov.abs/neg lower to `fadd mod(x), -0.0`). A
+ * saturated variant has no witness and fails closed. */
+bool agx3_falu_add_imm_runtime(uint16_t dest, uint16_t src0,
+                               uint8_t minifloat,
+                               const struct agx3_falu_mods *m,
+                               const struct agx3_falu_runtime *runtime,
+                               uint8_t out[AGX3_FALU_MOD_MAX_LENGTH],
+                               uint8_t *len);
+
+/* G17G only: dest = srcmods(src0) * minifloat, the long f32mul with the
+ * immediate-operand alternative. Apple folds a negated source into the
+ * constant's sign, so only the absolute value is a source modifier here
+ * (gpu/m5-xfb-alu4-reference.metal, -alu6-):
+ *
+ *   a * 2.0          29 00 05 10 22 80 ac 02 0b 00 20 00 00 10   f17 = 0x40
+ *   fabs(a) * 2.0    29 00 05 10 22 80 ac 02 0b 00 20 08 00 10   f47
+ *   -fabs(a) * 2.0   29 00 05 10 22 80 ad 02 0b 00 20 08 00 10   f17 = 0xc0
+ *
+ * all with a dead source waiting for the load in slot 8. */
+bool agx3_falu_mul_imm_runtime(uint16_t dest, uint16_t src0,
+                               uint8_t minifloat,
+                               const struct agx3_falu_mods *m,
+                               const struct agx3_falu_runtime *runtime,
+                               uint8_t out[AGX3_FALU_MOD_MAX_LENGTH],
+                               uint8_t *len);
+
 bool agx3_falu_mul_mod_runtime(enum agx_isa_encoding enc, uint16_t dest,
                               uint16_t src0, uint16_t src1,
                               const struct agx3_falu_mods *m,
@@ -218,6 +254,11 @@ bool agx3_falu_fma_addend_imm_narrow_m5(uint16_t dest, uint16_t src0, uint16_t s
    uint8_t immediate, const struct agx3_falu_mods *mods,
    const struct agx3_falu_runtime *runtime,
    uint8_t out[AGX3_FALU_MOD_MAX_LENGTH], uint8_t *len);
+
+bool agx3_falu_fma_addend_imm(enum agx_isa_encoding enc, uint16_t dest,
+                             uint16_t src0, uint16_t src1, uint8_t immediate,
+                             const struct agx3_falu_runtime *runtime,
+                             uint8_t out[AGX3_FALU_MOD_MAX_LENGTH], uint8_t *len);
 
 #ifdef __cplusplus
 }

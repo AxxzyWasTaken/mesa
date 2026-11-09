@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "drm-uapi/asahi_drm.h"
+#include "util/macros.h"
 
 /* Prefixes belong to an occurrence in the ioctl payload, not the recorded
  * command buffer: simultaneous-use command buffers can appear more than once.
@@ -14,15 +15,19 @@ hk_drm_serialize_prefix(struct drm_asahi_cmd_header *h, uint64_t prior[2],
                          uint32_t vdm_before, uint32_t cdm_before,
                          const uint64_t initial[2], bool exact)
 {
-   if (vdm_before >= DRM_ASAHI_BARRIER_NONE ||
-       cdm_before >= DRM_ASAHI_BARRIER_NONE)
+   if (exact && (vdm_before >= DRM_ASAHI_BARRIER_NONE ||
+                 cdm_before >= DRM_ASAHI_BARRIER_NONE))
       return false;
 
+   /* Without exact priors, a submit too long for 16-bit indices is split
+    * into ioctls, and queue_submit_looped() recomputes each serialized
+    * barrier from its position in its ioctl. */
    const uint32_t before[2] = {vdm_before, cdm_before};
    uint16_t barriers[2];
    for (unsigned sq = 0; sq < 2; ++sq) {
       bool historical = exact && before[sq] == 0;
-      barriers[sq] = historical ? DRM_ASAHI_BARRIER_NONE : before[sq];
+      barriers[sq] = historical ? DRM_ASAHI_BARRIER_NONE
+                                : MIN2(before[sq], DRM_ASAHI_BARRIER_NONE - 1);
       prior[sq] = historical ? initial[sq] : 0;
    }
    h->vdm_barrier = barriers[0];
@@ -79,7 +84,30 @@ hk_drm_rebase_prior(struct drm_asahi_cmd_header *h, void *payload,
    h->vdm_barrier = barriers[0];
    h->cdm_barrier = barriers[1];
    if (exact && h->cmd_type == DRM_ASAHI_CMD_RENDER &&
-       (r->legacy.flags & DRM_ASAHI_RENDER_COMPUTE_STAGE_BARRIERS)) {
+       (r->legacy.flags & DRM_ASAHI_RENDER_STAGE_PREFIXES)) {
+      /* Both tiling prefixes are rebased like the header's. */
+      struct drm_asahi_cmd_render_with_stage_prefixes *s = payload;
+      if (h->size != sizeof(*s))
+         return false;
+      __u16 *ta[2] = {&s->ta_vdm_barrier, &s->ta_cdm_barrier};
+      __u64 *ta_prior[2] = {&s->ta_prior_vdm, &s->ta_prior_cdm};
+      for (unsigned sq = 0; sq < 2; ++sq) {
+         const uint16_t value = *ta[sq];
+         if (value == DRM_ASAHI_BARRIER_NONE || value == 0)
+            continue;
+         if (value > before[sq]) {
+            *ta[sq] = value - before[sq];
+         } else {
+            if (initial[sq] > UINT64_MAX - value)
+               return false;
+            const uint64_t absolute = initial[sq] + value;
+            if (absolute > *ta_prior[sq])
+               *ta_prior[sq] = absolute;
+            *ta[sq] = DRM_ASAHI_BARRIER_NONE;
+         }
+      }
+   } else if (exact && h->cmd_type == DRM_ASAHI_CMD_RENDER &&
+              (r->legacy.flags & DRM_ASAHI_RENDER_COMPUTE_STAGE_BARRIERS)) {
       /* The tiling half's compute prefix is rebased like the header's. */
       struct drm_asahi_cmd_render_with_stage_prior *s = payload;
       if (h->size != sizeof(*s))

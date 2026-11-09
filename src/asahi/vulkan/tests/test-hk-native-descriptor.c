@@ -1789,6 +1789,13 @@ main(void)
    };
    assert(hk_pack_native_pbe(9, &native_pbe, &pbe));
    assert(memcmp(&native_pbe, linear_pbe, sizeof(linear_pbe)) == 0);
+   uint8_t gen10_linear_pbe[32];
+   memcpy(gen10_linear_pbe, linear_pbe, sizeof(gen10_linear_pbe));
+   /* Height expands to 15 bits, starting at descriptor bit39. */
+   gen10_linear_pbe[4] = 0x80;
+   gen10_linear_pbe[5] = 0x3f;
+   assert(hk_pack_native_pbe(10, &native_pbe, &pbe));
+   assert(memcmp(&native_pbe, gen10_linear_pbe, sizeof(gen10_linear_pbe)) == 0);
    pbe.stride = 0;
    pbe.layout = AGX_LAYOUT_GPU;
    pbe.dimension = AGX_TEXTURE_DIMENSION_2D_ARRAY;

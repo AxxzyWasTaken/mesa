@@ -31,7 +31,7 @@
  * generations.  This helper does not emit a live command or enable command
  * allocation, submission, or device admission.
  */
-static bool
+bool
 agx_vdm_stream_link_core_supported(enum agx_chip chip)
 {
    switch (chip) {
@@ -55,6 +55,8 @@ agx_vdm_stream_link_core_supported(enum agx_chip chip)
    case AGX_CHIP_G15P:
    case AGX_CHIP_G16P:
    case AGX_CHIP_G17A:
+   /* No J873 native capture contains this record yet. */
+   case AGX_CHIP_G18G:
    case AGX_CHIP_UNKNOWN:
    default:
       return false;

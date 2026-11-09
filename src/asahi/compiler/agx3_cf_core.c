@@ -50,24 +50,39 @@ agx3_cf_icmp_reg16(enum agx_isa_encoding enc, enum agx3_cf_icond cond,
                    const struct agx3_cf_source_hints hints[2], uint16_t wait_mask,
                    uint8_t out[AGX3_CF_MAX_LENGTH], uint8_t *len)
 {
-   if (!agx3b(enc) || !icond_ok(cond) || !slot_ok(slot) || !src || !hints ||
-       !out || !len || (wait_mask != 0 && wait_mask != 32))
+   /* agx3c (G17G and G18G) is the same compare with its class constants f32/f33 = 3/82,
+    * waiting at f33 + slot (AGX3b's slot-6 f39 is the same rule): metal-nt
+    * applegpu_g17g breaks a loop on ushort a == b with icmp f41 after
+    * slot-8 loads, applegpu_g18g tests x < y with f34 after slot-1 loads
+    * (g18ref-out/probe/m6-libagx-forms3 lk3_break_eq16, lk3_if_lt16). */
+   const bool c = enc == AGX_ISA_ENCODING_AGX3C;
+   if ((!agx3b(enc) && !c) || !icond_ok(cond) || !slot_ok(slot) || !src ||
+       !hints || !out || !len ||
+       (c ? (wait_mask >> 8) != 0 : (wait_mask != 0 && wait_mask != 32)))
       return false;
    for (unsigned i = 0; i < 2; ++i)
       if (src[i] >= 256 || (hints[i].cache && hints[i].discard))
          return false;
    const bool sign_extend = cond == AGX3_CF_ICOND_SLT || cond == AGX3_CF_ICOND_SGT;
    const struct agx3_field_kv base[] = {
-      KV(9,2), KV(10,1), KV(24,2), KV(25,1),
+      KV(9,2), KV(10,1), KV(24,2), KV(25,1), KV(32,3), KV(33,82),
    };
-   const struct agx3_field_kv fields[] = {
+   struct agx3_field_kv fields[19] = {
       KV(2,src[0]), KV(17,src[1]), KV(31,slot), KV(42,cond),
       KV(11,hints[0].cache), KV(13,hints[0].discard), KV(14,sign_extend),
       KV(26,hints[1].cache), KV(28,hints[1].discard), KV(29,sign_extend),
-      KV(39,wait_mask == 32),
    };
+   unsigned n = 10;
+   if (c) {
+      for (unsigned i = 0; i < 8; ++i)
+         if (wait_mask & (1u << i))
+            fields[n++] = (struct agx3_field_kv)KV(34 + i, 1);
+   } else {
+      fields[n++] = (struct agx3_field_kv)KV(39, wait_mask == 32);
+   }
    for (unsigned ep = 0; ep < 2; ++ep)
-      if (agx3_bind_compose(enc,"icmp",ep,base,4,fields,11,out,len))
+      if (agx3_bind_compose(enc, "icmp", ep, base, c ? 6 : 4, fields, n, out,
+                            len))
          return true;
    return false;
 }
@@ -263,6 +278,48 @@ agx3_cf_icmp_imm16_runtime(enum agx_isa_encoding enc, enum agx3_cf_icond cond,
    return agx3_bind_compose(enc,"icmp",1,base,gpu1 ? 7 : 5,fields,7,out,len);
 }
 
+/* G18G only: agx3_cf_icmp_imm16_runtime() as the G18G layer emits it on
+ * AGX_ISA_ENCODING_AGX3C (re-encoded as agx3d afterwards). */
+bool
+agx3_cf_icmp_imm16_runtime_g18g(enum agx_isa_encoding enc,
+                                enum agx3_cf_icond cond, unsigned slot,
+                                uint16_t src, uint8_t imm,
+                                struct agx3_cf_source_hints hint,
+                                uint16_t wait_mask,
+                                uint8_t out[AGX3_CF_MAX_LENGTH],
+                                uint8_t *len)
+{
+   if (enc != AGX_ISA_ENCODING_AGX3C)
+      return agx3_cf_icmp_imm16_runtime(enc, cond, slot, src, imm, hint,
+                                        wait_mask, out, len);
+
+   /* The source is the icmp's eight-bit half index on both encodings:
+    * Apple's own applegpu_g17g/g18g compares name halves up to 204 in f2
+    * (g18ref-out/probe/m6-high-cf16), and the 16-bit form round-trips
+    * 0..254 through the same field. */
+   if (!icond_ok(cond) || !slot_ok(slot) || src >= 256 || !out || !len ||
+       (hint.cache && hint.discard))
+      return false;
+   /* Control flow arrives with a retired scoreboard. Ground the signed
+    * half/zero predicate needed by sampler-border selection independently
+    * of the wider immediate and compact-wait domains. */
+   if (imm != 0 || wait_mask != 0 ||
+       (cond != AGX3_CF_ICOND_EQ && cond != AGX3_CF_ICOND_SLT &&
+        cond != AGX3_CF_ICOND_SGT))
+      return false;
+   /* Native signed and unsigned zero tests both sign-extend the half.
+    * This preserves equality and every relation to zero. Live witnesses
+    * retain the source for the taken branch instead of discarding it. */
+   const struct agx3_field_kv base[] = {
+      KV(9,2), KV(10,1), KV(14,1), KV(24,1), KV(25,1), KV(32,3), KV(33,82),
+   };
+   const struct agx3_field_kv fields[] = {
+      KV(2,src), KV(16,imm), KV(42,cond), KV(31,slot), KV(11,hint.cache),
+      KV(13,hint.discard), KV(39,wait_mask == 32),
+   };
+   return agx3_bind_compose(enc,"icmp",1,base,7,fields,7,out,len);
+}
+
 /*
  * Compare a 16-bit register against the immediate zero -- the shape every
  * branch on a boolean takes, since Mesa keeps booleans in 16-bit halves.
@@ -273,7 +330,7 @@ agx3_cf_icmp_imm16_runtime(enum agx_isa_encoding enc, enum agx3_cf_icond cond,
  * 16-bit immediate forms are not covered here. Register/register compares
  * use agx3_cf_icmp_reg16(), including its compact unsigned encoding point.
  */
-static bool
+bool
 agx3_cf_icmp_zero16_runtime(enum agx_isa_encoding enc, enum agx3_cf_icond cond,
                             unsigned slot, uint16_t src,
                             struct agx3_cf_source_hints hint, uint16_t wait_mask,
@@ -666,6 +723,20 @@ agx3_cf_patch_branch(enum agx_isa_encoding enc, bool is_bn, uint8_t *branch,
    return false;
 }
 
+/*
+ * G17G (AGX3c) spells the same compare with its selector constants f36/f37
+ * and eight wait slots (f38..f45). Apple's applegpu_g17g branches in
+ * test/native/g17g/m5-compare-select-reference.metal, each a register that is
+ * not read again (f13), slot 0, chosen smallest first as Apple does:
+ *
+ *   if (x <  0.5f)    0a012aa10302             f18 = 32, f46 = 1
+ *   if (x >  1.0f)    0a012ab10202             f18 = 48, f46 = 2
+ *   if (x < -1.0f)    0a013ab10302             f18 = 176
+ *   half x < 1.0h     0a002ab10302             f10 = 1
+ *   if (x >= 0.0f)    1a012b81060002020000     lt, unordered: f34, f46 = 5
+ *   if (x <= 2.0f)    1a012bc1060003020000     gt, unordered: f46 = 6
+ *   if (x == 0.0f)    0a012b81060000020000     f46 = 0
+ */
 bool agx3_cf_fcmp_zero_imm(enum agx_isa_encoding enc, enum agx3_cf_fcond cond,
                         bool or_nan, unsigned slot, uint16_t source, bool source_16,
                         uint8_t minifloat, struct agx3_cf_source_hints hint,

@@ -20,7 +20,7 @@
 #define HK_MAX_PUSH_SIZE                 256
 #define HK_MAX_DYNAMIC_BUFFERS           64
 #define HK_MAX_RTS                       8
-#define HK_MIN_SSBO_ALIGNMENT            16
+#define HK_MIN_SSBO_ALIGNMENT            4
 #define HK_MIN_TEXEL_BUFFER_ALIGNMENT    16
 #define HK_MIN_UBO_ALIGNMENT             64
 #define HK_MAX_VIEWPORTS                 16
@@ -35,7 +35,11 @@
 #define HK_MAX_DESCRIPTORS               (1 << 20)
 #define HK_PUSH_DESCRIPTOR_SET_SIZE                                            \
    (HK_MAX_PUSH_DESCRIPTORS * HK_MAX_DESCRIPTOR_SIZE)
-#define HK_SSBO_BOUNDS_CHECK_ALIGNMENT 4
+/* Storage buffer descriptors hold the exact byte range and every bounds check
+ * (explicit I/O lowering, check_in_bounds) tests offset + size - 1 < range,
+ * so ranges are not rounded up for robustBufferAccess2.
+ */
+#define HK_SSBO_BOUNDS_CHECK_ALIGNMENT 1
 #define HK_MAX_MULTIVIEW_VIEW_COUNT    32
 
 #define HK_SPARSE_ADDR_SPACE_SIZE (1ull << 39)

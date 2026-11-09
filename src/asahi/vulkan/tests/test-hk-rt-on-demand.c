@@ -114,7 +114,7 @@ __wrap_agx_bo_unreference(struct agx_device *dev, struct agx_bo *bo)
 
 int
 __wrap_agx_bo_bind(struct agx_device *dev, struct agx_bo *bo, uint64_t address,
-                   uint64_t size, uint64_t offset, uint32_t flags)
+                   size_t size, uint64_t offset, uint32_t flags)
 {
    if (flags & DRM_ASAHI_BIND_UNBIND)
       ++unbinds;
@@ -440,6 +440,15 @@ main(void)
    unsetenv("ASAHI_G17P_RT_DISABLE");
 
    test_cache_key();
+
+   /* A noborder run must never replace border-enabled disk-cache entries. */
+   unsetenv("HK_PERFTEST");
+   uint64_t normal_env = hk_codegen_env_hash();
+   setenv("HK_PERFTEST", "noborder", 1);
+   T("noborder has a separate disk-cache identity",
+     normal_env != hk_codegen_env_hash());
+   unsetenv("HK_PERFTEST");
+   T("normal disk-cache identity returns", normal_env == hk_codegen_env_hash());
 
    if (failures) {
       fprintf(stderr, "%u failure(s)\n", failures);

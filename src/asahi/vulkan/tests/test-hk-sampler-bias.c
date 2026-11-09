@@ -60,7 +60,9 @@ int main(void)
             MESA_SHADER_FRAGMENT, &options, "sampler bias");
          nir_tex_instr *tex = texture(&b, ops[i], shadow);
          nir_def *handle = nir_get_tex_src(tex, nir_tex_src_sampler_handle);
-         bool expected = ops[i] == nir_texop_txb && !shadow;
+         /* An explicit LOD takes the sampler's bias too (D3D LOD rules). */
+         bool expected =
+            (ops[i] == nir_texop_txb || ops[i] == nir_texop_txl) && !shadow;
          bool changed = nir_shader_tex_pass(b.shader, hk_lower_g17p_sampler_bias,
                                             nir_metadata_control_flow, NULL);
          assert(changed == expected);

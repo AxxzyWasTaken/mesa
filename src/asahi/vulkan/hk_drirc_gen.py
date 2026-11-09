@@ -24,6 +24,14 @@ def declare_options():
         B("hk_fake_minmax", False,
           "Fake support for min/max filtering",
           c_name="fake_minmax"),
+        B("hk_sparse_strict_residency", False,
+          "Report sparseResidencyNonResidentStrict on G17P, where a write to "
+          "an unbound page can still be read back",
+          c_name="sparse_strict_residency"),
+        B("hk_d3d_nearest_mip", False,
+          "Round a nearest mip selection halfway between levels up, as "
+          "Direct3D does, rather than down, as Vulkan does",
+          c_name="d3d_nearest_mip"),
         B("hk_image_view_min_lod", False,
           "Emulate VK_EXT_image_view_min_lod (conformant but slower)",
           c_name="image_view_min_lod"),

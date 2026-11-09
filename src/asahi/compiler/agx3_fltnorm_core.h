@@ -202,15 +202,29 @@ bool agx3_rgb10a2_encode_for_encoding(enum agx_isa_encoding enc,
                         uint8_t out[16], uint8_t *length);
 bool agx3_rgb10a2_encode(const struct agx3_rgb10a2_desc *desc,
                         uint8_t out[14], uint8_t *length);
+/* G18G (M6) compiles as agx3c: G17G/G18G RGB10A2 fragment epilogs share the
+ * operand fields, with the additional f82/f83 sub-opcode pair. Packed floats
+ * and part-start markers remain G17P-only there until their shader-linking
+ * paths are qualified; otherwise as agx3_rgb10a2_encode_for_encoding. */
+bool agx3_rgb10a2_encode_g18g(enum agx_isa_encoding enc,
+                              const struct agx3_rgb10a2_desc *desc,
+                              uint8_t out[16], uint8_t *length);
 
 struct agx3_rgb10a2_unpack_desc {
    uint16_t dest, source; /* half indices: four f32 outputs, one u32 input */
    uint16_t wait_mask;
    bool discard;
-   bool dest_hint; /* AGX3C f11 */
+   bool dest_hint; /* AGX3C f11: G17G/G18G destination lifetime hint */
    uint8_t layout; /* enum agx3_packed_layout */
 };
 bool agx3_rgb10a2_unpack_encode(
+   enum agx_isa_encoding enc, const struct agx3_rgb10a2_unpack_desc *desc,
+   uint8_t out[16], uint8_t *length);
+/* G18G (M6) compiles as agx3c: native G17G/G18G RGB10A2 framebuffer reads and
+ * unpack_unorm10a2_to_float, ten bytes with f27 marking a retained source.
+ * AGX3B goes through agx3_rgb10a2_unpack_encode; packed-float layouts are
+ * refused on agx3c/agx3d. */
+bool agx3_rgb10a2_unpack_encode_g18g(
    enum agx_isa_encoding enc, const struct agx3_rgb10a2_unpack_desc *desc,
    uint8_t out[16], uint8_t *length);
 
@@ -331,7 +345,7 @@ struct agx3_normflt_desc {
    uint16_t src;       /* 16-bit register holding the packed lanes */
    bool two_lanes;     /* unpack both bytes; false = one lane */
    bool snorm;         /* signed-normalized source */
-   bool is_16bit;      /* 16-bit normalized lane, G17P only */
+   bool is_16bit;      /* 16-bit normalized lane */
    uint8_t srgb;       /* enum agx3_fltnorm_srgb */
    uint16_t wait_mask; /* bit i waits scoreboard slot i + 1 */
 };

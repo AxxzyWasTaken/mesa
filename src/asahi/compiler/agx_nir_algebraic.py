@@ -58,9 +58,18 @@ for s in [8, 16, 32, 64]:
          ("ubitfield_extract", 'value', ('iand', 'offset', s - 1), 'bits'))
     ]
 
+# Based on the VIR lowering: step back one ulp when RTNE rounded away from zero.
+def f2f16_rtz(x):
+    return ('bcsel', ('flt', ('fabs', x), ('fabs', ('f2f32', ('f2f16_rtne', x)))),
+            ('isub', ('f2f16_rtne', x), 1), ('f2f16_rtne', x))
+
 lower_pack = [
+    # The hardware converts with RTNE; D3D's f32tof16 (and AMD's packHalf)
+    # truncate, and GLSL leaves the rounding to the implementation.
     (('pack_half_2x16_split', a, b),
-     ('pack_32_2x16_split', ('f2f16', a), ('f2f16', b))),
+     ('pack_32_2x16_split', f2f16_rtz(a), f2f16_rtz(b))),
+    (('pack_half_2x16_rtz_split', a, b),
+     ('pack_32_2x16_split', f2f16_rtz(a), f2f16_rtz(b))),
 
     # We don't have 8-bit ALU, so we need to lower this. But if we lower it like
     # this, we can at least coalesce the pack_32_2x16_split and only pay the
@@ -87,10 +96,7 @@ lower_pack = [
     (('unpack_64_2x32_split_x', ('pack_64_2x32_split', a, b)), a),
     (('unpack_64_2x32_split_y', ('pack_64_2x32_split', a, b)), b),
 
-    # Based on the VIR lowering
-    (('f2f16_rtz', 'a@32'),
-     ('bcsel', ('flt', ('fabs', a), ('fabs', ('f2f32', ('f2f16_rtne', a)))),
-      ('isub', ('f2f16_rtne', a), 1), ('f2f16_rtne', a))),
+    (('f2f16_rtz', 'a@32'), f2f16_rtz(a)),
 
     # Codegen depends on this trivial case being optimized out.
     (('ubitfield_extract', 'value', 'offset', 0), 0),
@@ -301,6 +307,7 @@ for s_ in range(1, 5):
 
     v = 1 << s
     is_mult = f'(is_unsigned_multiple_of_{v})'
+    is_mult_below_2g = f'(is_unsigned_multiple_of_{v}_below_2g)'
 
     fuse_lea += [
         # A + b * s = A + B * s with relaxed multiply
@@ -311,32 +318,27 @@ for s_ in range(1, 5):
         (('iadd', 'a@64', ('u2u64', ('amul', 'b@32', f'#c{is_mult}'))),
          ('ulea_agx', a, ('imul', b, ('ushr', c, s)), s)),
 
-        # A + (b 2^s + c d 2^s) = A + (b + cd) 2^s with relaxation.
+        # A + (b + c d) = A + ((b + c d) / 2^s) 2^s with relaxation, for b and
+        # d multiples of 2^s.
         #
-        # amul is bounded by the buffer size by definition, and both the GL & VK
-        # limit UBOs and SSBOs to INT32_MAX bytes. Therefore, amul has no signed
-        # wrap.
+        # The offset is the 32-bit sum X = (b + c d) mod 2^32, zero-extended;
+        # amul does not wrap. With unsigned shifts,
         #
-        # Further, because we are zero-extending the 32-bit result, the 32-bit
-        # sum must be nonnegative -- if it were negative, it would represent an
-        # offset above INT32_MAX which would be invalid given the amul and
-        # max buffer size. Thus with signed math
+        #   X / 2^s = ((b >> s) + c (d >> s)) mod 2^(32 - s)
         #
-        #   0 <= b 2^s + cd 2^s < INT32_MAX
-        #
-        # ..and hence
-        #
-        #   0 <= b + cd < INT32_MAX
-        #
-        # Those bounds together with distributivity mean that
-        #
-        #   (b 2^s + cd 2^s) mod 2^32 = 2^s ((b + cd) mod 2^32)
-        #
-        # ...which is exactly what we need to factor out the shift.
+        # because 2^s ((b >> s) + c (d >> s)) = b + c d exactly. When b is below
+        # 2^31 the sum wraps only for an offset past 4 GiB, outside every buffer,
+        # so the mod is free. A larger b is either an offset past 2 GiB or a
+        # negative one, b - 2^32 (buf[i - 1]); there the sum wraps, so mask it.
+        (('iadd', 'a@64', ('u2u64', ('iadd', f'#b{is_mult_below_2g}',
+                                     ('amul', 'c@32', f'#d{is_mult}')))),
+         ('ulea_agx', a, ('iadd', ('ushr', b, s),
+                                  ('amul', 'c@32', ('ushr', d, s))), s)),
         (('iadd', 'a@64', ('u2u64', ('iadd', f'#b{is_mult}',
                                      ('amul', 'c@32', f'#d{is_mult}')))),
-         ('ulea_agx', a, ('iadd', ('ishr', b, s),
-                                  ('amul', 'c@32', ('ishr', d, s))), s)),
+         ('ulea_agx', a, ('iand', ('iadd', ('ushr', b, s),
+                                           ('amul', 'c@32', ('ushr', d, s))),
+                                  (1 << (32 - s)) - 1), s)),
     ]
 
 # 8-bit rules are lowest precedence since we really like to fuse shifts
@@ -383,6 +385,17 @@ for bits in range(1, 16):
          ('ubitfield_extract', a, 16, bits)),
     ])
 
+# Computing (2*b)*b first can overflow even when a - 2*a*b*b is finite.
+# Multiplying a first bounds the intermediates when the final result is finite;
+# keeping the factor of two in the final FMA also avoids overflow before the
+# subtraction. Only reassociate non-precise FP32 operations with no shared
+# intermediate. Run after the generic algebraic passes to preserve this order.
+avoid_square_overflow = [
+    (('~ffma@32', ('fneg', a),
+      ('~fmul(is_used_once)', ('~fmul(is_used_once)', 2.0, b), b), a),
+     ('ffma', -2.0, ('fmul', ('fmul', a, b), b), a)),
+]
+
 fold_aligned_bounds = []
 for shift in (1, 2):
     size = 1 << shift
@@ -394,6 +407,23 @@ for shift in (1, 2):
                ('iadd', ('iand', 'a@32', -size),
                               delta + size - 1), 'b@32'),
              ('ult', ('ushr', folded_offset, shift), ('ushr', b, shift))))
+
+# D3D float-to-integer conversions saturate and map NaN to 0. DXVK spells them
+# out as a conversion plus clamping selects; the M5 hardware conversion already
+# does exactly this (verified for both signs of NaN, infinities and every
+# boundary), so fold the selects into the bare conversion.
+fold_d3d_float_to_int = [
+    (('bcsel', ('fneu', 'a@32', a), 0,
+      ('bcsel', ('flt', a, -2147483648.0), -0x80000000,
+       ('bcsel', ('flt', 2147483520.0, a), 0x7fffffff, ('f2i32', a)))),
+     ('f2i32', a)),
+    (('bcsel', ('flt', 4294967040.0, 'a@32'), 0xffffffff,
+      ('f2u32', ('bcsel', ('fneu', a, a), 0.0, ('fmax', a, 0.0)))),
+     ('f2u32', a)),
+    (('bcsel', ('flt', 4294967040.0, 'a@32'), 0xffffffff,
+      ('f2u32', ('fmax', a, 0.0))),
+     ('f2u32', a)),
+]
 
 fold_selected_f2i32 = [
     (('bcsel@32(agx_selected_f2i32_controls_match)', 'a@1',
@@ -441,6 +471,8 @@ agx_selected_f2i32_controls_match(const nir_alu_instr *instr)
     print(nir_algebraic.AlgebraicPass("agx_nir_lower_algebraic_late",
                                       lower_sm5_shift + lower_pack +
                                       lower_selects).render())
+    print(nir_algebraic.AlgebraicPass("agx_nir_avoid_square_overflow",
+                                      avoid_square_overflow).render())
     print(nir_algebraic.AlgebraicPass("agx_nir_fuse_selects",
                                       opt_selects).render())
     print(nir_algebraic.AlgebraicPass("agx_nir_fold_pixel_coord",
@@ -449,6 +481,8 @@ agx_selected_f2i32_controls_match(const nir_alu_instr *instr)
                                       fold_extract16_bfe).render())
     print(nir_algebraic.AlgebraicPass("agx_nir_fuse_doubled_add",
                                       fuse_doubled_add).render())
+    print(nir_algebraic.AlgebraicPass("agx_nir_fold_d3d_float_to_int",
+                                      fold_d3d_float_to_int).render())
     print(nir_algebraic.AlgebraicPass("agx_nir_fuse_algebraic_late",
                                       fuse_extr + fuse_ubfe +
                                       fuse_imad + ixor_bcsel +

@@ -121,10 +121,18 @@ static void
 asahi_fill_cdm_command(struct hk_device *dev, struct hk_cs *cs,
                        struct drm_asahi_cmd_compute *cmd)
 {
-   size_t len = cs->stream_linked ? 65536 /* XXX */ : (cs->current - cs->start);
+   /* A linked stream leaves its root through a link record, so the root
+    * allocation bounds the part the kernel is given. */
+   size_t len =
+      cs->stream_linked ? cs->root_size : (cs->current - cs->start);
 
    *cmd = (struct drm_asahi_cmd_compute){
-      .flags = cs->m5_matrix_ops ? DRM_ASAHI_COMPUTE_USES_MATRIX : 0,
+      .flags = (cs->m5_matrix_ops ? DRM_ASAHI_COMPUTE_USES_MATRIX : 0) |
+               (!cs->query_access &&
+                      (dev->dev.params.features &
+                       DRM_ASAHI_FEATURE_COMPUTE_NO_QUERY_ACCESS)
+                   ? DRM_ASAHI_COMPUTE_NO_QUERY_ACCESS
+                   : 0),
       .cdm_ctrl_stream_base = cs->addr,
       .cdm_ctrl_stream_end = cs->addr + len,
 
@@ -134,7 +142,7 @@ asahi_fill_cdm_command(struct hk_device *dev, struct hk_cs *cs,
       .ts.end.offset = cs->timestamp.end.offset_B,
    };
 
-   if (cs->uses_sampler_heap) {
+   if (cs->uses_sampler_heap && !agx_stream_sampler_state(&dev->dev)) {
       cmd->sampler_heap = dev->samplers.table.bo->va->addr;
       cmd->sampler_count = dev->samplers.table.alloc;
    }
@@ -215,8 +223,10 @@ asahi_fill_vdm_command(struct hk_device *dev, struct hk_cs *cs,
    static_assert(sizeof(c->zls_ctrl) == sizeof(cs->cr.zls_control));
    memcpy(&c->zls_ctrl, &cs->cr.zls_control, sizeof(cs->cr.zls_control));
 
-   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip)) {
-      c->isp_zls_pixels = agx_chip_g17_m5(dev->dev.chip)
+   const bool g18g = dev->dev.chip == AGX_CHIP_G18G;
+   if (agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+       g18g) {
+      c->isp_zls_pixels = agx_chip_g17_m5(dev->dev.chip) || g18g
          ? hk_drm_m5_zls_pixels(
               cs->cr.zls_width, cs->cr.zls_height, cs->cr.depth.buffer,
               cs->cr.depth.meta, cs->cr.stencil.buffer, cs->cr.stencil.meta)
@@ -309,7 +319,7 @@ asahi_fill_vdm_command(struct hk_device *dev, struct hk_cs *cs,
    c->isp_scissor_base = cs->uploaded_scissor;
    c->isp_dbias_base = cs->uploaded_zbias;
 
-   if (cs->uses_sampler_heap) {
+   if (cs->uses_sampler_heap && !agx_stream_sampler_state(&dev->dev)) {
       c->sampler_heap = dev->samplers.table.bo->va->addr;
       c->sampler_count = dev->samplers.table.alloc;
    }
@@ -318,6 +328,14 @@ asahi_fill_vdm_command(struct hk_device *dev, struct hk_cs *cs,
 
    if (cs->cr.process_empty_tiles)
       c->flags |= DRM_ASAHI_RENDER_PROCESS_EMPTY_TILES;
+
+   /* Only a render that is its whole API pass: the streams hk splits one
+    * pass into carry no barrier between them and rely on the kernel's
+    * attachment ordering. */
+   if (cs->cr.whole_attachments && cs->g17p_pass_begins &&
+       cs->g17p_pass_ends && !cs->m5_continued_pass &&
+       (dev->dev.params.features & DRM_ASAHI_FEATURE_WHOLE_ATTACHMENT_RENDERS))
+      c->flags |= DRM_ASAHI_RENDER_WHOLE_ATTACHMENTS;
 
    if (cs->scratch.vs.main || cs->scratch.vs.preamble) {
       c->flags |= DRM_ASAHI_RENDER_VERTEX_SCRATCH;
@@ -386,8 +404,9 @@ asahi_append_compute_attachments(struct hk_device *dev,
                                  const struct hk_cs *cs)
 {
    /* Attachment spans are hints for the native AGX3 firmware interface.
-    * AGX2 has never sent them, so G13 and G14 keep that submission. */
-   if (!agx_native_graphics(&dev->dev))
+    * AGX2 has never sent them, so G13 and G14 keep that submission. G18G
+    * (M6) sends them as well. */
+   if (!agx_native_graphics(&dev->dev) && dev->dev.chip != AGX_CHIP_G18G)
       return;
 
    const struct hk_drm_attachment_set *set = &cs->compute_attachments;
@@ -411,7 +430,7 @@ asahi_append_fragment_attachments(struct hk_device *dev,
                                   const struct hk_cs *cs)
 {
    /* See asahi_append_compute_attachments(). */
-   if (!agx_native_graphics(&dev->dev))
+   if (!agx_native_graphics(&dev->dev) && dev->dev.chip != AGX_CHIP_G18G)
       return;
 
    const struct hk_drm_attachment_set *set = &cs->fragment_attachments;
@@ -568,6 +587,7 @@ queue_submit_looped(struct hk_device *dev, struct hk_queue *queue,
       }
 
       /* We need to fix up the barriers since barriers are ioctl-relative */
+      uint16_t slice_before[2] = {0, 0};
       for (unsigned scan = base_offs; scan < offs;) {
          struct drm_asahi_cmd_header *cmd = (void *)(cmdbuf + scan);
          scan += sizeof(*cmd) + cmd->size;
@@ -575,6 +595,16 @@ queue_submit_looped(struct hk_device *dev, struct hk_queue *queue,
          if (cmd->cmd_type != DRM_ASAHI_CMD_RENDER &&
              cmd->cmd_type != DRM_ASAHI_CMD_COMPUTE)
             continue;
+
+         /* A serialized command waits for every earlier one: the commands
+          * before it in this ioctl, or with none, all earlier ioctls (0).
+          * Its whole-submit index may not fit in 16 bits. */
+         if (queue->sync.serialize && !queue->sync.exact_prior) {
+            cmd->vdm_barrier = slice_before[0];
+            cmd->cdm_barrier = slice_before[1];
+            slice_before[cmd->cmd_type == DRM_ASAHI_CMD_COMPUTE]++;
+            continue;
+         }
 
          if (!hk_drm_rebase_prior(cmd, cmd + 1, submitted_vdm,
                                   submitted_cdm, prior_base,
@@ -694,9 +724,15 @@ hk_flush_bind(struct hk_bind_builder *b)
     * so we don't leave a gap.
     */
    struct drm_asahi_gem_bind_op op;
-   if (!b->mem) {
+   if (!b->mem && b->buffer && hk_sparse_buffer_unmapped(&b->dev->dev)) {
       op = (struct drm_asahi_gem_bind_op){
-         .handle = b->dev->dev.scratch_bo->uapi_handle,
+         .flags = DRM_ASAHI_BIND_UNBIND,
+         .addr = va_addr,
+         .range = b->size,
+      };
+   } else if (!b->mem) {
+      op = (struct drm_asahi_gem_bind_op){
+         .handle = b->dev->sparse_fill->uapi_handle,
          .flags = DRM_ASAHI_BIND_READ | DRM_ASAHI_BIND_WRITE |
                   agx_fill_bind_flags(&b->dev->dev),
          .addr = b->va->addr + b->resourceOffset,
@@ -720,6 +756,7 @@ hk_flush_bind(struct hk_bind_builder *b)
 
    if (!b->mem) {
       op.handle = b->dev->dev.zero_bo->uapi_handle;
+      op.flags = DRM_ASAHI_BIND_READ | agx_fill_bind_flags(&b->dev->dev);
    }
 
    util_dynarray_append(&b->binds, op);
@@ -747,7 +784,8 @@ hk_sparse_buffer_map_commit(struct hk_bind_builder *b)
       const uint64_t first = (op->addr - b->va->addr) / AIL_PAGESIZE;
       const uint64_t pages = DIV_ROUND_UP(op->range, AIL_PAGESIZE);
       const bool resident =
-         op->handle != b->dev->dev.scratch_bo->uapi_handle;
+         op->handle != b->dev->sparse_fill->uapi_handle &&
+         !(op->flags & DRM_ASAHI_BIND_UNBIND);
 
       VkResult result = hk_update_physical_sparse_map(
          b->dev, op->addr, op->range, !resident);
@@ -798,7 +836,7 @@ hk_sparse_image_map_commit(struct hk_bind_builder *b)
       const uint64_t resource_offset = op->addr - b->va->addr;
       const uint64_t size_page = ail_bytes_to_pages(op->range);
       const bool enabled =
-         op->handle != b->dev->dev.scratch_bo->uapi_handle;
+         op->handle != b->dev->sparse_fill->uapi_handle;
 
       for (uint64_t offs_page = 0; offs_page < size_page; ++offs_page) {
          const uint64_t target_page =
@@ -1327,6 +1365,19 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
 
    if (flush_sstt) {
       assert(queue->g17p_sstt_flush_bo);
+      if (agx_chip_g17_m5(dev->dev.chip) &&
+          (dev->dev.params.features & DRM_ASAHI_FEATURE_COMPUTE_RESOURCES)) {
+         /* This stream flushes metadata without dispatching a shader. Declare
+          * its empty resource list, as for other flush-only M5 streams.
+          */
+         const struct drm_asahi_cmd_header resources = {
+            .cmd_type = DRM_ASAHI_SET_COMPUTE_RESOURCES,
+            .size = 0,
+            .vdm_barrier = DRM_ASAHI_BARRIER_NONE,
+            .cdm_barrier = DRM_ASAHI_BARRIER_NONE,
+         };
+         util_dynarray_append(&payload, resources);
+      }
       struct drm_asahi_cmd_header header = agx_cmd_header(true, 0, 0);
       const struct drm_asahi_cmd_compute_with_prior cmd = {
          .legacy = {
@@ -1500,6 +1551,28 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
                cmd.prior_vdm = command_prior[HK_SYNC_VDM];
                cmd.prior_cdm = command_prior[HK_SYNC_CDM];
             }
+            if (dev->dev.chip == AGX_CHIP_G18G) {
+               /* G18 kernels consume the versioned resource suffix on
+                * every compute command (agx_batch.c's extended payload).
+                * The G18 kernel never advertises
+                * DRM_ASAHI_FEATURE_EXACT_PRIOR_BARRIERS, so
+                * queue->sync.exact_prior is always false here and the
+                * legacy (non-prior) command carries everything the G18
+                * UAPI accepts (w7Q PR-10 finding 4). */
+               struct drm_asahi_cmd_compute_g18 g18 = {
+                  .base.legacy = cmd.legacy,
+                  .resources = cs->g18_compute_resources,
+               };
+               g18.base.legacy.flags |= DRM_ASAHI_COMPUTE_G18_RESOURCES;
+               g18.resources.version = 1;
+               struct drm_asahi_cmd_header g18_header = header;
+               g18_header.size = sizeof(g18);
+               util_dynarray_append(&payload, g18_header);
+               util_dynarray_append_array(&payload, uint8_t, &g18,
+                                          sizeof(g18));
+               nr_cdm++;
+               continue;
+            }
             util_dynarray_append(&payload, header);
             util_dynarray_append_array(&payload, uint8_t, &cmd, header.size);
             nr_cdm++;
@@ -1555,13 +1628,26 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
             struct drm_asahi_cmd_render_with_prior cmd = {0};
             asahi_fill_vdm_command(dev, cs, &cmd.legacy);
 
+            /* M5: the vertex half's own render and compute prefixes, when
+             * they are narrower than the whole render's, so its tiling can
+             * overlap the fragment work of the renders only its fragment
+             * half depends on. Supersedes the single-subqueue forms below. */
+            const bool stage_prefixes =
+               agx_chip_g17_m5(dev->dev.chip) && !queue->sync.serialize &&
+               queue->sync.exact_prior &&
+               (dev->dev.params.features &
+                DRM_ASAHI_FEATURE_RENDER_STAGE_PREFIXES) &&
+               cs->sync.ta_split;
+            if (stage_prefixes)
+               cmd.legacy.flags |= DRM_ASAHI_RENDER_STAGE_PREFIXES;
+
             /* The render's vertex half depends on no earlier render while its
              * fragment half does (hk_sync: every render dependency targets
              * fragment or attachment work alone): let the kernel order only
              * the fragment half after them, so this render's vertex work can
              * overlap their fragment work. Compute dependencies keep ordering
              * the vertex half either way. */
-            if (!queue->sync.serialize &&
+            if (!stage_prefixes && !queue->sync.serialize &&
                 (dev->dev.params.features &
                  DRM_ASAHI_FEATURE_FRAGMENT_BARRIERS) &&
                 cs->sync.ta_split &&
@@ -1578,6 +1664,7 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
             STATIC_ASSERT(sizeof(struct drm_asahi_cmd_render_with_stage_prior) ==
                           sizeof(struct drm_asahi_cmd_render_with_prior) + 16);
             const bool stage_cdm =
+               !stage_prefixes &&
                agx_chip_g17_m5(dev->dev.chip) && queue->sync.exact_prior &&
                (dev->dev.params.features &
                 DRM_ASAHI_FEATURE_COMPUTE_STAGE_BARRIERS) &&
@@ -1591,7 +1678,8 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
                hk_frame_anatomy_render(anatomy, dev, cs, &cmd.legacy, i,
                                        nr_vdm + nr_cdm, payload.size);
             header.size = hk_drm_render_command_size(
-               agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip),
+               agx_native_graphics(&dev->dev) || agx_chip_g17_m5(dev->dev.chip) ||
+                  dev->dev.chip == AGX_CHIP_G18G,
                queue->sync.exact_prior);
             if (queue->sync.exact_prior) {
                cmd.prior_vdm = command_prior[HK_SYNC_VDM];
@@ -1616,6 +1704,18 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
                header.size = sizeof(extended);
                util_dynarray_append(&payload, header);
                util_dynarray_append_array(&payload, uint8_t, &extended, header.size);
+            } else if (stage_prefixes) {
+               const struct drm_asahi_cmd_render_with_stage_prefixes staged = {
+                  .legacy = cmd,
+                  .ta_cdm_barrier = cs->sync.barrier_ta[HK_SYNC_CDM],
+                  .ta_prior_cdm = cs->sync.prior_ta[HK_SYNC_CDM],
+                  .ta_vdm_barrier = cs->sync.barrier_ta[HK_SYNC_VDM],
+                  .ta_prior_vdm = cs->sync.prior_ta[HK_SYNC_VDM],
+               };
+               header.size = sizeof(staged);
+               util_dynarray_append(&payload, header);
+               util_dynarray_append_array(&payload, uint8_t, &staged,
+                                          header.size);
             } else if (stage_cdm) {
                const struct drm_asahi_cmd_render_with_stage_prior staged = {
                   .legacy = cmd,

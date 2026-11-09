@@ -940,7 +940,7 @@ hk_get_device_features(
        * offset for each mapping and its RO shadow; G17P's transactional
        * VM_BIND path retains each mapping independently. Residency metadata
        * is per resource VA, not per backing allocation. */
-      features->sparseResidencyAliased = agx_is_a18_pro(dev);
+      features->sparseResidencyAliased = sparse;
       features->sparseResidencyImage2D = sparse;
       /* The sparse binder and SSTT use the same slice layout for 3D images
        * as for 2D arrays. Report the nonstandard, one-slice block shape rather
@@ -968,7 +968,7 @@ hk_get_device_features(
        * quad encodings. The execution modes also select helper-capable
        * fragment entry and prevent merging triangles across derivative quads.
        */
-      features->shaderQuadControl = agx_is_a18_pro(dev);
+      features->shaderQuadControl = dev->chip == AGX_CHIP_G17P;
 
       /* Qualified on A18 Pro only. */
       if (dev->chip == AGX_CHIP_G17P) {
@@ -1041,8 +1041,11 @@ hk_get_device_properties(const struct agx_device *dev,
 
    /* Note: update nir_shader_compiler_options.max_samples when changing this. */
    const VkSampleCountFlagBits sample_counts =
-      VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_2_BIT | VK_SAMPLE_COUNT_4_BIT |
-      (agx_chip_g17_m5(dev->chip) ? VK_SAMPLE_COUNT_8_BIT : 0);
+      dev->chip == AGX_CHIP_G18G
+         ? VK_SAMPLE_COUNT_1_BIT
+         : (VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_2_BIT |
+            VK_SAMPLE_COUNT_4_BIT |
+            (agx_chip_g17_m5(dev->chip) ? VK_SAMPLE_COUNT_8_BIT : 0));
 
    /* Integer colour attachments and sampled multisample images use the same
     * native tile store/reload and texel-fetch paths as other colour formats.
@@ -1103,18 +1106,23 @@ hk_get_device_properties(const struct agx_device *dev,
                                (agx_chip_native_agx3(dev->chip) ? 15 : 0),
       .maxUniformBufferRange = 65536,
 
-      /* From a hardware perspective, storage buffers are lowered to global
-       * address arithmetic so there is no hard limit. However, making efficient
-       * use of the hardware addressing modes depends on no signed wrapping in
-       * any `amul` operations, which are themselves bounded by
-       * maxStorageBufferRange. Therefore, limit storage buffers to INT32_MAX
-       * bytes instead of UINT32_MAX. This is believed to be acceptable for
-       * Direct3D.
+      /* Storage buffers are lowered to global address arithmetic with a
+       * zero-extended 32-bit offset, so the whole 32-bit range works. Direct3D
+       * views reach just under 4 GiB.
+       *
+       * M5 and later fold constant index addends into a signed byte offset
+       * (agx_nir_lower_address() with byte_offsets), which sign-extends a
+       * scaled index and relies on every valid offset staying below 2^31.
+       * Keep them at INT32_MAX; G13/G14 and G17P take the full range.
        */
-      .maxStorageBufferRange = INT32_MAX,
+      .maxStorageBufferRange =
+         agx_chip_isa_encoding(dev->chip) == AGX_ISA_ENCODING_AGX2 ||
+               agx_chip_isa_encoding(dev->chip) == AGX_ISA_ENCODING_AGX3B
+            ? UINT32_MAX
+            : INT32_MAX,
       .maxPushConstantsSize = HK_MAX_PUSH_SIZE,
       .maxMemoryAllocationCount = 4096,
-      .maxSamplerAllocationCount = 4000,
+      .maxSamplerAllocationCount = 1 << 20,
       .bufferImageGranularity = 0x400,
       .sparseAddressSpaceSize = agx_chip_g17_m5(dev->chip)
                                    ? HK_M5_SPARSE_ADDR_SPACE_SIZE
@@ -1360,7 +1368,8 @@ hk_get_device_properties(const struct agx_device *dev,
       .shaderSignedZeroInfNanPreserveFloat32 = true,
       .shaderSignedZeroInfNanPreserveFloat64 = false,
       .shaderDenormPreserveFloat16 = true,
-      .shaderDenormPreserveFloat32 = false,
+      /* agx_nir_lower_denorm_preserve() computes flushed cases exactly. */
+      .shaderDenormPreserveFloat32 = dev->chip == AGX_CHIP_G17P,
       .shaderDenormPreserveFloat64 = false,
       .shaderDenormFlushToZeroFloat16 = false,
       .shaderDenormFlushToZeroFloat32 = true,
@@ -1414,7 +1423,8 @@ hk_get_device_properties(const struct agx_device *dev,
       .minSubgroupSize = 32,
       .maxSubgroupSize = 32,
       .maxComputeWorkgroupSubgroups = 1024 / 32,
-      .requiredSubgroupSizeStages = 0,
+      /* The only subgroup size is 32, so requiring it is always satisfied. */
+      .requiredSubgroupSizeStages = VK_SHADER_STAGE_COMPUTE_BIT,
       .maxInlineUniformBlockSize = HK_MAX_INLINE_UNIFORM_BLOCK_SIZE,
       .maxPerStageDescriptorInlineUniformBlocks = 32,
       .maxPerStageDescriptorUpdateAfterBindInlineUniformBlocks = 32,
@@ -1440,7 +1450,7 @@ hk_get_device_properties(const struct agx_device *dev,
       .maxPushDescriptors = HK_MAX_PUSH_DESCRIPTORS,
 
       /* VK_EXT_custom_border_color */
-      .maxCustomBorderColorSamplers = 4000,
+      .maxCustomBorderColorSamplers = 1 << 20,
 
       /* VK_EXT_extended_dynamic_state3 */
       .dynamicPrimitiveTopologyUnrestricted = true,
@@ -1563,6 +1573,19 @@ hk_get_device_properties(const struct agx_device *dev,
       .advancedBlendAllOperations = true,
    };
 
+   /* Strict residency on M5 relies on soft faults; see
+    * hk_sparse_buffer_unmapped(). */
+   if (agx_chip_g17_m5(dev->chip))
+      properties->sparseResidencyNonResidentStrict = agx_has_soft_fault(dev);
+
+   /* G17P maps unbound pages to a zeroed fill page, so they read zero, but
+    * the page is writable: a store or copy into an unbound page is read back
+    * afterwards, which strict residency forbids. Report it only where the
+    * driconf asks (vkd3d-proton, for tiled resources tier 2). */
+   if (dev->chip == AGX_CHIP_G17P)
+      properties->sparseResidencyNonResidentStrict =
+         instance->drirc.misc.sparse_strict_residency;
+
    if (agx_chip_native_agx3(dev->chip)) {
       /* Measured per operation under the G17P drm-shim:
        *
@@ -1579,8 +1602,8 @@ hk_get_device_properties(const struct agx_device *dev,
        * G17P uses the same lane instructions in native vertex/fragment
        * programs and the compute programs implementing tessellation and
        * geometry. Other AGX3 targets retain their stage restriction. */
-      properties->subgroupQuadOperationsInAllStages = agx_is_a18_pro(dev);
-      properties->sparseResidencyNonResidentStrict = false;
+      properties->subgroupQuadOperationsInAllStages =
+         dev->chip == AGX_CHIP_G17P;
    }
 
    snprintf(properties->deviceName, sizeof(properties->deviceName), "%s",
@@ -1667,7 +1690,7 @@ hk_env_cmp(const void *a, const void *b)
    return strcmp(*(const char *const *)a, *(const char *const *)b);
 }
 
-static uint64_t
+uint64_t
 hk_codegen_env_hash(void)
 {
    static const char *const runtime_only[] = {
@@ -1689,7 +1712,9 @@ hk_codegen_env_hash(void)
          for (size_t o = 0; o + l <= name_len && !skip; ++o)
             skip = !strncmp(*e + o, runtime_only[i], l);
       }
-      if (!skip)
+      /* HK_PERFTEST includes code-generation choices such as noborder. */
+      if (!skip || (name_len == strlen("HK_PERFTEST") &&
+                    !strncmp(*e, "HK_PERFTEST", name_len)))
          list[n++] = *e;
    }
    qsort(list, n, sizeof(list[0]), hk_env_cmp);
@@ -2008,7 +2033,9 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
          debug_get_bool_option("ASAHI_M5_NATIVE_RT", false);
       supported_extensions.KHR_ray_tracing_pipeline = native_rt;
       supported_extensions.KHR_ray_tracing_maintenance1 = native_rt;
-      supported_extensions.KHR_pipeline_library = native_rt;
+      /* Graphics pipeline libraries need VK_KHR_pipeline_library whether or
+       * not ray tracing pipelines are exposed. */
+      supported_extensions.KHR_pipeline_library |= native_rt;
    }
    supported_extensions.KHR_cooperative_matrix =
       agx_chip_g17_m5(pdev->dev.chip) &&
@@ -2032,7 +2059,7 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
 
    if (agx_native_graphics(&pdev->dev)) {
       supported_extensions.KHR_shader_quad_control =
-         agx_is_a18_pro(&pdev->dev);
+         pdev->dev.chip == AGX_CHIP_G17P;
    }
 
    /* VK_KHR_shader_fma makes shaderFmaFloat32 mandatory. */

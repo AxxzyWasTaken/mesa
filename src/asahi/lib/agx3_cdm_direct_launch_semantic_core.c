@@ -19,7 +19,7 @@ agx3_cdm_direct_launch_target_grounded(enum agx_chip chip)
    return agx3_cdm_launch_target_grounded(chip);
 }
 
-static bool
+bool
 agx3_cdm_direct_template_build(
    const struct agx3_cdm_direct_template_fields *fields,
    struct agx3_cdm_direct_template *result)
@@ -106,7 +106,7 @@ agx3_cdm_direct_template_build_from_sources(
    return agx3_cdm_direct_template_build(&fields, result);
 }
 
-static bool
+bool
 agx3_cdm_direct_template_decode(
    const struct agx3_cdm_direct_template *template_words,
    struct agx3_cdm_direct_template_fields *fields)
@@ -153,8 +153,8 @@ agx3_cdm_direct_dimension_word(uint8_t dimensions, uint32_t *word)
 static bool
 agx3_cdm_direct_g15x_bit31_allowed(enum agx_chip chip)
 {
-   return chip == AGX_CHIP_G15S || chip == AGX_CHIP_G15C ||
-          chip == AGX_CHIP_G15D;
+   return chip == AGX_CHIP_G15G || chip == AGX_CHIP_G15S ||
+          chip == AGX_CHIP_G15C || chip == AGX_CHIP_G15D;
 }
 
 bool

@@ -100,7 +100,8 @@ agx_nir_lower_cull_distance_vs(nir_shader *s)
 }
 
 bool
-agx_nir_lower_cull_distance_fs(nir_shader *s, unsigned nr_distances)
+agx_nir_lower_cull_distance_fs(nir_shader *s, unsigned nr_distances,
+                               bool native_constant_planes)
 {
    assert(s->info.stage == MESA_SHADER_FRAGMENT);
    assert(nr_distances > 0);
@@ -126,7 +127,26 @@ agx_nir_lower_cull_distance_fs(nir_shader *s, unsigned nr_distances)
        * zero across the primtive <==> cull distance is negative across the
        * primitive <==> the primitive is culled.
        */
-      culled = nir_ior(b, culled, nir_ball(b, nir_feq_imm(b, cf, 0)));
+      nir_def *zero = nir_ball(b, nir_feq_imm(b, cf, 0));
+
+      if (native_constant_planes) {
+         /* Native constant planes encode a marker in A, not a derivative.
+          * As in cf_constant_marker() in interpolation lowering, C holds
+          * the constant value when A has a small exponent and nonzero
+          * significand. Comparing the marker with floating zero would
+          * leave an all-negative cull half-space incorrectly visible.
+          */
+         nir_def *a = nir_channel(b, cf, 0);
+         nir_def *small_exponent =
+            nir_ult_imm(b, nir_iand_imm(b, a, 0x7f800000), 0x01000000);
+         nir_def *significand =
+            nir_ine_imm(b, nir_iand_imm(b, a, 0x007fffff), 0);
+         nir_def *constant = nir_iand(b, small_exponent, significand);
+         zero = nir_bcsel(b, constant,
+                          nir_feq_imm(b, nir_channel(b, cf, 2), 0), zero);
+      }
+
+      culled = nir_ior(b, culled, zero);
    }
 
    /* Emulate primitive culling by discarding fragments */

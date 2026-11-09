@@ -86,7 +86,7 @@ mock_bo_free(struct agx_device *dev, uint32_t handle)
 
 int
 __wrap_agx_bo_bind(struct agx_device *dev, struct agx_bo *bo, uint64_t address,
-                   uint64_t size, uint64_t offset, uint32_t flags)
+                   size_t size, uint64_t offset, uint32_t flags)
 {
    return bind_fails ? -1 : 0;
 }

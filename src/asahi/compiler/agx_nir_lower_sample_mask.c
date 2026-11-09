@@ -7,6 +7,7 @@
 #include "compiler/nir/nir_builder.h"
 #include "agx_compiler.h"
 #include "agx_debug.h"
+#include "agx_nir.h"
 #include "nir.h"
 #include "nir_builder_opcodes.h"
 #include "nir_intrinsics.h"
@@ -270,6 +271,76 @@ bool
 agx_nir_lower_sample_mask_m5(nir_shader *shader)
 {
    return lower_sample_mask(shader, true);
+}
+
+/* The split shader's testing flag is a whole-sample boolean (~0/0), not an
+ * arbitrary sample set. Preserve that provenance before sysval lowering and
+ * preamble promotion. G18 has witnessed full testing updates and non-testing
+ * kills, so mark the fused update for selection between those exact words:
+ *
+ *   sample_mask(testing | killed, killed ^ 0xff)
+ *     testing: sample_mask(0xff, killed ^ 0xff)
+ *     otherwise: sample_mask(killed, 0)
+ *
+ * The latter has disjoint TARGET/LIVE in the original and therefore performs
+ * no tests. Keep TARGET/LIVE and control flow unchanged: branching around a
+ * coverage operation could skip the pixel transaction entry on one path.
+ * Do not apply this to an arbitrary partial-target testing update.
+ */
+static bool
+mark_g18_sample_mask_tests(UNUSED nir_builder *b, nir_intrinsic_instr *intr,
+                            UNUSED void *data)
+{
+   if (intr->intrinsic != nir_intrinsic_sample_mask_agx ||
+       nir_intrinsic_flags(intr) || intr->src[0].ssa->bit_size != 16 ||
+       intr->src[1].ssa->bit_size != 16)
+      return false;
+
+   nir_alu_instr *target = nir_src_as_alu(intr->src[0]);
+   nir_alu_instr *live = nir_src_as_alu(intr->src[1]);
+   bool subset = false;
+   if (target && target->op == nir_op_iand) {
+      unsigned constant = nir_src_is_const(target->src[0].src) ? 0 : 1;
+      if (!nir_src_is_const(target->src[constant].src))
+         return false;
+      unsigned bits = nir_src_as_uint(target->src[constant].src);
+      if (!bits || (bits & ~ALL_SAMPLES))
+         return false;
+      target = nir_src_as_alu(target->src[constant ^ 1].src);
+      subset = true;
+   }
+   if (!target || target->op != nir_op_ior || !live ||
+       live->op != nir_op_ixor)
+      return false;
+
+   for (unsigned t = 0; t < 2; ++t) {
+      nir_intrinsic_instr *testing =
+         nir_src_as_intrinsic(target->src[t].src);
+      if (!testing || testing->intrinsic !=
+                         nir_intrinsic_load_shader_part_tests_zs_agx)
+         continue;
+
+      nir_src killed = target->src[1 - t].src;
+      for (unsigned k = 0; k < 2; ++k) {
+         if (!nir_srcs_equal(live->src[k].src, killed) ||
+             !nir_src_is_const(live->src[1 - k].src) ||
+             nir_src_as_uint(live->src[1 - k].src) != ALL_SAMPLES)
+            continue;
+
+         nir_intrinsic_set_flags(intr, subset ? AGX_SAMPLE_MASK_SUBSET_FULL_OR_KILL
+                                               : AGX_SAMPLE_MASK_FULL_OR_KILL);
+         return true;
+      }
+   }
+
+   return false;
+}
+
+bool
+agx_nir_mark_g18_sample_mask_tests(nir_shader *shader)
+{
+   return nir_shader_intrinsics_pass(shader, mark_g18_sample_mask_tests,
+                                     nir_metadata_all, NULL);
 }
 
 struct deferred_ctx {
@@ -1171,4 +1242,271 @@ bool
 agx_nir_lower_sample_mask_deferred_m5(nir_shader *shader)
 {
    return lower_sample_mask_deferred(shader, true, false, NULL);
+}
+
+bool
+agx_nir_coalesce_sample_mask_updates(nir_shader *shader, unsigned nr_samples)
+{
+   if ((nr_samples != 2 && nr_samples != 4) || shader->info.writes_memory ||
+       shader->info.fs.early_fragment_tests ||
+       shader->info.fs.needs_coarse_quad_helper_invocations ||
+       shader->info.fs.needs_full_quad_helper_invocations)
+      return false;
+
+   nir_function_impl *impl = nir_shader_get_entrypoint(shader);
+   nir_intrinsic_instr *updates[4];
+   unsigned update_bits[4];
+   unsigned count = 0, covered = 0;
+   const unsigned all = BITFIELD_MASK(nr_samples);
+   nir_block *update_block = NULL;
+   nir_def *target = NULL, *live = NULL;
+   unsigned flags = 0;
+
+   nir_foreach_block(block, impl) {
+      nir_foreach_instr(instr, block) {
+         if (instr->type != nir_instr_type_intrinsic)
+            continue;
+         nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+         if (intr->intrinsic != nir_intrinsic_sample_mask_agx)
+            continue;
+
+         /* Keep kill-only operations in place. Below, moving a testing
+          * update past one requires disjoint affected sample sets. */
+         if (nir_src_is_const(intr->src[1]) &&
+             nir_src_as_uint(intr->src[1]) == 0)
+            continue;
+
+         if (count == ARRAY_SIZE(updates) ||
+             (update_block && update_block != block))
+            return false;
+
+         nir_alu_instr *mask = nir_src_as_alu(intr->src[0]);
+         if (!mask || mask->op != nir_op_iand ||
+             intr->src[0].ssa->bit_size != 16 ||
+             intr->src[1].ssa->bit_size != 16)
+            return false;
+
+         unsigned constant = nir_src_is_const(mask->src[0].src) ? 0 : 1;
+         if (!nir_src_is_const(mask->src[constant].src))
+            return false;
+         unsigned bits = nir_src_as_uint(mask->src[constant].src);
+         nir_def *base = mask->src[constant ^ 1].src.ssa;
+         if (base->num_components != 1 ||
+             mask->src[constant].src.ssa->num_components != 1 ||
+             mask->src[constant ^ 1].swizzle[0] != 0 ||
+             mask->src[constant].swizzle[0] != 0)
+            return false;
+         if (!bits || (bits & ~all) || (covered & bits) ||
+             (target && target != base) ||
+             (live && live != intr->src[1].ssa) ||
+             (count && flags != nir_intrinsic_flags(intr)))
+            return false;
+
+         target = base;
+         live = intr->src[1].ssa;
+         flags = nir_intrinsic_flags(intr);
+         update_block = block;
+         covered |= bits;
+         update_bits[count] = bits;
+         updates[count++] = intr;
+      }
+   }
+
+   if (count < 2 || covered != all)
+      return false;
+
+   bool between = false;
+   unsigned next_update = 0, moved_samples = 0;
+   nir_foreach_instr(instr, update_block) {
+      if (instr == &updates[0]->instr)
+         between = true;
+      if (!between)
+         continue;
+      if (instr == &updates[count - 1]->instr)
+         break;
+      if (instr == &updates[next_update]->instr) {
+         moved_samples |= update_bits[next_update++];
+         continue;
+      }
+      if (instr->type == nir_instr_type_alu ||
+          instr->type == nir_instr_type_load_const)
+         continue;
+      if (instr->type != nir_instr_type_intrinsic)
+         return false;
+      nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+      if (intr->intrinsic == nir_intrinsic_sample_mask_agx) {
+         if (!nir_src_is_const(intr->src[1]) ||
+             nir_src_as_uint(intr->src[1]) != 0)
+            return false;
+         nir_alu_instr *mask = nir_src_as_alu(intr->src[0]);
+         if (!mask || mask->op != nir_op_iand ||
+             intr->src[0].ssa->bit_size != 16 ||
+             intr->src[0].ssa->num_components != 1)
+            return false;
+         unsigned constant = nir_src_is_const(mask->src[0].src) ? 0 : 1;
+         if (!nir_src_is_const(mask->src[constant].src) ||
+             mask->src[constant].src.ssa->num_components != 1 ||
+             mask->src[constant ^ 1].src.ssa->num_components != 1 ||
+             mask->src[constant].swizzle[0] != 0 ||
+             mask->src[constant ^ 1].swizzle[0] != 0)
+            return false;
+         unsigned killed = nir_src_as_uint(mask->src[constant].src);
+         if (killed & moved_samples)
+            return false;
+      } else if (intr->intrinsic != nir_intrinsic_export_agx &&
+          !nir_intrinsic_can_reorder(intr))
+         return false;
+   }
+
+   nir_builder b = nir_builder_at(nir_before_instr(&updates[count - 1]->instr));
+   nir_intrinsic_instr *combined = nir_sample_mask_agx(&b, target, live);
+   if (flags == AGX_SAMPLE_MASK_SUBSET_FULL_OR_KILL)
+      flags = AGX_SAMPLE_MASK_FULL_OR_KILL;
+   nir_intrinsic_set_flags(combined, flags);
+   for (unsigned i = 0; i < count; ++i)
+      nir_instr_remove(&updates[i]->instr);
+
+   return nir_progress(true, impl, nir_metadata_control_flow);
+}
+
+/*
+ * Give a G17P tile access the sample-mask source its hardware form actually
+ * takes.
+ *
+ * At one sample the operand is the whole-pixel immediate, which is what Mesa
+ * already spells as ALL_SAMPLES, so nothing has to happen.
+ *
+ * At two or four samples there is no immediate form at all. Apple's compiler
+ * reads the live coverage word out of a special register and passes that
+ * register as the mask -- raw for a per-pixel shader ("every sample this
+ * fragment covers"), ANDed with a one-hot bit for each iteration of an
+ * unrolled per-sample shader. Reproduce exactly those two shapes.
+ *
+ * A non-constant mask is already an expression in a register, so it is left
+ * alone and reaches the packer as the register form by itself. An epilog
+ * unrolled per sample (agx_nir_unroll_g17p_samples) has folded each sample's
+ * `mask & active_samples` to that sample's one-hot constant beforehand, so it
+ * too becomes coverage ANDed with the sample's bit.
+ */
+struct g17p_tile_sample_state {
+   unsigned samples;
+   nir_def *coverage;
+   nir_block *block;
+   /* msaa163: G18G reads the coverage as the 16-bit active-sample word (W16
+    * SR39); the agx3c encoder G18G compiles through has no load_sample_mask
+    * form. */
+   bool g18;
+};
+
+static bool
+lower_g17p_tile_sample(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+{
+   struct g17p_tile_sample_state *state = data;
+   unsigned src;
+   switch (intr->intrinsic) {
+   case nir_intrinsic_load_local_pixel_agx:
+      src = 0;
+      break;
+   case nir_intrinsic_store_local_pixel_agx:
+      src = 1;
+      break;
+   default:
+      /* Coverage changes at depth/stencil writes, demotes and interlocks.
+       * Conservatively end the local reuse window at any side effect. */
+      if (!(nir_intrinsic_infos[intr->intrinsic].flags &
+            NIR_INTRINSIC_CAN_ELIMINATE))
+         state->coverage = NULL;
+      return false;
+   }
+
+   const unsigned samples = state->samples;
+   if (samples == 1) {
+      /* Per-sample epilogs still carry a dynamic active-sample mask, but
+       * there is only sample zero. The native 1x tile instruction takes the
+       * whole-pixel immediate; preserve its form for these epilogs. */
+      if (nir_src_is_const(intr->src[src]) &&
+          nir_src_as_uint(intr->src[src]) == ALL_SAMPLES)
+         return false;
+
+      b->cursor = nir_before_instr(&intr->instr);
+      nir_src_rewrite(&intr->src[src],
+                      nir_imm_intN_t(b, ALL_SAMPLES, 16));
+      return true;
+   }
+
+   /* Already a live expression: the per-sample lowerings have ANDed the mask
+    * with an active-sample register, which is the register form. */
+   if (!nir_src_is_const(intr->src[src]))
+      return false;
+
+   const unsigned mask = nir_src_as_uint(intr->src[src]);
+   if (mask == 0) {
+      /* Static unrolling can prove that the API mask excludes this sample.
+       * A zero-coverage tile access is dead, and keeping it would turn one
+       * surviving sample into an unsupported mixed zero/nonzero protocol. */
+      b->cursor = nir_before_instr(&intr->instr);
+      if (intr->intrinsic == nir_intrinsic_load_local_pixel_agx) {
+         nir_def_rewrite_uses(
+            &intr->def,
+            nir_undef(b, intr->def.num_components, intr->def.bit_size));
+      }
+      nir_instr_remove(&intr->instr);
+      return true;
+   }
+
+   if (mask != ALL_SAMPLES &&
+       mask >= (1u << samples))
+      return false;
+
+   b->cursor = nir_before_instr(&intr->instr);
+
+   /* active_samples_agx is a loop system value: NIR may CSE it across
+    * depth/stencil writes. At this point we need the hardware's *current*
+    * coverage, including the tests for this particular unrolled sample.
+    * load_sample_mask is ordered and lowers to the same G17P SR39 read. */
+   if (!state->coverage || state->block != intr->instr.block) {
+      state->coverage = state->g18 ? nir_load_active_samples_agx(b)
+                                   : nir_u2u16(b, nir_load_sample_mask(b));
+      state->block = intr->instr.block;
+   }
+   nir_def *coverage = state->coverage;
+   nir_def *sel = (mask == ALL_SAMPLES)
+                     ? coverage
+                     : nir_iand(b, coverage, nir_imm_intN_t(b, mask, 16));
+
+   nir_src_rewrite(&intr->src[src], sel);
+   return true;
+}
+
+bool
+agx_nir_lower_g17p_tile_samples(nir_shader *s, unsigned nr_samples)
+{
+   if (nr_samples != 1 && nr_samples != 2 && nr_samples != 4 && nr_samples != 8)
+      return false;
+
+   struct g17p_tile_sample_state state = {.samples = nr_samples};
+   return nir_shader_intrinsics_pass(s, lower_g17p_tile_sample,
+                                     nir_metadata_control_flow, &state);
+}
+
+bool
+agx_nir_lower_g18_tile_samples(nir_shader *s, unsigned nr_samples)
+{
+   /* Native326 adds two samples to the existing four-sample SR39 protocol. */
+   if (nr_samples != 2 && nr_samples != 4)
+      return false;
+
+   struct g17p_tile_sample_state state = {.samples = nr_samples, .g18 = true};
+   return nir_shader_intrinsics_pass(s, lower_g17p_tile_sample,
+                                     nir_metadata_control_flow, &state);
+}
+
+bool
+agx_nir_lower_g17p_1x_tile_samples(nir_shader *s)
+{
+   /* Honeykrisp advertises only one sample on G17P.  Per-sample epilog
+    * lowering still materializes `1 << sample_id`, but sample_id can only be
+    * zero.  Native 1x fragments encode the ordinary whole-pixel LSTCOL/LLDCOL
+    * forms, which carry no sample operand. */
+   return agx_nir_lower_g17p_tile_samples(s, 1);
 }

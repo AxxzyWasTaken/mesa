@@ -8,6 +8,7 @@
  */
 
 #include <stdint.h>
+#include "asahi/compiler/agx_debug.h"
 #include "asahi/compiler/agx_nir_texture.h"
 #include "asahi/layout/layout.h"
 #include "compiler/nir/nir_builder.h"
@@ -23,6 +24,7 @@
 #include "util/hash_table.h"
 #include "util/macros.h"
 #include "util/ralloc.h"
+#include "util/box.h"
 #include "util/u_sampler.h"
 #include "util/u_surface.h"
 #include "agx_state.h"
@@ -743,16 +745,66 @@ agx_blit(struct pipe_context *pipe, const struct pipe_blit_info *info)
          /* Resolve stencil by selecting sample zero, but preserve every
           * sample when copying between multisample images. G17P sample
           * shading handles the latter through the shared static lowering.
+          * Equal-sample-count G18 copies must preserve each source sample;
+          * its render blitter supports the per-sample shading path.
           */
-         stencil.sample0_only = info->src.resource->nr_samples > 1 &&
-                                info->dst.resource->nr_samples <= 1;
+         if (agx_device(pipe->screen)->chip == AGX_CHIP_G18G) {
+            const bool preserve_samples =
+               util_res_sample_count(stencil.src.resource) ==
+                  util_res_sample_count(stencil.dst.resource);
+            stencil.sample0_only =
+               info->src.resource->nr_samples > 1 && !preserve_samples;
+         } else {
+            stencil.sample0_only = info->src.resource->nr_samples > 1 &&
+                                   info->dst.resource->nr_samples <= 1;
+         }
          agx_blit(pipe, &stencil);
          return;
       }
    }
 
+   if (agx_device(pipe->screen)->debug & AGX_DBG_FAULTTRACE) {
+      fprintf(stderr,
+              "M5_BLIT %s %ux%u L%u -> %s %ux%u L%u mask=%#x filter=%u "
+              "scissor=%u samples=%u->%u\n",
+              util_format_name(info->src.format), info->src.box.width,
+              info->src.box.height, info->src.level,
+              util_format_name(info->dst.format), info->dst.box.width,
+              info->dst.box.height, info->dst.level, info->mask, info->filter,
+              info->scissor_enable, info->src.resource->nr_samples,
+              info->dst.resource->nr_samples);
+   }
+
+
    if (info->render_condition_enable && !agx_render_condition_check(ctx))
       return;
+
+   /* G17G: a blit that only copies bits (same view format, no scaling,
+    * filtering, masking, scissor or swizzle) goes through the CPU copy that
+    * resource_copy_region uses. This covers glCopyImageSubData between
+    * different formats of one size, which the state tracker turns into a
+    * reinterpreting blit; the draw path refuses most of those formats. */
+   if (agx_device(pipe->screen)->chip == AGX_CHIP_G17G &&
+       (info->src.format != info->src.resource->format ||
+        info->dst.format != info->dst.resource->format) &&
+       util_can_blit_via_copy_region(info, true, false)) {
+      enum pipe_format sf = info->src.resource->format;
+      enum pipe_format df = info->dst.resource->format;
+      if (!util_format_is_compressed(sf) && !util_format_is_compressed(df) &&
+          !util_format_is_depth_or_stencil(sf) &&
+          !util_format_is_depth_or_stencil(df) &&
+          info->src.resource->nr_samples <= 1 &&
+          info->dst.resource->nr_samples <= 1 &&
+          util_format_get_blocksize(sf) == util_format_get_blocksize(df) &&
+          util_format_get_blocksize(sf) ==
+             util_format_get_blocksize(info->src.format)) {
+         util_resource_copy_region(pipe, info->dst.resource, info->dst.level,
+                                   info->dst.box.x, info->dst.box.y,
+                                   info->dst.box.z, info->src.resource,
+                                   info->src.level, &info->src.box);
+         return;
+      }
+   }
 
    /* Legalize compression /before/ calling into u_blitter to avoid recursion.
     * u_blitter bans recursive usage.
@@ -763,6 +815,20 @@ agx_blit(struct pipe_context *pipe, const struct pipe_blit_info *info)
    agx_legalize_compression(ctx, agx_resource(info->src.resource),
                             info->src.format);
 
+   /* The current G18 fused EOT resolve replaces the multisample store. GL
+    * requires the source samples to survive a resolve, including subsequent
+    * texture fetches and resolves. Store them first and use the render blitter
+    * to fetch and average every sample until EOT can preserve both outputs. */
+   const bool g18_msaa4 =
+      agx_device(ctx->base.screen)->chip == AGX_CHIP_G18G &&
+      agx_g18_msaa4_enabled();
+
+   /* G17G resolves through u_blitter's sample fetches instead. Attaching
+    * the resolve to the batch that drew the multisample image makes its EOT
+    * store only the resolved target, so the samples themselves were never
+    * written and the next pass reloaded stale memory (dEQP-GLES3
+    * multisample.fbo_4_samples.stencil: samples a stencil test rejected
+    * came back zero; gpu/msstencil.c in m5air). */
    if (agx_native_graphics(agx_device(ctx->base.screen)) &&
        agx_g17p_direct_resolve_blit_shape(info, true) &&
        agx_g17p_attach_direct_resolve(ctx, info->src.resource,
@@ -773,6 +839,28 @@ agx_blit(struct pipe_context *pipe, const struct pipe_blit_info *info)
        agx_g17p_staged_resolve_blit_shape(info) &&
        agx_g17p_staged_resolve_blit(ctx, info))
       return;
+
+   /* The render blitter fetches every stored sample and performs the format's
+    * resolve in the shader. A non-layered framebuffer can select any valid
+    * layer of the supported array storage; u_blitter carries that layer into
+    * the source coordinates. Keep the single-layer extent and storage checks.
+    */
+   if (g18_msaa4 && util_res_sample_count(info->src.resource) > 1 &&
+       (!agx_g18_msaa4_storage(agx_device(ctx->base.screen),
+                                agx_resource(info->src.resource),
+                                info->src.format) ||
+        info->src.level != 0 || info->src.box.z < 0 ||
+        (unsigned)info->src.box.z >= info->src.resource->array_size ||
+        info->src.box.depth != 1)) {
+      mesa_loge("asahi: G18G multisample blit source %s %ux%u has "
+                "unsupported sample count, format or storage layout "
+                "(level=%u layer=%d depth=%d samples=%u target=%u)",
+                util_format_name(info->src.format), info->src.box.width,
+                info->src.box.height, info->src.level, info->src.box.z,
+                info->src.box.depth, util_res_sample_count(info->src.resource),
+                info->src.resource->target);
+      return;
+   }
 
    if (asahi_compute_blit_supported(agx_device(ctx->base.screen)->chip,
                                     info)) {
@@ -794,6 +882,8 @@ agx_blit(struct pipe_context *pipe, const struct pipe_blit_info *info)
       ctx, ctx->blitter,
       ASAHI_BLIT |
          (info->render_condition_enable ? 0 : ASAHI_DISABLE_RENDER_COND));
+   if (agx_device(pipe->screen)->debug & AGX_DBG_FAULTTRACE)
+      fprintf(stderr, "M5_BLIT entering u_blitter\n");
    util_blitter_blit(ctx->blitter, info, NULL);
 
    /* The first DRI drawable validation seeds its private MSAA colourbuffer
@@ -875,6 +965,17 @@ agx_resource_copy_region(struct pipe_context *pctx, struct pipe_resource *dst,
                          unsigned dstz, struct pipe_resource *src,
                          unsigned src_level, const struct pipe_box *src_box)
 {
+   if (agx_device(pctx->screen)->chip == AGX_CHIP_G17G) {
+      /* Copy through transfer maps, which synchronize with the GPU: G17G
+       * has no precompiled copy kernels (agx_launch_precomp refuses the
+       * batch), and a copy blit's render target is mostly outside the
+       * native PBE profile (mip levels, layers, most formats), so its batch
+       * would be dropped while the blit reported success. */
+      util_resource_copy_region(pctx, dst, dst_level, dstx, dsty, dstz, src,
+                                src_level, src_box);
+      return;
+   }
+
    if (dst->target == PIPE_BUFFER && src->target == PIPE_BUFFER) {
       struct agx_batch *batch = agx_get_compute_batch(agx_context(pctx));
       agx_batch_init_state(batch);
@@ -916,4 +1017,97 @@ agx_resource_copy_region(struct pipe_context *pctx, struct pipe_resource *dst,
    /* CPU fallback */
    util_resource_copy_region(pctx, dst, dst_level, dstx, dsty, dstz, src,
                              src_level, src_box);
+}
+
+/* G17G: generate mipmaps on the CPU. The blitter renders into the levels
+ * above the base, which the native PBE profile refuses (only level 0 of a
+ * single-level 2D target is proven), so those batches were dropped while
+ * the generation reported success. Box-filter 2x2 (2x2x2 for 3D) in float
+ * through texture maps; sRGB unpacks to linear and packs back. Returning
+ * false leaves compressed, integer and depth formats to the generic path.
+ */
+bool
+agx_generate_mipmap_g17g(struct pipe_context *pctx, struct pipe_resource *prsc,
+                         enum pipe_format format, unsigned base_level,
+                         unsigned last_level, unsigned first_layer,
+                         unsigned last_layer)
+{
+   const struct util_format_unpack_description *unpack =
+      util_format_unpack_description(format);
+   const struct util_format_pack_description *pack =
+      util_format_pack_description(format);
+   if (util_format_is_compressed(format) ||
+       util_format_is_pure_integer(format) ||
+       util_format_is_depth_or_stencil(format) || prsc->nr_samples > 1 ||
+       !unpack || !unpack->unpack_rgba || !pack || !pack->pack_rgba_float)
+      return false;
+
+   const bool is_3d = prsc->target == PIPE_TEXTURE_3D;
+   const unsigned bs = util_format_get_blocksize(format);
+
+   for (unsigned level = base_level + 1; level <= last_level; ++level) {
+      const unsigned sw = u_minify(prsc->width0, level - 1);
+      const unsigned sh = u_minify(prsc->height0, level - 1);
+      const unsigned sd = is_3d ? u_minify(prsc->depth0, level - 1) : 1;
+      const unsigned dw = u_minify(prsc->width0, level);
+      const unsigned dh = u_minify(prsc->height0, level);
+      const unsigned dd = is_3d ? u_minify(prsc->depth0, level) : 1;
+      const unsigned layers = is_3d ? 1 : last_layer - first_layer + 1;
+
+      for (unsigned l = 0; l < layers; ++l) {
+         const unsigned z0 = is_3d ? 0 : first_layer + l;
+         struct pipe_box sbox, dbox;
+         u_box_3d(0, 0, z0, sw, sh, sd, &sbox);
+         u_box_3d(0, 0, z0, dw, dh, dd, &dbox);
+         struct pipe_transfer *src_xfer, *dst_xfer;
+         const uint8_t *src = pctx->texture_map(
+            pctx, prsc, level - 1, PIPE_MAP_READ, &sbox, &src_xfer);
+         if (!src)
+            return false;
+         uint8_t *dst = pctx->texture_map(
+            pctx, prsc, level, PIPE_MAP_WRITE | PIPE_MAP_DISCARD_RANGE,
+            &dbox, &dst_xfer);
+         if (!dst) {
+            pctx->texture_unmap(pctx, src_xfer);
+            return false;
+         }
+
+         for (unsigned z = 0; z < dd; ++z) {
+            for (unsigned y = 0; y < dh; ++y) {
+               for (unsigned x = 0; x < dw; ++x) {
+                  float acc[4] = {0};
+                  unsigned n = 0;
+                  for (unsigned oz = 0; oz < (sd > 1 ? 2 : 1); ++oz) {
+                     for (unsigned oy = 0; oy < (sh > 1 ? 2 : 1); ++oy) {
+                        for (unsigned ox = 0; ox < (sw > 1 ? 2 : 1); ++ox) {
+                           const unsigned sx = MIN2(2 * x + ox, sw - 1);
+                           const unsigned sy = MIN2(2 * y + oy, sh - 1);
+                           const unsigned sz = MIN2(2 * z + oz, sd - 1);
+                           float px[4];
+                           util_format_unpack_rgba(
+                              format, px,
+                              src + sz * src_xfer->layer_stride +
+                                 sy * src_xfer->stride + sx * bs,
+                              1);
+                           for (unsigned c = 0; c < 4; ++c)
+                              acc[c] += px[c];
+                           n++;
+                        }
+                     }
+                  }
+                  for (unsigned c = 0; c < 4; ++c)
+                     acc[c] /= n;
+                  util_format_pack_rgba(format,
+                                        dst + z * dst_xfer->layer_stride +
+                                           y * dst_xfer->stride + x * bs,
+                                        acc, 1);
+               }
+            }
+         }
+
+         pctx->texture_unmap(pctx, dst_xfer);
+         pctx->texture_unmap(pctx, src_xfer);
+      }
+   }
+   return true;
 }

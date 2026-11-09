@@ -18,10 +18,17 @@ is_b(enum agx_isa_encoding e)
    return e == AGX_ISA_ENCODING_AGX3B;
 }
 
+/*
+ * G18G (agx3d) keeps pixwait and pixrel bit for bit: all 212 aligned
+ * applegpu_g17g/applegpu_g18g pixwait words and all 106 pixrel words of the
+ * j813-linux gpu/m5-*-reference corpus are byte-identical, and so are the
+ * oracle and glxgears fragment epilogues (07 30 00 05 00 00, 67 40 00 05 00 00,
+ * 67 10 00 04 00 00). Their wait field stays a mask on agx3d.
+ */
 static bool
 enc_ok(enum agx_isa_encoding e)
 {
-   return e == AGX_ISA_ENCODING_AGX3B || e == AGX_ISA_ENCODING_AGX3C;
+   return e == AGX_ISA_ENCODING_AGX3B || agx_encoding_is_g17_class(e);
 }
 
 static unsigned
@@ -78,8 +85,8 @@ agx3_pixel_colour_entry(enum agx_isa_encoding enc,
 
    const struct agx3_field_kv fields[] = {KV(14, 512), KV(15, 1)};
    const struct agx3_field_kv base_c[] = {KV(16, 3), KV(17, 122)};
-   if (!agx3_bind_compose(enc, "pixwait", 0, fields, NELEM(fields),
-                          is_b(enc) ? NULL : base_c,
+   if (!agx3_bind_compose(enc, "pixwait", agx3_bind_ep(enc, 0), fields,
+                          NELEM(fields), is_b(enc) ? NULL : base_c,
                           is_b(enc) ? 0 : NELEM(base_c),
                           out, len)) {
       memset(out, 0, AGX3_PIXEL_MAX_LENGTH);
@@ -218,7 +225,8 @@ agx3_pixel_wait(enum agx_isa_encoding enc, uint32_t writeout,
    ov[n++] = (struct agx3_field_kv)KV(34, writeout == 1 ? 0 : 1);
    n = wait_overrides(enc, wait_mask, 18, ov, n);
 
-   if (!agx3_bind_compose(enc, "pixwait", 0, is_b(enc) ? NULL : base_c,
+   if (!agx3_bind_compose(enc, "pixwait", agx3_bind_ep(enc, 0),
+                          is_b(enc) ? NULL : base_c,
                           is_b(enc) ? 0 : NELEM(base_c), ov, n, out,
                           len)) {
       memset(out, 0, AGX3_PIXEL_MAX_LENGTH);
@@ -255,7 +263,8 @@ agx3_pixel_release(enum agx_isa_encoding enc, uint32_t writeout, bool last,
    ov[n++] = (struct agx3_field_kv)KV(14, writeout | (last ? 0x200u : 0u));
    n = wait_overrides(enc, wait_mask, 17, ov, n);
 
-   if (!agx3_bind_compose(enc, "pixrel", 0, is_b(enc) ? NULL : base_c,
+   if (!agx3_bind_compose(enc, "pixrel", agx3_bind_ep(enc, 0),
+                          is_b(enc) ? NULL : base_c,
                           is_b(enc) ? 0 : NELEM(base_c), ov, n, out,
                           len)) {
       memset(out, 0, AGX3_PIXEL_MAX_LENGTH);

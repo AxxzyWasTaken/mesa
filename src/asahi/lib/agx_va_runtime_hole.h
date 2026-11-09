@@ -15,6 +15,17 @@
 #define AGX_G17_RUNTIME_GRAPH_VA_START UINT64_C(0x7000000000)
 #define AGX_G17_RUNTIME_GRAPH_VA_END   UINT64_C(0x7100000000)
 
+/* The T8122 (M3, G15G) kernel runtime reserves, in every VM, the top half of
+ * the 2^40 USC window, 0x7000000000 up to 0x8000000000, its own USC base at
+ * 0x1000000000-0x1008000000 and 0x1074000000-0x1074028000. A bind that touches
+ * one fails with EINVAL. These mirror Runtime::new_vm in
+ * drivers/gpu/drm/asahi/m3/m3_runtime.rs as of omacom/linux-aurora 4888ad0a0f
+ * (merged in be6381f9d2) by hand, until the kernel reports them. */
+#define AGX_T8122_RUNTIME_WINDOW_HIGH    UINT64_C(0x10080000000)
+#define AGX_T8122_RUNTIME_WINDOW_END     UINT64_C(0x10100000000)
+#define AGX_T8122_RUNTIME_RESERVED_START UINT64_C(0x7000000000)
+#define AGX_T8122_RUNTIME_RESERVED_END   UINT64_C(0x8000000000)
+
 /* T8140's channel-owned AXFB aliases are installed by the kernel in
  * every render-capable client root.  This range falls inside G17P's 4-GiB USC
  * heap, so userspace must remove it from the allocator before creating any
@@ -86,6 +97,48 @@
    (AGX_G17P_VDM_ALIAS_SIZE - \
     (AGX_G17P_VDM_ALIAS_RESERVED_END - AGX_G17P_VDM_ALIAS_RESERVED_START))
 
+/* The exclusive top of the main heap and its sparse alias. Native AGX3 chips
+ * keep the heap below the USC window, bounded by the absolute 36-bit-shr(3)
+ * USC Texture/Sampler field (2^39) and, on G17P, the compact VDM aperture. On
+ * T8122 (G15G) it also stops below the runtime's 0x7000000000 reservation,
+ * which leaves the heap [0x4000000000, 0x5000000000) and its alias
+ * [0x5000000000, 0x6000000000). Other chips keep the kernel's limit. */
+static inline uint64_t
+agx_va_user_limit(enum agx_chip chip, bool heap_below_usc, uint64_t kernel_start)
+{
+   if (!heap_below_usc)
+      return kernel_start;
+   return chip == AGX_CHIP_G15G ? AGX_T8122_RUNTIME_RESERVED_START
+                                : AGX_G17P_USER_LIMIT;
+}
+
+/*
+ * Client-root ranges the kernel reserves inside that same compact window for
+ * its own render-state objects (drivers/gpu/drm/asahi/g17_resources.rs, the
+ * G17P VM `reserved_ranges`). A user bind that overlaps one is refused with a
+ * bare EINVAL before it reaches the page tables, so the alias heap must never
+ * hand them out. Offsets from AGX_G17P_VDM_USER_BASE; each extent is derived
+ * from the kernel constant named beside it. Keep this table in step with the
+ * kernel: a stale entry costs address space, a missing one costs an aborted
+ * process the first time a client holds more live command BOs than fit below
+ * the arena (Firefox WebRender + WebGL: 32 batches x 768 KiB = exactly the
+ * 24 MiB between +8 MiB and G17P_RENDER_USER_ALIAS_START).
+ */
+/* G17P_RENDER_USER_ALIAS: 2 render pairs x 2 generations x 512-KiB slots. */
+#define AGX_G17P_KERNEL_RENDER_USER_ALIAS_START UINT64_C(0x02000000)
+#define AGX_G17P_KERNEL_RENDER_USER_ALIAS_END   UINT64_C(0x02200000)
+/* G17P_RENDER_TVB_GROWTH: (G17P_PM_MAX_OWNED_BLOCKS 0xd19 - 32 native
+ * blocks) x G17P_RENDER_TVB_BLOCK_STRIDE 0x28000. */
+#define AGX_G17P_KERNEL_TVB_GROWTH_START        UINT64_C(0x04000000)
+#define AGX_G17P_KERNEL_TVB_GROWTH_END          UINT64_C(0x246e8000)
+/* Render pair 1's disjoint TVB pool: growth start + G17P_RENDER_TVB_PAIR_STRIDE
+ * 0x28000000, then 0xd19 blocks x 0x28000. */
+#define AGX_G17P_KERNEL_TVB_PAIR1_START         UINT64_C(0x2c000000)
+#define AGX_G17P_KERNEL_TVB_PAIR1_END           UINT64_C(0x4cbe8000)
+/* G17P_RENDER_RT_DYNAMIC: 2 pairs x (32-MiB TPC + 4 x 8-MiB TMAP/HMTA). */
+#define AGX_G17P_KERNEL_RT_DYNAMIC_START        UINT64_C(0x50000000)
+#define AGX_G17P_KERNEL_RT_DYNAMIC_END          UINT64_C(0x58000000)
+
 /*
  * Reduce the kernel-reported user VA window to the power-of-two window the
  * driver actually allocates from, and derive the address bit that tells a
@@ -112,6 +165,10 @@ bool agx_capture_replay_heap_init(struct util_vma_heap *main_heap,
                                   struct util_vma_heap *replay_heap,
                                   uint64_t user_size);
 bool agx_g17p_vdm_alias_range_valid(uint64_t addr, uint64_t size);
+/* True if [addr, addr + size) touches a kernel-reserved client-root range. */
+bool agx_g17p_vdm_alias_kernel_reserved(uint64_t addr, uint64_t size);
+/* Bytes the alias heap can hand out once the kernel arenas are carved out. */
+uint64_t agx_g17p_vdm_alias_heap_capacity(void);
 bool agx_g17p_vdm_alias_compact(uint64_t addr, uint32_t *offset);
 
 /* agx_g17p_vdm_alias_compact() for one byte at addr, for per-draw callers. */

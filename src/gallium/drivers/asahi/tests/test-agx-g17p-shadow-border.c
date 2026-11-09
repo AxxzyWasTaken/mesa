@@ -191,7 +191,8 @@ compare(unsigned func, float ref, float depth)
 }
 
 static void
-check_compile(unsigned sampler, bool dynamic, bool fragment)
+check_compile(enum agx_chip chip, unsigned sampler, bool dynamic,
+              bool fragment)
 {
    nir_shader *s = build(-0.5, sampler, dynamic);
    if (fragment)
@@ -199,7 +200,7 @@ check_compile(unsigned sampler, bool dynamic, bool fragment)
    CHECK(agx_nir_lower_custom_border_g17p(s, true));
    struct agx_compiled_shader compiled = {0};
    struct agx_shader_key key = {
-      .dev = {.chip = AGX_CHIP_G17P, .encoding = AGX_ISA_ENCODING_AGX3B},
+      .dev = {.chip = chip, .encoding = AGX_ISA_ENCODING_AGX3B},
       .no_preamble = true,
    };
    key.fs.nr_samples = 1;
@@ -235,7 +236,7 @@ static void
 check_uniforms(void)
 {
    const enum agx_chip chips[] = {AGX_CHIP_G13G, AGX_CHIP_G14G,
-      AGX_CHIP_G15S, AGX_CHIP_G15C, AGX_CHIP_G17P};
+      AGX_CHIP_G15S, AGX_CHIP_G15C, AGX_CHIP_G16G, AGX_CHIP_G17P};
    const enum pipe_format formats[] = {PIPE_FORMAT_Z16_UNORM,
       PIPE_FORMAT_Z24_UNORM_S8_UINT, PIPE_FORMAT_Z32_FLOAT,
       PIPE_FORMAT_Z32_FLOAT_S8X24_UINT};
@@ -257,7 +258,9 @@ check_uniforms(void)
          sampler.base.border_color_format = formats[f];
          batch->stage_uniforms[MESA_SHADER_COMPUTE].custom_border_compare_func[31] = 0xdeadbeef;
          agx_set_sampler_uniforms(batch, MESA_SHADER_COMPUTE);
-         unsigned expected = chips[c] == AGX_CHIP_G17P
+         const bool emulates = chips[c] == AGX_CHIP_G16G ||
+                               chips[c] == AGX_CHIP_G17P;
+         unsigned expected = emulates
             ? PIPE_FUNC_GREATER | (f < 2 ? AGX_BORDER_COMPARE_CLAMP_REF : 0)
             : 0xdeadbeef;
          CHECK(batch->stage_uniforms[MESA_SHADER_COMPUTE].custom_border_compare_func[31] == expected);
@@ -301,11 +304,13 @@ main(void)
          ralloc_free(s);
          ++cases;
       }
-      check_compile(sampler, mode != 0, false);
+      check_compile(AGX_CHIP_G16G, sampler, mode != 0, false);
+      check_compile(AGX_CHIP_G17P, sampler, mode != 0, false);
    }
-   check_compile(0, false, true);
-   printf("PASS: %u shadow border NIR evaluations; 4 G17P encodings; "
-          "3 byte-identical opt-outs; 20 uniform generation/format controls\n", cases);
+   check_compile(AGX_CHIP_G16G, 0, false, true);
+   check_compile(AGX_CHIP_G17P, 0, false, true);
+   printf("PASS: %u shadow border NIR evaluations; 8 G16G/G17P encodings; "
+          "3 byte-identical opt-outs; 24 uniform generation/format controls\n", cases);
    glsl_type_singleton_decref();
    return 0;
 }

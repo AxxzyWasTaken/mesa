@@ -672,6 +672,24 @@ agx_ioto_g17p_compiler_spectpr_values(uint32_t spill_bytes,
 }
 
 bool
+agx_ioto_g17p_compiler_spectpr_build(
+   uint32_t spill_bytes, uint32_t d_value, struct agx_ioto_state *state)
+{
+   uint16_t spill_quads, d_rounded;
+   if (!state || !agx_ioto_g17p_compiler_spectpr_values(
+                    spill_bytes, d_value, &spill_quads, &d_rounded))
+      return false;
+
+   struct agx_ioto_state staged = {0};
+   staged.f[20] = spill_quads;
+   staged.f[21] = spill_quads;
+   staged.f[22] = d_rounded;
+
+   *state = staged;
+   return true;
+}
+
+bool
 agx_ioto_g17p_compiler_spectpr_pack(
    uint32_t spill_bytes, uint32_t d_value, void *output, size_t capacity)
 {

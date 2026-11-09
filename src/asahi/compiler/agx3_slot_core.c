@@ -52,13 +52,16 @@ agx3_slot_token_count(const struct agx3_slot_instr *instrs, unsigned n)
    return count;
 }
 
-bool
-agx3_slot_assign_with_entry(const struct agx3_slot_instr *instrs, unsigned n,
+static bool
+agx3_slot_assign_initial(const struct agx3_slot_instr *instrs, unsigned n,
                             unsigned nslots, const struct agx3_slot_entry *entry,
-                            unsigned entry_count, struct agx3_slot_result *out)
+                            unsigned entry_count,
+                            const struct agx3_slot_live_range *live,
+                            unsigned live_count, struct agx3_slot_result *out)
 {
    if (instrs == NULL || out == NULL || nslots < 1 || nslots > 8 ||
-       (entry_count && entry == NULL) || entry_count > AGX3_SLOT_NUM_TOKENS)
+       (entry_count && entry == NULL) || entry_count > AGX3_SLOT_NUM_TOKENS ||
+       (live_count && !live))
       return false;
 
    unsigned token_count = agx3_slot_token_count(instrs, n);
@@ -68,6 +71,16 @@ agx3_slot_assign_with_entry(const struct agx3_slot_instr *instrs, unsigned n,
          return false;
       if (entry[i].token >= token_count)
          token_count = entry[i].token + 1u;
+   }
+
+   for (unsigned i = 0; i < live_count; ++i) {
+      const struct agx3_slot_live_range *range = &live[i];
+      if (!range->count || !range->slot || range->slot > nslots ||
+          range->first >= AGX3_SLOT_NUM_TOKENS ||
+          range->count > AGX3_SLOT_NUM_TOKENS - range->first)
+         return false;
+      if (range->first + range->count > token_count)
+         token_count = range->first + range->count;
    }
 
    /* reg_slot[r] = slot (1..nslots) of the async op whose result currently
@@ -82,6 +95,15 @@ agx3_slot_assign_with_entry(const struct agx3_slot_instr *instrs, unsigned n,
          return false;
       reg_slot[entry[i].token] = entry[i].slot;
       pending |= (uint16_t)(1u << (entry[i].slot - 1));
+   }
+   for (unsigned i = 0; i < live_count; ++i) {
+      const struct agx3_slot_live_range *range = &live[i];
+      for (unsigned r = range->first; r < range->first + range->count; ++r) {
+         if (reg_slot[r])
+            return false;
+         reg_slot[r] = range->slot;
+      }
+      pending |= (uint16_t)(1u << (range->slot - 1));
    }
    uint16_t entry_pending = pending;
 
@@ -349,6 +371,25 @@ agx3_slot_assign_with_entry(const struct agx3_slot_instr *instrs, unsigned n,
    }
 
    return true;
+}
+
+bool
+agx3_slot_assign_with_entry(const struct agx3_slot_instr *instrs, unsigned n,
+                            unsigned nslots, const struct agx3_slot_entry *entry,
+                            unsigned entry_count, struct agx3_slot_result *out)
+{
+   return agx3_slot_assign_initial(instrs, n, nslots, entry, entry_count,
+                                   NULL, 0, out);
+}
+
+bool
+agx3_slot_assign_with_live(const struct agx3_slot_instr *instrs, unsigned n,
+                           unsigned nslots,
+                           const struct agx3_slot_live_range *live,
+                           unsigned live_count, struct agx3_slot_result *out)
+{
+   return agx3_slot_assign_initial(instrs, n, nslots, NULL, 0,
+                                   live, live_count, out);
 }
 
 bool

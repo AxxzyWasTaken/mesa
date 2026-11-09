@@ -100,6 +100,18 @@ static void pass(VkRect2D area, uint32_t colour, bool clear) {
     vkCmdDraw(cb, 3, 1, 0, 0);
   }
   vkCmdEndRendering(cb);
+  /* The next pass can LOAD pixels stored by this pass, including where the
+   * render areas overlap. Ending dynamic rendering supplies no dependency. */
+  vkCmdPipelineBarrier2(cb, &(VkDependencyInfo){
+      .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+      .memoryBarrierCount = 1,
+      .pMemoryBarriers = &(VkMemoryBarrier2){
+          .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+          .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+          .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+          .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+          .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
+                           VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT}});
 }
 
 static void submit(void) {

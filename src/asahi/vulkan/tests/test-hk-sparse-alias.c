@@ -103,7 +103,7 @@ buffer_aliases(struct hk_device *dev, struct hk_device_memory *memory)
    pages[0].memory = VK_NULL_HANDLE;
    assert(hk_sparse_buffer_bind_memory(dev, &info) == VK_SUCCESS);
    assert(recorded_count == 2);
-   assert(recorded[0].handle == dev->dev.scratch_bo->uapi_handle);
+   assert(recorded[0].handle == dev->sparse_fill->uapi_handle);
    assert(recorded[1].handle == dev->dev.zero_bo->uapi_handle);
    assert(recorded[0].flags & DRM_ASAHI_BIND_SINGLE_PAGE);
    assert(recorded[1].flags ==
@@ -197,7 +197,7 @@ main(void)
 {
    struct hk_device *dev = calloc(1, sizeof(*dev));
    assert(dev);
-   struct agx_bo scratch = {.uapi_handle = 2}, zero = {.uapi_handle = 3};
+   struct agx_bo fill = {.uapi_handle = 2}, zero = {.uapi_handle = 3};
    struct agx_bo bo = {.uapi_handle = 1, .size = 8 * AIL_PAGESIZE};
    struct hk_device_memory memory = {.bo = &bo};
    memory.vk.base.type = VK_OBJECT_TYPE_DEVICE_MEMORY;
@@ -205,7 +205,7 @@ main(void)
    dev->vk.base.device = &dev->vk;
    dev->dev.chip = AGX_CHIP_G17P;
    dev->dev.sparse_ro_offset = UINT64_C(1) << 36;
-   dev->dev.scratch_bo = &scratch;
+   dev->sparse_fill = &fill;
    dev->dev.zero_bo = &zero;
    dev->dev.ops.bo_bind = record_bind;
    buffer_aliases(dev, &memory);

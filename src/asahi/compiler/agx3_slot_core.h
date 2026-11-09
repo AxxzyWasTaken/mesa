@@ -121,6 +121,16 @@ bool agx3_slot_assign_with_entry(const struct agx3_slot_instr *instrs, unsigned 
                                  unsigned entry_count,
                                  struct agx3_slot_result *out);
 
+/* A still-pending producer before the first instruction in this region.
+ * Tokens name its written results, not async reads of an input payload.
+ * Ranges must be nonempty, disjoint and inside the dependency-token domain.
+ * Several ranges may share one slot; waiting it retires all of them. */
+struct agx3_slot_live_range {
+   uint16_t first;
+   uint16_t count;
+   uint8_t slot;
+};
+
 /*
  * Assign slots and waits for one straight-line instruction region, which may
  * span fallthrough basic blocks. `n` is the instruction count; `nslots` is 6
@@ -138,6 +148,17 @@ bool agx3_slot_assign_with_entry(const struct agx3_slot_instr *instrs, unsigned 
  */
 bool agx3_slot_assign(const struct agx3_slot_instr *instrs, unsigned n,
                       unsigned nslots, struct agx3_slot_result *out);
+
+/* Import pending results into the same scoreboard ledger as instructions.
+ * For example, the G17P loader publishes packed constant-program inputs in
+ * TPS halves 8..8+input_count on slot 6 before the shader starts. This models
+ * their RAW/WAW dependencies without a wait on every subsequent input read.
+ * A NULL live pointer is valid only with live_count == 0, which preserves
+ * agx3_slot_assign exactly. Invalid live ranges leave out unchanged. */
+bool agx3_slot_assign_with_live(
+   const struct agx3_slot_instr *instrs, unsigned n, unsigned nslots,
+   const struct agx3_slot_live_range *live, unsigned live_count,
+   struct agx3_slot_result *out);
 
 #ifdef __cplusplus
 }
