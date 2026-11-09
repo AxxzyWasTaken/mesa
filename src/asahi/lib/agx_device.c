@@ -979,6 +979,16 @@ agx_open_device(void *memctx, struct agx_device *dev)
       goto fail;
    }
 
+   if (dev->chip == AGX_CHIP_G15G &&
+       !agx_params_native_kernel_abi_supported(&dev->params)) {
+      fprintf(stderr,
+              "Incompatible native AGX3 kernel contract (features %#llx); "
+              "use the kernel matched to this Mesa build; see its "
+              "compatibility documentation\n",
+              (unsigned long long)dev->params.features);
+      goto fail;
+   }
+
    /* The M4 Pro runs as G17P too; it takes the M-series name below. */
    const char *product = dev->params.chip_id == 0x8140
                             ? agx_chip_exact_product_name(dev->chip)
@@ -1095,6 +1105,9 @@ agx_open_device(void *memctx, struct agx_device *dev)
    }
 
    uint64_t shader_size = 0x100000000ull;
+   /* T8122: only the lower half of the 2^40 window is free. */
+   if (dev->chip == AGX_CHIP_G15G)
+      shader_size = AGX_T8122_RUNTIME_WINDOW_HIGH - dev->shader_base;
 
    /*
     * Where the user heap goes relative to the USC window.
@@ -1190,7 +1203,8 @@ agx_open_device(void *memctx, struct agx_device *dev)
    const uint64_t user_limit =
       agx_chip_g17_m5(dev->chip) || dev->chip == AGX_CHIP_G18G
          ? AGX_M5_DATA_END
-         : heap_below_usc ? AGX_G17P_USER_LIMIT : vm_create.kernel_start;
+         : agx_va_user_limit(dev->chip, heap_below_usc,
+                             vm_create.kernel_start);
    uint64_t user_size = user_limit - user_start;
 
    int ret = dev->ops.simple_ioctl(dev, DRM_IOCTL_ASAHI_VM_CREATE, &vm_create);
@@ -1278,6 +1292,16 @@ agx_open_device(void *memctx, struct agx_device *dev)
    }
    if (agx_chip_native_agx3(dev->chip))
       initialized |= AGX_INIT_ALIAS_HEAP;
+   /* The compact alias heap starts inside the T8122 runtime USC base; keep
+    * out of it (the rest of that range is already outside the heap). */
+   if (dev->chip == AGX_CHIP_G15G &&
+       !util_vma_heap_alloc_addr(&dev->g17p_vdm_alias_heap,
+                                 AGX_G17P_VDM_ALIAS_BASE,
+                                 AGX_G17P_VDM_ALIAS_RESERVED_START -
+                                    AGX_G17P_VDM_ALIAS_BASE)) {
+      fprintf(stderr, "Failed to reserve the T8122 runtime USC base\n");
+      goto fail;
+   }
 
    if (!agx_va_reserve_runtime_graph_hole(
           dev->chip, &dev->main_heap, user_start, user_size,
@@ -1315,6 +1339,9 @@ agx_open_device(void *memctx, struct agx_device *dev)
       /* Compiled as G17G and re-encoded as agx3d (asahi_clc), launched
        * through the M5 compute profile (agx_launch_precomp). */
       dev->libagx_programs = libagx_g18g;
+   } else if (dev->chip == AGX_CHIP_G15G) {
+      /* Its own build: G15G needs the scheduling stalls G15S does not. */
+      dev->libagx_programs = libagx_g15g;
    } else if (dev->chip == AGX_CHIP_G15S || dev->chip == AGX_CHIP_G15C) {
       /* G15C executes the same AGX3B encoding as G15S with no extra
        * scheduling rules, so it runs the G15S build of the programs. */

@@ -540,6 +540,15 @@ agx_native_graphics(const struct agx_device *dev)
    return agx_chip_native_agx3(dev->chip);
 }
 
+/* This interface carries native sampler state in GPU records, not in the
+ * firmware command's optional sampler-heap fields. */
+static inline bool
+agx_stream_sampler_state(const struct agx_device *dev)
+{
+   return dev->chip == AGX_CHIP_G15G &&
+          dev->params.gpu_hal_generation == DRM_ASAHI_GPU_HAL_200;
+}
+
 /* T6040 uses the G17P architecture profile, while capability rollout may
  * still be product-specific. Device admission has already checked USC/HAL. */
 static inline bool

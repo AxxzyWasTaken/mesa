@@ -207,8 +207,9 @@ enum agx_submission_model {
 static inline bool
 agx_chip_native_agx3(enum agx_chip chip)
 {
-   return chip == AGX_CHIP_G15S || chip == AGX_CHIP_G15C ||
-          chip == AGX_CHIP_G16G || chip == AGX_CHIP_G17P;
+   return chip == AGX_CHIP_G15G || chip == AGX_CHIP_G15S ||
+          chip == AGX_CHIP_G15C || chip == AGX_CHIP_G16G ||
+          chip == AGX_CHIP_G17P;
 }
 
 /* The chip whose record encodings GPU-generated (libagx) command-stream
@@ -489,7 +490,8 @@ agx_chip_has_native_render_context(enum agx_chip chip)
 static inline bool
 agx_chip_native_indirect_compute(enum agx_chip chip)
 {
-   return chip == AGX_CHIP_G17P || chip == AGX_CHIP_G15S ||
+   return chip == AGX_CHIP_G17P || chip == AGX_CHIP_G15G ||
+          chip == AGX_CHIP_G15S ||
           chip == AGX_CHIP_G15C || chip == AGX_CHIP_G16G;
 }
 
@@ -580,7 +582,8 @@ agx_chip_explicit_robust_image_bounds(enum agx_chip chip)
 static inline bool
 agx_chip_native_imageblock(enum agx_chip chip)
 {
-   return chip == AGX_CHIP_G17P || chip == AGX_CHIP_G15S ||
+   return chip == AGX_CHIP_G17P || chip == AGX_CHIP_G15G ||
+          chip == AGX_CHIP_G15S ||
           chip == AGX_CHIP_G15C || chip == AGX_CHIP_G16G;
 }
 
@@ -716,6 +719,10 @@ bool agx_params_g18g_bringup_supported(
 /* Exact M5 (T8142, G17G) kernel contract the driver admits. This is not a
  * declaration of a complete or conformant device path. */
 bool agx_params_m5_supported(
+   const struct drm_asahi_params_global *params);
+
+/* Reject the known incompatible pre-unification native kernel contract. */
+bool agx_params_native_kernel_abi_supported(
    const struct drm_asahi_params_global *params);
 
 bool agx_params_fixup_upstream_uapi(struct drm_asahi_params_global *params);

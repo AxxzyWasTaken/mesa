@@ -142,7 +142,7 @@ asahi_fill_cdm_command(struct hk_device *dev, struct hk_cs *cs,
       .ts.end.offset = cs->timestamp.end.offset_B,
    };
 
-   if (cs->uses_sampler_heap) {
+   if (cs->uses_sampler_heap && !agx_stream_sampler_state(&dev->dev)) {
       cmd->sampler_heap = dev->samplers.table.bo->va->addr;
       cmd->sampler_count = dev->samplers.table.alloc;
    }
@@ -319,7 +319,7 @@ asahi_fill_vdm_command(struct hk_device *dev, struct hk_cs *cs,
    c->isp_scissor_base = cs->uploaded_scissor;
    c->isp_dbias_base = cs->uploaded_zbias;
 
-   if (cs->uses_sampler_heap) {
+   if (cs->uses_sampler_heap && !agx_stream_sampler_state(&dev->dev)) {
       c->sampler_heap = dev->samplers.table.bo->va->addr;
       c->sampler_count = dev->samplers.table.alloc;
    }
