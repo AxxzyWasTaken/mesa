@@ -338,7 +338,6 @@ if with_tests
         'agx3_compose/agx3b_tables.c',
         'agx3_compose/agx3c_tables.c',
         'agx3_compose/agx3d_tables.c',
-        'test/agx3_compose_corpus_vectors.c',
         'test/test-agx3-compose-corpus.c',
       ),
       c_args : [c_msvc_compat_args, no_override_init_args],

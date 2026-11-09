@@ -20,7 +20,7 @@ static unsigned failures;
 static unsigned checks;
 
 static void
-expect(const char *what, bool ok, const uint8_t *bytes, uint8_t len,
+expect(const char *what, bool ok, const uint8_t *bytes, const uint8_t *len,
        const char *expected_hex)
 {
    char got[2 * AGX3_PIXEL_MAX_LENGTH + 1] = {0};
@@ -33,7 +33,7 @@ expect(const char *what, bool ok, const uint8_t *bytes, uint8_t len,
       return;
    }
 
-   for (unsigned i = 0; i < len; ++i)
+   for (unsigned i = 0; i < *len; ++i)
       snprintf(got + 2 * i, 3, "%02x", bytes[i]);
 
    if (strcmp(got, expected_hex) != 0) {
@@ -59,10 +59,10 @@ main(void)
    uint8_t len;
 
    expect("AGX3b colour entry",
-          agx3_pixel_colour_entry(AGX_ISA_ENCODING_AGX3B, b, &len), b, len,
+          agx3_pixel_colour_entry(AGX_ISA_ENCODING_AGX3B, b, &len), b, &len,
           "870254000600");
    expect("M5 native colour entry",
-          agx3_pixel_colour_entry(AGX_ISA_ENCODING_AGX3C, b, &len), b, len,
+          agx3_pixel_colour_entry(AGX_ISA_ENCODING_AGX3C, b, &len), b, &len,
           "073000050000");
    expect_refused("AGX2 colour entry",
                   agx3_pixel_colour_entry(AGX_ISA_ENCODING_AGX2, b, &len));
@@ -71,10 +71,10 @@ main(void)
     * atomic_fetch_add_explicit(): class 4 without the colour selector
     * before the atomic, a barrier after its reload. */
    expect("AGX3b returning-atomic class",
-          agx3_pixel_atomic_acquire(AGX_ISA_ENCODING_AGX3B, b, &len), b, len,
+          agx3_pixel_atomic_acquire(AGX_ISA_ENCODING_AGX3B, b, &len), b, &len,
           "870254040000");
    expect("AGX3b returning-atomic barrier",
-          agx3_pixel_atomic_barrier(AGX_ISA_ENCODING_AGX3B, b, &len), b, len,
+          agx3_pixel_atomic_barrier(AGX_ISA_ENCODING_AGX3B, b, &len), b, &len,
           "070454c40800");
    expect_refused("AGX3c returning-atomic barrier",
                   agx3_pixel_atomic_barrier(AGX_ISA_ENCODING_AGX3C, b, &len));
@@ -121,12 +121,12 @@ main(void)
    for (unsigned i = 0; i < sizeof(b_wait) / sizeof(b_wait[0]); ++i) {
       const bool ok = agx3_pixel_wait(AGX_ISA_ENCODING_AGX3B,
                                       b_wait[i].writeout, 0, b, &len);
-      expect("AGX3b pixwait", ok, b, len, b_wait[i].hex);
+      expect("AGX3b pixwait", ok, b, &len, b_wait[i].hex);
    }
 
    /* AGX3b pixwait carrying scoreboard waits on slots 1 and 2. */
    expect("AGX3b pixwait wait{1,2}",
-          agx3_pixel_wait(AGX_ISA_ENCODING_AGX3B, 1, 0x3, b, &len), b, len,
+          agx3_pixel_wait(AGX_ISA_ENCODING_AGX3B, 1, 0x3, b, &len), b, &len,
           "873254010000");
 
    /* AGX3b pixrel: descriptor = (last ? 0x200 : 0) | writeout. */
@@ -146,7 +146,7 @@ main(void)
       const bool ok =
          agx3_pixel_release(AGX_ISA_ENCODING_AGX3B, b_rel[i].writeout,
                             b_rel[i].last, 0, b, &len);
-      expect("AGX3b pixrel", ok, b, len, b_rel[i].hex);
+      expect("AGX3b pixrel", ok, b, &len, b_rel[i].hex);
    }
 
    /* AGX3c pixwait / pixrel, same roles over the wider encoding. */
@@ -163,7 +163,7 @@ main(void)
    for (unsigned i = 0; i < sizeof(c_wait) / sizeof(c_wait[0]); ++i) {
       const bool ok = agx3_pixel_wait(AGX_ISA_ENCODING_AGX3C,
                                       c_wait[i].writeout, 0, b, &len);
-      expect("AGX3c pixwait", ok, b, len, c_wait[i].hex);
+      expect("AGX3c pixwait", ok, b, &len, c_wait[i].hex);
    }
 
    static const struct {
@@ -181,7 +181,7 @@ main(void)
       const bool ok =
          agx3_pixel_release(AGX_ISA_ENCODING_AGX3C, c_rel[i].writeout,
                             c_rel[i].last, 0, b, &len);
-      expect("AGX3c pixrel", ok, b, len, c_rel[i].hex);
+      expect("AGX3c pixrel", ok, b, &len, c_rel[i].hex);
    }
 
    /* Fail-closed: unwitnessed masks, the f15-gated entry form, out-of-range

@@ -1289,8 +1289,9 @@ agx_swtnl_draw(struct agx_context *ctx, const struct pipe_draw_info *info,
          uint8_t *ptr = NULL;
 
          if (sb->buffer) {
-            ptr = map_buffer(ctx, sb->buffer, PIPE_MAP_READ | PIPE_MAP_WRITE,
-                             &ssbo_transfers[s][i]);
+            ptr = (uint8_t *)map_buffer(ctx, sb->buffer,
+                                        PIPE_MAP_READ | PIPE_MAP_WRITE,
+                                        &ssbo_transfers[s][i]);
             if (ptr)
                ptr += sb->buffer_offset;
          }

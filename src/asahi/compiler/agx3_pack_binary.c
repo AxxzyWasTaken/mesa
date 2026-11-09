@@ -20431,13 +20431,18 @@ agx3_pack_binary(agx_context *ctx, struct util_dynarray *emission)
 
          if (enc == AGX_ISA_ENCODING_AGX3C && I->op == AGX_OPCODE_HADD &&
              I->nr_dests == 1 && I->nr_srcs == 2 &&
+             !(I->saturate && ctx->key->dev.emit_agx3d) &&
              agx3_half_reg(I->dest[0]) && agx_channels(I->dest[0]) == 1) {
             const bool swap = I->src[0].type == AGX_INDEX_IMMEDIATE;
             const agx_index src = I->src[swap ? 1 : 0], imm = I->src[swap ? 0 : 1];
+            /* The only witnessed saturating form is the fsat lowering, an
+             * add of minifloat negative zero to a plain source. G18G uses
+             * the native short form below. */
             if (agx3_half_reg(src) && agx_channels(src) == 1 && !src.abs &&
                 !src.kill && !(src.cache && src.discard) &&
                 imm.type == AGX_INDEX_IMMEDIATE && imm.value <= UINT8_MAX &&
-                !imm.abs && !imm.neg && !imm.memory) {
+                !imm.abs && !imm.neg && !imm.memory &&
+                (!I->saturate || (!src.neg && imm.value == UINT8_C(0x80)))) {
                uint8_t bytes[AGX3_ALU_MAX_LENGTH], len;
                if (!agx3_alu_hadd_minifloat(enc, I->dest[0].value, src.value,
                       imm.value, src.neg, I->saturate,
