@@ -7892,9 +7892,11 @@ build_fs_g17g_array_fetch(bool runtime_lod)
               .backend_flags = AGX_TEXTURE_FLAG_NO_CLAMP);
 
    fs_store_colour(&b, texel);
-   NIR_PASS(_, b.shader, agx_nir_lower_texture);
+   NIR_PASS(_, b.shader, agx_nir_lower_texture_for_generation,
+            AGX_DESCRIPTOR_GENERATION_10);
    nir_shader *nir = fs_finish(&b);
-   NIR_PASS(_, nir, agx_nir_lower_texture);
+   NIR_PASS(_, nir, agx_nir_lower_texture_for_generation,
+            AGX_DESCRIPTOR_GENERATION_10);
    return nir;
 }
 

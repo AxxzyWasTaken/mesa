@@ -8,8 +8,8 @@ static nir_def *
 repair_tininess(nir_builder *b, nir_def *a, nir_def *c, nir_def *z,
                 nir_def *native)
 {
-   /* G17P detects FMA tininess before rounding. Repair only a flushed result
-    * whose exact magnitude lies in [2^-126 - 2^-150, 2^-126). RTE rounds that
+   /* G17P and M5 detect FMA tininess before rounding. Repair only a flushed
+    * result whose exact magnitude lies in [2^-126 - 2^-150, 2^-126). RTE rounds that
     * interval (including its even tie) to the smallest normal.
     *
     * Work in units of 2^-150. The exact product has 48 significant bits.

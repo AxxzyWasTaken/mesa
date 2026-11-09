@@ -15,6 +15,17 @@
 #define AGX_G17_RUNTIME_GRAPH_VA_START UINT64_C(0x7000000000)
 #define AGX_G17_RUNTIME_GRAPH_VA_END   UINT64_C(0x7100000000)
 
+/* The T8122 (M3, G15G) kernel runtime reserves, in every VM, the top half of
+ * the 2^40 USC window, 0x7000000000 up to 0x8000000000, its own USC base at
+ * 0x1000000000-0x1008000000 and 0x1074000000-0x1074028000. A bind that touches
+ * one fails with EINVAL. These mirror Runtime::new_vm in
+ * drivers/gpu/drm/asahi/m3/m3_runtime.rs as of omacom/linux-aurora 4888ad0a0f
+ * (merged in be6381f9d2) by hand, until the kernel reports them. */
+#define AGX_T8122_RUNTIME_WINDOW_HIGH    UINT64_C(0x10080000000)
+#define AGX_T8122_RUNTIME_WINDOW_END     UINT64_C(0x10100000000)
+#define AGX_T8122_RUNTIME_RESERVED_START UINT64_C(0x7000000000)
+#define AGX_T8122_RUNTIME_RESERVED_END   UINT64_C(0x8000000000)
+
 /* T8140's channel-owned AXFB aliases are installed by the kernel in
  * every render-capable client root.  This range falls inside G17P's 4-GiB USC
  * heap, so userspace must remove it from the allocator before creating any
@@ -85,6 +96,21 @@
 #define AGX_G17P_VDM_ALIAS_AVAILABLE_SIZE \
    (AGX_G17P_VDM_ALIAS_SIZE - \
     (AGX_G17P_VDM_ALIAS_RESERVED_END - AGX_G17P_VDM_ALIAS_RESERVED_START))
+
+/* The exclusive top of the main heap and its sparse alias. Native AGX3 chips
+ * keep the heap below the USC window, bounded by the absolute 36-bit-shr(3)
+ * USC Texture/Sampler field (2^39) and, on G17P, the compact VDM aperture. On
+ * T8122 (G15G) it also stops below the runtime's 0x7000000000 reservation,
+ * which leaves the heap [0x4000000000, 0x5000000000) and its alias
+ * [0x5000000000, 0x6000000000). Other chips keep the kernel's limit. */
+static inline uint64_t
+agx_va_user_limit(enum agx_chip chip, bool heap_below_usc, uint64_t kernel_start)
+{
+   if (!heap_below_usc)
+      return kernel_start;
+   return chip == AGX_CHIP_G15G ? AGX_T8122_RUNTIME_RESERVED_START
+                                : AGX_G17P_USER_LIMIT;
+}
 
 /*
  * Client-root ranges the kernel reserves inside that same compact window for

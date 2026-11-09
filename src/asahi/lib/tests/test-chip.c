@@ -280,7 +280,7 @@ test_independent_generation_axes(void)
    CHECK(!agx_chip_driver_supported(AGX_CHIP_G18G));
 
    CHECK(!agx_chip_driver_supported(AGX_CHIP_G15P));
-   CHECK(!agx_chip_driver_supported(AGX_CHIP_G15G));
+   CHECK(agx_chip_driver_supported(AGX_CHIP_G15G));
    CHECK(agx_chip_driver_supported(AGX_CHIP_G17P));
    CHECK(!agx_chip_driver_supported(AGX_CHIP_G17S));
    CHECK(!agx_chip_driver_supported(AGX_CHIP_UNKNOWN));

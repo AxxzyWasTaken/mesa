@@ -5510,8 +5510,9 @@ TEST_F(AGX3PackBinary, TextureResultShuffleKeepsHalfCopiesInLowBank)
    agx_ra(b->shader);
 
    agx_foreach_instr_global(b->shader, I) {
-      if (I->op == AGX_OPCODE_MOV && I->dest[0].size == AGX_SIZE_16)
+      if (I->op == AGX_OPCODE_MOV && I->dest[0].size == AGX_SIZE_16) {
          EXPECT_LT(I->dest[0].value, 128u);
+      }
    }
 
    agx_lower_pseudo(b->shader);
@@ -15419,8 +15420,9 @@ TEST_F(AGX3PackBinary, BufferFetchStoreKeepsNativeReadCoordinatesSeparate)
                                    code.data() + i, 20,
                                    &fetch)) {
             EXPECT_EQ(fetch.coord, with_store ? 16 : 0);
-            if (with_store)
+            if (with_store) {
                EXPECT_EQ(fetch.slot, 1);
+            }
             found = true;
          }
       }

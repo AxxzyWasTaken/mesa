@@ -142,7 +142,7 @@ asahi_fill_cdm_command(struct hk_device *dev, struct hk_cs *cs,
       .ts.end.offset = cs->timestamp.end.offset_B,
    };
 
-   if (cs->uses_sampler_heap) {
+   if (cs->uses_sampler_heap && !agx_stream_sampler_state(&dev->dev)) {
       cmd->sampler_heap = dev->samplers.table.bo->va->addr;
       cmd->sampler_count = dev->samplers.table.alloc;
    }
@@ -319,7 +319,7 @@ asahi_fill_vdm_command(struct hk_device *dev, struct hk_cs *cs,
    c->isp_scissor_base = cs->uploaded_scissor;
    c->isp_dbias_base = cs->uploaded_zbias;
 
-   if (cs->uses_sampler_heap) {
+   if (cs->uses_sampler_heap && !agx_stream_sampler_state(&dev->dev)) {
       c->sampler_heap = dev->samplers.table.bo->va->addr;
       c->sampler_count = dev->samplers.table.alloc;
    }
@@ -1365,6 +1365,19 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
 
    if (flush_sstt) {
       assert(queue->g17p_sstt_flush_bo);
+      if (agx_chip_g17_m5(dev->dev.chip) &&
+          (dev->dev.params.features & DRM_ASAHI_FEATURE_COMPUTE_RESOURCES)) {
+         /* This stream flushes metadata without dispatching a shader. Declare
+          * its empty resource list, as for other flush-only M5 streams.
+          */
+         const struct drm_asahi_cmd_header resources = {
+            .cmd_type = DRM_ASAHI_SET_COMPUTE_RESOURCES,
+            .size = 0,
+            .vdm_barrier = DRM_ASAHI_BARRIER_NONE,
+            .cdm_barrier = DRM_ASAHI_BARRIER_NONE,
+         };
+         util_dynarray_append(&payload, resources);
+      }
       struct drm_asahi_cmd_header header = agx_cmd_header(true, 0, 0);
       const struct drm_asahi_cmd_compute_with_prior cmd = {
          .legacy = {

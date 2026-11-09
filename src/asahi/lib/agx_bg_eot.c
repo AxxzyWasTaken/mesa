@@ -589,10 +589,10 @@ agx_build_end_of_tile_shader(struct agx_bg_eot_cache *cache,
           (key->tib.layered && cache->dev->chip != AGX_CHIP_G18G) ||
           key->tib.spilled[0] ||
           agx_tilebuffer_offset_B(&key->tib, 0) != 0 ||
-          !(cache->dev->chip == AGX_CHIP_G18G &&
-            key->tib.logical_format[0] == PIPE_FORMAT_R11G11B10_FLOAT) &&
-          !agx_g17g_rt0_eot_physical_format_supported(
-             agx_tilebuffer_physical_format(&key->tib, 0)))
+          (!(cache->dev->chip == AGX_CHIP_G18G &&
+             key->tib.logical_format[0] == PIPE_FORMAT_R11G11B10_FLOAT) &&
+           !agx_g17g_rt0_eot_physical_format_supported(
+              agx_tilebuffer_physical_format(&key->tib, 0))))
          return NULL;
 
       for (unsigned rt = 1; rt < ARRAY_SIZE(key->op); ++rt) {

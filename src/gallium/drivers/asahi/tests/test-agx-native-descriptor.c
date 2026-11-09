@@ -307,6 +307,7 @@ test_g17p_sampler_handles(void)
                                                &untouched));
    CHECK(untouched == AGX_GALLIUM_G17P_CUSTOM_BORDER_BASE);
    CHECK(!agx_gallium_g17p_custom_border_handle(AGX_CHIP_G17P, 0, NULL));
+   untouched = 0x5555;
    CHECK(!agx_gallium_g17p_sampler_handle(
       AGX_CHIP_G18G, AGX_GALLIUM_G17P_API_SAMPLERS, &untouched));
    CHECK(!agx_gallium_g17p_custom_border_handle(

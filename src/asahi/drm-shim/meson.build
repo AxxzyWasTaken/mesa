@@ -29,3 +29,21 @@ libasahi_noop_drm_shim = shared_library(
   gnu_symbol_visibility : 'hidden',
   install : true,
 )
+
+if with_tests
+  asahi_vm_limits_test = executable(
+    'asahi-vm-limits', 'test-vm-limits.c',
+    include_directories : [inc_include],
+    dependencies : [dep_libdrm],
+  )
+  foreach hal : ['legacy', 'hal200']
+    test(
+      'asahi-vm-limits-' + hal, prog_python,
+      args : [files('../../gallium/drivers/asahi/tests/run-shim.py'),
+              libasahi_noop_drm_shim, asahi_vm_limits_test],
+      env : ['ASAHI_SHIM_CHIP=g15g',
+             'ASAHI_SHIM_G15G_HAL200=' + (hal == 'hal200' ? '1' : '0')],
+      suite : ['asahi'],
+    )
+  endforeach
+endif

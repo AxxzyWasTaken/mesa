@@ -952,6 +952,7 @@ test_agx3_cdm_barrier(void)
    /* The wide-visibility form: the G15 parts on the native path and G16G
     * pack and decode it; other chips refuse it in both directions. */
    const enum agx_chip wide[] = {
+      AGX_CHIP_G15G,
       AGX_CHIP_G15S,
       AGX_CHIP_G15C,
       AGX_CHIP_G16G,
@@ -973,7 +974,6 @@ test_agx3_cdm_barrier(void)
    }
 
    const enum agx_chip narrow[] = {
-      AGX_CHIP_G15G,
       AGX_CHIP_G15D,
       AGX_CHIP_G17P,
    };

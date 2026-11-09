@@ -1650,7 +1650,8 @@ agx_cmdbuf(struct agx_device *dev, struct drm_asahi_cmd_render *c,
    c->isp_dbias_base = depth_bias_ptr;
    c->isp_oclqry_base = visibility_result_ptr;
 
-   if (batch->sampler_heap.bo) {
+   if (batch->sampler_heap.bo &&
+       !agx_stream_sampler_state(dev)) {
       c->sampler_heap = batch->sampler_heap.bo->va->addr;
       c->sampler_count = batch->sampler_heap.count;
    }
@@ -1814,6 +1815,11 @@ agx_flush_compute(struct agx_context *ctx, struct agx_batch *batch,
          batch->sampler_heap.bo ? batch->sampler_heap.bo->va->addr : 0,
       .sampler_count = batch->sampler_heap.count,
    };
+
+   if (agx_stream_sampler_state(dev)) {
+      cmdbuf->sampler_heap = 0;
+      cmdbuf->sampler_count = 0;
+   }
 
    if (batch->cs_scratch) {
       // The commented out lines *may* be related to subgroup-level preemption,

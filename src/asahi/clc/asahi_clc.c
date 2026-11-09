@@ -26,8 +26,8 @@
 #include "util/set.h"
 #include <sys/mman.h>
 
-const char *targets[] = {"g13g", "g13x", "g17p", "g15s", "g16g", "g17g",
-                         "g18g"};
+const char *targets[] = {"g13g", "g13x", "g17p", "g15s", "g15g", "g16g",
+                         "g17g", "g18g"};
 
 /* G18G compiles every qualified kernel, like the other targets: a refusal,
  * or a kernel needing scratch (its compute profile,
@@ -65,6 +65,8 @@ target_chip(const char *target)
       return AGX_CHIP_G17G;
    else if (!strcmp(target, "g15s"))
       return AGX_CHIP_G15S;
+   else if (!strcmp(target, "g15g"))
+      return AGX_CHIP_G15G;
    else if (!strcmp(target, "g16g"))
       return AGX_CHIP_G16G;
    /* G18G compiles as G17G (agx3c) and re-encodes its code as agx3d, exactly

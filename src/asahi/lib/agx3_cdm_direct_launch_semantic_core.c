@@ -153,8 +153,8 @@ agx3_cdm_direct_dimension_word(uint8_t dimensions, uint32_t *word)
 static bool
 agx3_cdm_direct_g15x_bit31_allowed(enum agx_chip chip)
 {
-   return chip == AGX_CHIP_G15S || chip == AGX_CHIP_G15C ||
-          chip == AGX_CHIP_G15D;
+   return chip == AGX_CHIP_G15G || chip == AGX_CHIP_G15S ||
+          chip == AGX_CHIP_G15C || chip == AGX_CHIP_G15D;
 }
 
 bool
