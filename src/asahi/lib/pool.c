@@ -74,22 +74,27 @@ agx_pool_alloc_aligned_with_bo(struct agx_pool *pool, size_t sz,
 
       if (unlikely(fresh == NULL)) {
          /* BO creation fails once the kernel has failed this VM (a GPU
-          * recovery blamed our work: the context already reports a reset) or
-          * on real memory exhaustion. Recycle a backing that fits rather
-          * than dereferencing NULL: what is written here is never executed
-          * on a failed VM, and the application sees the reset through
-          * GL_ARB_robustness and rebuilds its context.
+          * recovery blamed our work: the context already reports a reset).
+          * Recycle a backing that fits rather than dereferencing NULL: what
+          * is written here is never executed on a failed VM, and the
+          * application sees the reset through GL_ARB_robustness and rebuilds
+          * its context.
+          *
+          * On a healthy VM the failure is real memory exhaustion, and a
+          * submitted batch that has not completed may still read any of our
+          * backings. Recycling one would corrupt it, so abort instead.
           */
-         util_dynarray_foreach(&pool->bos, struct agx_bo *, it) {
-            if ((*it)->size >= sz) {
-               fresh = *it;
-               break;
+         if (agx_device_vm_failed(pool->dev)) {
+            util_dynarray_foreach(&pool->bos, struct agx_bo *, it) {
+               if ((*it)->size >= sz) {
+                  fresh = *it;
+                  break;
+               }
             }
          }
 
          if (fresh == NULL) {
-            fprintf(stderr, "agx: pool %s cannot allocate %zu bytes and has "
-                            "no backing to recycle\n",
+            fprintf(stderr, "agx: pool %s cannot allocate %zu bytes\n",
                     pool->label ? pool->label : "(unnamed)", sz);
             abort();
          }

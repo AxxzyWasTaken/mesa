@@ -952,6 +952,21 @@ agx_retire_failed_submit(struct agx_context *ctx, struct agx_batch *batch,
    errno = error;
 }
 
+/* Drop a batch on a context that has faulted, without encoding it. This is
+ * the retirement agx_batch_submit uses for the same case: the batch may write
+ * BOs, so it needs the full cleanup that releases its writer entries, which
+ * agx_batch_reset (for empty batches) does not do.
+ */
+void
+agx_batch_retire_faulted(struct agx_context *ctx, struct agx_batch *batch)
+{
+   struct util_dynarray cmdbuf = UTIL_DYNARRAY_INIT;
+
+   assert(ctx->any_faults);
+   agx_retire_failed_submit(ctx, batch, NULL, NULL, 0, NULL, &cmdbuf, EIO, 0,
+                            0);
+}
+
 static void
 asahi_add_attachment(struct attachments *att, struct agx_resource *rsrc)
 {

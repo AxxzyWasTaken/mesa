@@ -512,6 +512,7 @@ uint32_t agx_create_command_queue_with_render_scs(struct agx_device *dev,
    enum drm_asahi_priority priority, const uint64_t layouts[2]);
 int agx_destroy_command_queue(struct agx_device *dev, uint32_t queue_id);
 bool agx_probe_high_priority(struct agx_device *dev);
+bool agx_device_vm_failed(struct agx_device *dev);
 
 int agx_import_sync_file(struct agx_device *dev, struct agx_bo *bo, int fd);
 int agx_export_sync_file(struct agx_device *dev, struct agx_bo *bo);

@@ -198,6 +198,17 @@ agx_drm_vm_status(struct agx_device *dev, int32_t *error)
    return true;
 }
 
+/* True once the kernel has failed this VM (a GPU recovery blamed our work).
+ * Every later bind and submission on it is refused.
+ */
+bool
+agx_device_vm_failed(struct agx_device *dev)
+{
+   int32_t error = 0;
+
+   return agx_drm_vm_status(dev, &error) && error != 0;
+}
+
 static int
 agx_drm_bo_bind(struct agx_device *dev, struct drm_asahi_gem_bind_op *ops,
                 uint32_t count)

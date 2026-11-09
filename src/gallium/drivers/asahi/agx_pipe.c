@@ -1916,11 +1916,11 @@ agx_flush_batch(struct agx_context *ctx, struct agx_batch *batch)
     * and the reset is already reported through robustness. Drop the batch
     * instead of encoding it: a batch begun after the loss can be half built
     * (Zen reached agx_build_bg_eot with a 0-sample, 0 px tile layout, which
-    * the native descriptor check aborts on).
+    * the native descriptor check aborts on). Retire it as a failed submit,
+    * so the BOs it writes are released from the writer table.
     */
    if (unlikely(ctx->any_faults)) {
-      batch->initialized = false;
-      agx_batch_reset(ctx, batch);
+      agx_batch_retire_faulted(ctx, batch);
       return;
    }
 

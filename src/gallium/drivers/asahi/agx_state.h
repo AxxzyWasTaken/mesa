@@ -1518,6 +1518,8 @@ agx_batch_is_compute(struct agx_batch *batch)
 struct agx_batch *agx_get_batch(struct agx_context *ctx);
 struct agx_batch *agx_get_compute_batch(struct agx_context *ctx);
 void agx_batch_reset(struct agx_context *ctx, struct agx_batch *batch);
+void agx_batch_retire_faulted(struct agx_context *ctx,
+                              struct agx_batch *batch);
 int agx_cleanup_batches(struct agx_context *ctx);
 
 void agx_batch_add_timestamp_query(struct agx_batch *batch,
