@@ -10134,6 +10134,8 @@ agx_optimize_nir(nir_shader *nir, bool soft_fault, bool uniform_atomics,
    if (progress) {
       if (byte_indices)
          NIR_PASS(_, nir, agx_nir_lower_subgroups_g17p);
+      else if (m5)
+         NIR_PASS(_, nir, agx_nir_lower_subgroups_m5);
       else
          NIR_PASS(_, nir, agx_nir_lower_subgroups);
    }
@@ -13491,7 +13493,7 @@ agx_preserve_quad_control(nir_shader *nir)
 
 static void
 agx_preprocess_nir_internal(nir_shader *nir, bool g17p, bool native_fragment_depth,
-                            bool g18g)
+                            bool g18g, bool m5)
 {
    if (!nir)
       return;
@@ -13557,6 +13559,8 @@ agx_preprocess_nir_internal(nir_shader *nir, bool g17p, bool native_fragment_dep
       NIR_PASS(_, nir, agx_nir_lower_g18_subgroups);
    if (g17p)
       NIR_PASS(_, nir, agx_nir_lower_subgroups_g17p);
+   else if (m5)
+      NIR_PASS(_, nir, agx_nir_lower_subgroups_m5);
    else
       NIR_PASS(_, nir, agx_nir_lower_subgroups);
    NIR_PASS(_, nir, nir_lower_all_phis_to_scalar);
@@ -13641,20 +13645,20 @@ agx_preprocess_nir_internal(nir_shader *nir, bool g17p, bool native_fragment_dep
 void
 agx_preprocess_nir(nir_shader *nir)
 {
-   agx_preprocess_nir_internal(nir, false, false, false);
+   agx_preprocess_nir_internal(nir, false, false, false, false);
 }
 
 void
 agx_preprocess_nir_g17p(nir_shader *nir)
 {
-   agx_preprocess_nir_internal(nir, true, true, false);
+   agx_preprocess_nir_internal(nir, true, true, false, false);
 }
 
 void
 agx_preprocess_nir_g18g(nir_shader *nir)
 {
    /* Select G18 trig without inheriting G17P subgroup/shared-memory rules. */
-   agx_preprocess_nir_internal(nir, false, false, true);
+   agx_preprocess_nir_internal(nir, false, false, true, false);
 }
 
 static bool
@@ -16045,5 +16049,5 @@ agx_compile_shader_nir(nir_shader *nir, struct agx_shader_key *key,
 void
 agx_preprocess_nir_m5(nir_shader *nir)
 {
-   agx_preprocess_nir_internal(nir, false, true, false);
+   agx_preprocess_nir_internal(nir, false, true, false, true);
 }
