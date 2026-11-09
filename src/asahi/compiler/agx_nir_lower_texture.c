@@ -1442,14 +1442,16 @@ image_texel_address(nir_builder *b, nir_intrinsic_instr *intr,
    } else if (dim == GLSL_SAMPLER_DIM_BUF && !(gen9 || gen10)) {
       return libagx_buffer_texel_address(b, desc_address, coord, blocksize_B);
    } else if (gen9 || gen10) {
-      /* Gen9 keeps the addressing word in the storage tail that follows the
-       * texture/PBE pair, 40 bytes past the PBE handle. Gen10 has no tail
-       * record; Gallium packs the same word into the PBE's last eight
-       * bytes, which no Gen10 field occupies. */
+      /* The software-metadata ABI keeps the addressing word in the storage
+       * tail after the texture/PBE pair on both Gen9 and Gen10. Gallium's
+       * plain Gen10 descriptors instead keep it in the PBE's last eight
+       * bytes. Select the offset from the descriptor ABI, not just the GPU
+       * generation. */
       nir_def *sw_address =
          nir_iadd_imm(b, desc_address,
-                      gen10 ? AGX_GEN10_IMAGE_ATOMIC_SW_OFFSET
-                            : AGX_G17P_IMAGE_ATOMIC_SW_FROM_PBE);
+                      gen10 && !buffer_metadata
+                         ? AGX_GEN10_IMAGE_ATOMIC_SW_OFFSET
+                         : AGX_G17P_IMAGE_ATOMIC_SW_FROM_PBE);
       if (dim == GLSL_SAMPLER_DIM_MS) {
          /* MS storage uses a linear PBE over the tiled allocation. Its
           * native width is the buffer window, not the source image width.
