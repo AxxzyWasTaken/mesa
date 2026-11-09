@@ -31,11 +31,16 @@ compile_native_fma(unsigned mode, unsigned components,
    key.dev.encoding = (chip == AGX_CHIP_G13G || chip == AGX_CHIP_G14G)
                          ? AGX_ISA_ENCODING_AGX2
                          : AGX_ISA_ENCODING_AGX3B;
+   if (chip == AGX_CHIP_G17C)
+      key.dev.encoding = AGX_ISA_ENCODING_AGX3C;
    key.dev.chip = chip;
    key.no_preamble = true;
    key.reserved_preamble = 32;
    key.fs.nr_samples = 1;
-   agx_preprocess_nir(b.shader);
+   if (chip == AGX_CHIP_G17C)
+      agx_preprocess_nir_m5(b.shader);
+   else
+      agx_preprocess_nir(b.shader);
    agx_shader_part part = {};
    bool compiled = agx_compile_shader_nir(b.shader, &key, &part);
    EXPECT_TRUE(compiled);
@@ -52,30 +57,36 @@ compile_native_fma(unsigned mode, unsigned components,
 
 TEST(NativeFMA, ExplicitRTERepairsTininess)
 {
-   for (unsigned components = 1; components <= 4; ++components) {
-      SCOPED_TRACE(components);
-      auto plain = compile_native_fma(0, components);
-      auto rte =
-         compile_native_fma(FLOAT_CONTROLS_ROUNDING_MODE_RTE_FP32, components);
-      EXPECT_FALSE(plain.empty());
-      EXPECT_NE(plain, rte);
+   for (enum agx_chip chip : {AGX_CHIP_G17P, AGX_CHIP_G17C}) {
+      SCOPED_TRACE(chip);
+      for (unsigned components = 1; components <= 4; ++components) {
+         SCOPED_TRACE(components);
+         auto plain = compile_native_fma(0, components, chip);
+         auto rte = compile_native_fma(FLOAT_CONTROLS_ROUNDING_MODE_RTE_FP32,
+                                       components, chip);
+         EXPECT_FALSE(plain.empty());
+         EXPECT_NE(plain, rte);
+      }
    }
 }
 
 TEST(NativeFMA, OnlyRTERequiresTheTininessRepair)
 {
-   for (unsigned components = 1; components <= 4; ++components) {
-      SCOPED_TRACE(components);
-      auto plain = compile_native_fma(0, components);
-      auto ftz = compile_native_fma(FLOAT_CONTROLS_DENORM_FLUSH_TO_ZERO_FP32,
-                                    components);
-      auto rte_ftz =
-         compile_native_fma(FLOAT_CONTROLS_ROUNDING_MODE_RTE_FP32 |
-                               FLOAT_CONTROLS_DENORM_FLUSH_TO_ZERO_FP32,
-                            components);
-      EXPECT_FALSE(plain.empty());
-      EXPECT_EQ(plain, ftz);
-      EXPECT_NE(plain, rte_ftz);
+   for (enum agx_chip chip : {AGX_CHIP_G17P, AGX_CHIP_G17C}) {
+      SCOPED_TRACE(chip);
+      for (unsigned components = 1; components <= 4; ++components) {
+         SCOPED_TRACE(components);
+         auto plain = compile_native_fma(0, components, chip);
+         auto ftz = compile_native_fma(FLOAT_CONTROLS_DENORM_FLUSH_TO_ZERO_FP32,
+                                       components, chip);
+         auto rte_ftz =
+            compile_native_fma(FLOAT_CONTROLS_ROUNDING_MODE_RTE_FP32 |
+                                  FLOAT_CONTROLS_DENORM_FLUSH_TO_ZERO_FP32,
+                               components, chip);
+         EXPECT_FALSE(plain.empty());
+         EXPECT_EQ(plain, ftz);
+         EXPECT_NE(plain, rte_ftz);
+      }
    }
 }
 
