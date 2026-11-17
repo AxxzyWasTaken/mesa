@@ -1,0 +1,51 @@
+date 2026-11-17T22:40:47+00:00
+7.3.0-j616c-ia2
+Apple MacBook Pro (16-inch, M4 Max)
+AC online 0, battery Discharging 91%
+mode macos: fans 0/0 rpm, SMC automatic, SoC die 73.0 C
+ 22:40:47 up  4:48,  2 users,  load average: 1.04, 0.80, 0.87
+wip GL: driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+vkmsaa2x: creating ms-colour
+vkmsaa2x: creating ms-depth
+vkmsaa2x: creating resolved
+vkmsaa2x: creating res-depth
+vkmsaa2x: creating post
+vkmsaa2x: creating verify-c
+vkmsaa2x: creating verify-z
+wip VK: driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-57df4db849), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+m417 GL: driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+vkmsaa2x: creating ms-colour
+vkmsaa2x: creating ms-depth
+vkmsaa2x: creating resolved
+vkmsaa2x: creating res-depth
+vkmsaa2x: creating post
+vkmsaa2x: creating verify-c
+vkmsaa2x: creating verify-z
+m417 VK: driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-56a5252e3b), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+m418 GL: driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+vkmsaa2x: creating ms-colour
+vkmsaa2x: creating ms-depth
+vkmsaa2x: creating resolved
+vkmsaa2x: creating res-depth
+vkmsaa2x: creating post
+vkmsaa2x: creating verify-c
+vkmsaa2x: creating verify-z
+m418 VK: driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-1752a4d936), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+m420 GL: driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-67f4306d29)
+vkmsaa2x: creating ms-colour
+vkmsaa2x: creating ms-depth
+vkmsaa2x: creating resolved
+vkmsaa2x: creating res-depth
+vkmsaa2x: creating post
+vkmsaa2x: creating verify-c
+vkmsaa2x: creating verify-z
+m420 VK: driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+mc2x GL: driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-db2a2b3b69)
+vkmsaa2x: creating ms-colour
+vkmsaa2x: creating ms-depth
+vkmsaa2x: creating resolved
+vkmsaa2x: creating res-depth
+vkmsaa2x: creating post
+vkmsaa2x: creating verify-c
+vkmsaa2x: creating verify-z
+mc2x VK: driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns

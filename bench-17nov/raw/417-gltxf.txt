@@ -1,0 +1,76 @@
+gltxf-K1 v=wip i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K1 v=wip i=1 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 2.021 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=m417 i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K1 v=m417 i=1 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 1.750 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=wip i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K1 v=wip i=2 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 2.020 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=m417 i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K1 v=m417 i=2 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 1.750 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=wip i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K1 v=wip i=3 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 2.020 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=m417 i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K1 v=m417 i=3 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 1.751 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=wip i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K1 v=wip i=4 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 2.022 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=m417 i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K1 v=m417 i=4 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 1.751 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=wip i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K1 v=wip i=5 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 2.021 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=m417 i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K1 v=m417 i=5 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 1.750 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=wip i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K1 v=wip i=6 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 2.022 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=m417 i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K1 v=m417 i=6 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 1.752 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=wip i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K1 v=wip i=7 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 2.023 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1 v=m417 i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K1 v=m417 i=7 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=plain(flags 0x0) frames=300: 1.751 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K2 v=wip i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K2 v=wip i=1 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 4.579 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=m417 i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K2 v=m417 i=1 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 3.847 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=wip i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K2 v=wip i=2 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 4.582 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=m417 i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K2 v=m417 i=2 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 3.844 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=wip i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K2 v=wip i=3 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 4.582 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=m417 i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K2 v=m417 i=3 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 3.841 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=wip i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K2 v=wip i=4 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 4.581 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=m417 i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K2 v=m417 i=4 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 3.844 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=wip i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K2 v=wip i=5 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 4.577 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=m417 i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K2 v=m417 i=5 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 3.849 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=wip i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K2 v=wip i=6 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 4.582 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=m417 i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K2 v=m417 i=6 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 3.849 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=wip i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K2 v=wip i=7 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 4.579 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K2 v=m417 i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K2 v=m417 i=7 rc=0 | gltxf 3456x2234 K=2 taps/pixel=76 context=plain(flags 0x0) frames=200: 3.861 ms/frame image=bb1c28bcf62d0ded glerr=0x0
+gltxf-K1-robust v=wip i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K1-robust v=wip i=1 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=robust(flags 0x4) frames=300: 2.025 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1-robust v=m417 i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K1-robust v=m417 i=1 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=robust(flags 0x4) frames=300: 2.026 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1-robust v=wip i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K1-robust v=wip i=2 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=robust(flags 0x4) frames=300: 2.025 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1-robust v=m417 i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K1-robust v=m417 i=2 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=robust(flags 0x4) frames=300: 2.027 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1-robust v=wip i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K1-robust v=wip i=3 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=robust(flags 0x4) frames=300: 2.027 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1-robust v=m417 i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K1-robust v=m417 i=3 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=robust(flags 0x4) frames=300: 2.026 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1-robust v=wip i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K1-robust v=wip i=4 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=robust(flags 0x4) frames=300: 2.027 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1-robust v=m417 i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K1-robust v=m417 i=4 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=robust(flags 0x4) frames=300: 2.027 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1-robust v=wip i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gltxf-K1-robust v=wip i=5 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=robust(flags 0x4) frames=300: 2.027 ms/frame image=76c294e61b6f8da1 glerr=0x0
+gltxf-K1-robust v=m417 i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-56a5252e3b)
+gltxf-K1-robust v=m417 i=5 rc=0 | gltxf 3456x2234 K=1 taps/pixel=28 context=robust(flags 0x4) frames=300: 2.030 ms/frame image=76c294e61b6f8da1 glerr=0x0

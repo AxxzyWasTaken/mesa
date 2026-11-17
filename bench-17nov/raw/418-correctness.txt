@@ -1,0 +1,6 @@
+gldepthcomp 17 33: wip f8490ce6 (z32 compressed 0) m418-nocompress f8490ce6 m418 f8490ce6 (z32 compressed 2)
+gldepthcomp 1920 1080: wip 7d68757b (z32 compressed 0) m418-nocompress 7d68757b m418 7d68757b (z32 compressed 2)
+gldepthcomp 3456 2234: wip 18c08ae5 (z32 compressed 0) m418-nocompress 18c08ae5 m418 18c08ae5 (z32 compressed 2)
+gldepthcomp 2048 2048: wip a1729ca4 (z32 compressed 0) m418-nocompress a1729ca4 m418 a1729ca4 (z32 compressed 2)
+gldepthbench resource log wip:       1 z32_float 2048x2048x1 GPU;      1 z32_float 3456x2234x1 GPU;
+gldepthbench resource log m418:       1 z32_float 2048x2048x1 GPU;      1 z32_float 2048x2048x1 GPU COMP;      1 z32_float 3456x2234x1 GPU COMP;

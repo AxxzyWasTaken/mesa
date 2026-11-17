@@ -1,0 +1,3 @@
+Ok:                138 
+Fail:              0   
+hk_g16s_compression_test (mc2x build): G17P compression policy: 7153 checks passed

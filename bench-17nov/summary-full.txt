@@ -1,0 +1,145 @@
+
+### 417-gltxf: gltxf-K1
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip | 7 | 2.021 | 2.020-2.023 | 0.1 % |  | n/a |
+| m417 | 7 | 1.751 | 1.750-1.752 | 0.1 % | -13.4 % | n/a |
+
+image hashes: identical across all runs and variants: wip: image=76c294e61b6f8da1; m417: image=76c294e61b6f8da1
+
+per-run ms/frame (run order): wip: 2.021 2.020 2.020 2.022 2.021 2.022 2.023; m417: 1.750 1.750 1.751 1.751 1.750 1.752 1.751
+
+### 417-gltxf: gltxf-K2
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip | 7 | 4.581 | 4.577-4.582 | 0.1 % |  | n/a |
+| m417 | 7 | 3.847 | 3.841-3.861 | 0.5 % | -16.0 % | n/a |
+
+image hashes: identical across all runs and variants: wip: image=bb1c28bcf62d0ded; m417: image=bb1c28bcf62d0ded
+
+per-run ms/frame (run order): wip: 4.579 4.582 4.582 4.581 4.577 4.582 4.579; m417: 3.847 3.844 3.841 3.844 3.849 3.849 3.861
+
+### 417-gltxf: gltxf-K1-robust
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip | 5 | 2.027 | 2.025-2.027 | 0.1 % |  | n/a |
+| m417 | 5 | 2.027 | 2.026-2.030 | 0.2 % | +0.0 % | n/a |
+
+image hashes: identical across all runs and variants: wip: image=76c294e61b6f8da1; m417: image=76c294e61b6f8da1
+
+per-run ms/frame (run order): wip: 2.025 2.025 2.027 2.027 2.027; m417: 2.026 2.027 2.026 2.027 2.030
+
+### 418-depth: gldepthbench
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip | 7 | 3.703 | 3.703-3.707 | 0.1 % |  | n/a |
+| m418 | 7 | 3.676 | 3.675-3.679 | 0.1 % | -0.7 % | n/a |
+| m418+ASAHI_G17P_GL_DEPTH_COMPRESS=0 | 7 | 3.704 | 3.703-3.720 | 0.5 % | +0.0 % | n/a |
+
+image hashes: identical across all runs and variants: wip: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; m418: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; m418+ASAHI_G17P_GL_DEPTH_COMPRESS=0: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1
+
+per-run ms/frame (run order): wip: 3.703 3.703 3.703 3.703 3.704 3.703 3.707; m418: 3.676 3.675 3.676 3.677 3.679 3.677 3.676; m418+ASAHI_G17P_GL_DEPTH_COMPRESS=0: 3.720 3.705 3.705 3.703 3.704 3.704 3.704
+
+### 418-sodium: sodium-terrain
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip | 7 | 0.810 | 0.801-0.931 | 16.0 % |  | n/a |
+| m418 | 7 | 0.846 | 0.760-0.868 | 12.8 % | +4.4 % | n/a |
+
+image hashes: identical across all runs and variants: wip: hash=f44c81fdb3fca783; m418: hash=f44c81fdb3fca783
+
+per-run ms/frame (run order): wip: 0.818 0.809 0.931 0.807 0.903 0.801 0.810; m418: 0.866 0.842 0.760 0.855 0.846 0.868 0.764
+
+### 418-sodium: sodium-game
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip+SB_GAME=1 | 7 | 0.706 | 0.704-0.712 | 1.1 % |  | n/a |
+| m418+SB_GAME=1 | 7 | 0.665 | 0.663-0.666 | 0.5 % | -5.8 % | n/a |
+
+image hashes: identical across all runs and variants: wip+SB_GAME=1: hash=f44c81fdb3fca783; m418+SB_GAME=1: hash=f44c81fdb3fca783
+
+per-run ms/frame (run order): wip+SB_GAME=1: 0.706 0.709 0.706 0.707 0.704 0.705 0.712; m418+SB_GAME=1: 0.665 0.666 0.664 0.663 0.663 0.665 0.665
+
+### 418b-depth: gldepthbench
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip | 7 | 3.702 | 3.701-3.703 | 0.1 % |  | n/a |
+| m418 | 7 | 3.676 | 3.674-3.678 | 0.1 % | -0.7 % | n/a |
+| m418+ASAHI_G17P_GL_DEPTH_COMPRESS=0 | 7 | 3.702 | 3.701-3.704 | 0.1 % | +0.0 % | n/a |
+
+image hashes: identical across all runs and variants: wip: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; m418: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; m418+ASAHI_G17P_GL_DEPTH_COMPRESS=0: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1
+
+per-run ms/frame (run order): wip: 3.702 3.701 3.701 3.702 3.702 3.702 3.703; m418: 3.678 3.674 3.677 3.676 3.676 3.675 3.675; m418+ASAHI_G17P_GL_DEPTH_COMPRESS=0: 3.701 3.702 3.701 3.703 3.704 3.702 3.704
+
+### 418b-depth: gldepthbench-composite
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip | 7 | 3.811 | 3.808-3.813 | 0.1 % |  | n/a |
+| m418 | 7 | 3.790 | 3.788-3.792 | 0.1 % | -0.6 % | n/a |
+| m418+ASAHI_G17P_GL_DEPTH_COMPRESS=0 | 7 | 3.812 | 3.810-3.815 | 0.1 % | +0.0 % | n/a |
+
+image hashes: identical across all runs and variants: wip: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; m418: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; m418+ASAHI_G17P_GL_DEPTH_COMPRESS=0: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1
+
+per-run ms/frame (run order): wip: 3.810 3.813 3.811 3.812 3.812 3.808 3.811; m418: 3.789 3.789 3.791 3.790 3.791 3.788 3.792; m418+ASAHI_G17P_GL_DEPTH_COMPRESS=0: 3.812 3.812 3.813 3.812 3.810 3.810 3.815
+
+### 418c-sodium: sodium-terrain
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip | 15 | 0.803 | 0.798-0.941 | 17.8 % |  | n/a |
+| m418 | 15 | 0.771 | 0.756-0.900 | 18.7 % | -4.0 % | n/a |
+
+image hashes: identical across all runs and variants: wip: hash=f44c81fdb3fca783; m418: hash=f44c81fdb3fca783
+
+per-run ms/frame (run order): wip: 0.824 0.808 0.803 0.814 0.803 0.801 0.812 0.802 0.798 0.803 0.941 0.815 0.798 0.809 0.801; m418: 0.797 0.892 0.846 0.843 0.900 0.759 0.763 0.851 0.850 0.758 0.771 0.756 0.758 0.757 0.762
+
+### vk-2x: rgba8-d24
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| m420 | 7 | 2.302 | 2.293-2.305 | 0.5 % |  | 2.145 |
+| mc2x | 7 | 1.155 | 1.152-1.164 | 1.0 % | -49.8 % | 1.032 |
+
+image hashes: identical across all runs and variants: m420: samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b; mc2x: samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b
+
+per-run ms/frame (run order): m420: 2.293 2.297 2.302 2.302 2.305 2.304 2.297; mc2x: 1.152 1.155 1.154 1.156 1.159 1.155 1.164
+
+### vk-2x: rgba16f-d24
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| m420 | 7 | 3.261 | 3.256-3.273 | 0.5 % |  | 3.102 |
+| mc2x | 7 | 1.239 | 1.234-2.195 | 77.6 % | -62.0 % | 1.113 |
+
+image hashes: identical across all runs and variants: m420: samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7; mc2x: samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7
+
+per-run ms/frame (run order): m420: 3.273 3.267 3.263 3.261 3.256 3.261 3.260; mc2x: 1.247 1.238 1.239 1.239 1.236 2.195 1.234
+
+### vk-2x: rgba8-d200
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| m420 | 7 | 3.122 | 3.113-3.128 | 0.5 % |  | 2.959 |
+| mc2x | 7 | 1.617 | 1.607-1.625 | 1.1 % | -48.2 % | 1.489 |
+
+image hashes: identical across all runs and variants: m420: samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1; mc2x: samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1
+
+per-run ms/frame (run order): m420: 3.122 3.113 3.117 3.116 3.128 3.124 3.124; mc2x: 1.617 1.616 1.607 1.610 1.619 1.621 1.625
+
+### vk-2x: rgba8-d24-nocompress
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| mc2x+ASAHI_MESA_DEBUG=1queue,nocompress | 5 | 2.537 | 2.531-2.548 | 0.7 % |  | 2.374 |
+
+image hashes: identical across all runs and variants: mc2x+ASAHI_MESA_DEBUG=1queue,nocompress: samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b
+
+per-run ms/frame (run order): mc2x+ASAHI_MESA_DEBUG=1queue,nocompress: 2.548 2.534 2.537 2.539 2.531

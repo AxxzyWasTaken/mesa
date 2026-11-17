@@ -1,0 +1,116 @@
+## rgba8 mc2x nocompress
+image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+image resolved   3456x2234 1x size=30965760 memtype=0 flags=0xf
+image res-depth  3456x2234 1x size=30965760 memtype=0 flags=0xf
+image post       3456x2234 1x size=30965760 memtype=0 flags=0xf
+image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+probe ms-colour  size=61931520 plain=0: bytes changed clear->draw: first 61931520 bytes 54500388, past them 0 of 0 (last half 0); nonzero past them: clear 0, draw 0
+probe ms-depth   size=61931520 plain=0: bytes changed clear->draw: first 61931520 bytes 58191795, past them 0 of 0 (last half 0); nonzero past them: clear 0, draw 0
+## rgba8 m420 (plain sizes 61931520 / 61931520)
+vkmsaa2x: creating ms-colour
+  driver: No compression: AGX3 image outside G17P policy
+vkmsaa2x: creating ms-depth
+  driver: No compression: AGX3 image outside G17P policy
+vkmsaa2x: creating resolved
+  driver: G17P compression enabled: r8g8b8a8_unorm 3456x2234
+vkmsaa2x: creating res-depth
+  driver: G17P compression enabled: z32_float 3456x2234
+vkmsaa2x: creating post
+  driver: G17P compression enabled: r8g8b8a8_unorm 3456x2234
+vkmsaa2x: creating verify-c
+  driver: No compression: AGX3 image outside G17P policy
+vkmsaa2x: creating verify-z
+  driver: No compression: AGX3 image outside G17P policy
+image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+probe ms-colour  size=61931520 plain=61931520: bytes changed clear->draw: first 61931520 bytes 54500388, past them 0 of 0 (last half 0); nonzero past them: clear 0, draw 0
+probe ms-depth   size=61931520 plain=61931520: bytes changed clear->draw: first 61931520 bytes 58191795, past them 0 of 0 (last half 0); nonzero past them: clear 0, draw 0
+## rgba8 mc2x (plain sizes 61931520 / 61931520)
+vkmsaa2x: creating ms-colour
+  driver: G17P compression enabled: r8g8b8a8_unorm 3456x2234
+vkmsaa2x: creating ms-depth
+  driver: G17P compression enabled: z32_float 3456x2234
+vkmsaa2x: creating resolved
+  driver: G17P compression enabled: r8g8b8a8_unorm 3456x2234
+vkmsaa2x: creating res-depth
+  driver: G17P compression enabled: z32_float 3456x2234
+vkmsaa2x: creating post
+  driver: G17P compression enabled: r8g8b8a8_unorm 3456x2234
+vkmsaa2x: creating verify-c
+  driver: No compression: AGX3 image outside G17P policy
+vkmsaa2x: creating verify-z
+  driver: No compression: AGX3 image outside G17P policy
+image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+probe ms-colour  size=62980096 plain=61931520: bytes changed clear->draw: first 61931520 bytes 4785053, past them 194993 of 1048576 (last half 10939); nonzero past them: clear 483840, draw 482976
+probe ms-depth   size=62980096 plain=61931520: bytes changed clear->draw: first 61931520 bytes 31152650, past them 474976 of 1048576 (last half 38615); nonzero past them: clear 483840, draw 482976
+## rgba16f mc2x nocompress
+image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+image resolved   3456x2234 1x size=61931520 memtype=0 flags=0xf
+image res-depth  3456x2234 1x size=30965760 memtype=0 flags=0xf
+image post       3456x2234 1x size=30965760 memtype=0 flags=0xf
+image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+probe ms-colour  size=123863040 plain=0: bytes changed clear->draw: first 123863040 bytes 98793672, past them 0 of 0 (last half 0); nonzero past them: clear 0, draw 0
+probe ms-depth   size=61931520 plain=0: bytes changed clear->draw: first 61931520 bytes 58191795, past them 0 of 0 (last half 0); nonzero past them: clear 0, draw 0
+## rgba16f m420 (plain sizes 123863040 / 61931520)
+vkmsaa2x: creating ms-colour
+  driver: No compression: AGX3 image outside G17P policy
+vkmsaa2x: creating ms-depth
+  driver: No compression: AGX3 image outside G17P policy
+vkmsaa2x: creating resolved
+  driver: G17P compression enabled: r16g16b16a16_float 3456x2234
+vkmsaa2x: creating res-depth
+  driver: G17P compression enabled: z32_float 3456x2234
+vkmsaa2x: creating post
+  driver: G17P compression enabled: r8g8b8a8_unorm 3456x2234
+vkmsaa2x: creating verify-c
+  driver: No compression: AGX3 image outside G17P policy
+vkmsaa2x: creating verify-z
+  driver: No compression: AGX3 image outside G17P policy
+image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+probe ms-colour  size=123863040 plain=123863040: bytes changed clear->draw: first 123863040 bytes 98793672, past them 0 of 0 (last half 0); nonzero past them: clear 0, draw 0
+probe ms-depth   size=61931520 plain=61931520: bytes changed clear->draw: first 61931520 bytes 58191795, past them 0 of 0 (last half 0); nonzero past them: clear 0, draw 0
+## rgba16f mc2x (plain sizes 123863040 / 61931520)
+vkmsaa2x: creating ms-colour
+  driver: G17P compression enabled: r16g16b16a16_float 3456x2234
+vkmsaa2x: creating ms-depth
+  driver: G17P compression enabled: z32_float 3456x2234
+vkmsaa2x: creating resolved
+  driver: G17P compression enabled: r16g16b16a16_float 3456x2234
+vkmsaa2x: creating res-depth
+  driver: G17P compression enabled: z32_float 3456x2234
+vkmsaa2x: creating post
+  driver: G17P compression enabled: r8g8b8a8_unorm 3456x2234
+vkmsaa2x: creating verify-c
+  driver: No compression: AGX3 image outside G17P policy
+vkmsaa2x: creating verify-z
+  driver: No compression: AGX3 image outside G17P policy
+image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+probe ms-colour  size=124911616 plain=123863040: bytes changed clear->draw: first 123863040 bytes 11778115, past them 474079 of 1048576 (last half 38594); nonzero past them: clear 483840, draw 482976
+probe ms-depth   size=62980096 plain=61931520: bytes changed clear->draw: first 61931520 bytes 31152650, past them 474976 of 1048576 (last half 38615); nonzero past them: clear 483840, draw 482976

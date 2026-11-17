@@ -1,0 +1,60 @@
+sodium-terrain v=wip i=1 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=1 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1214.3 fps (0.824 ms/frame, 2547 Mtris/s) cpu=0.402 ms/frame
+sodium-terrain v=m418 i=1 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=1 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1254.5 fps (0.797 ms/frame, 2631 Mtris/s) cpu=0.389 ms/frame
+sodium-terrain v=wip i=2 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=2 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1237.6 fps (0.808 ms/frame, 2595 Mtris/s) cpu=0.392 ms/frame
+sodium-terrain v=m418 i=2 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=2 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1120.7 fps (0.892 ms/frame, 2350 Mtris/s) cpu=0.460 ms/frame
+sodium-terrain v=wip i=3 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=3 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1244.8 fps (0.803 ms/frame, 2611 Mtris/s) cpu=0.377 ms/frame
+sodium-terrain v=m418 i=3 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=3 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1181.9 fps (0.846 ms/frame, 2479 Mtris/s) cpu=0.392 ms/frame
+sodium-terrain v=wip i=4 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=4 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1227.8 fps (0.814 ms/frame, 2575 Mtris/s) cpu=0.462 ms/frame
+sodium-terrain v=m418 i=4 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=4 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1186.9 fps (0.843 ms/frame, 2489 Mtris/s) cpu=0.393 ms/frame
+sodium-terrain v=wip i=5 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=5 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1245.0 fps (0.803 ms/frame, 2611 Mtris/s) cpu=0.393 ms/frame
+sodium-terrain v=m418 i=5 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=5 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1111.2 fps (0.900 ms/frame, 2330 Mtris/s) cpu=0.421 ms/frame
+sodium-terrain v=wip i=6 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=6 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1249.2 fps (0.801 ms/frame, 2620 Mtris/s) cpu=0.376 ms/frame
+sodium-terrain v=m418 i=6 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=6 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1317.9 fps (0.759 ms/frame, 2764 Mtris/s) cpu=0.392 ms/frame
+sodium-terrain v=wip i=7 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=7 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1231.9 fps (0.812 ms/frame, 2583 Mtris/s) cpu=0.405 ms/frame
+sodium-terrain v=m418 i=7 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=7 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1310.4 fps (0.763 ms/frame, 2748 Mtris/s) cpu=0.386 ms/frame
+sodium-terrain v=wip i=8 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=8 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1247.2 fps (0.802 ms/frame, 2616 Mtris/s) cpu=0.394 ms/frame
+sodium-terrain v=m418 i=8 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=8 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1175.7 fps (0.851 ms/frame, 2466 Mtris/s) cpu=0.389 ms/frame
+sodium-terrain v=wip i=9 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=9 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1252.9 fps (0.798 ms/frame, 2627 Mtris/s) cpu=0.375 ms/frame
+sodium-terrain v=m418 i=9 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=9 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1176.0 fps (0.850 ms/frame, 2466 Mtris/s) cpu=0.404 ms/frame
+sodium-terrain v=wip i=10 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=10 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1245.8 fps (0.803 ms/frame, 2613 Mtris/s) cpu=0.400 ms/frame
+sodium-terrain v=m418 i=10 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=10 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1319.5 fps (0.758 ms/frame, 2767 Mtris/s) cpu=0.379 ms/frame
+sodium-terrain v=wip i=11 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=11 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1063.3 fps (0.941 ms/frame, 2230 Mtris/s) cpu=0.487 ms/frame
+sodium-terrain v=m418 i=11 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=11 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1297.5 fps (0.771 ms/frame, 2721 Mtris/s) cpu=0.385 ms/frame
+sodium-terrain v=wip i=12 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=12 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1227.4 fps (0.815 ms/frame, 2574 Mtris/s) cpu=0.411 ms/frame
+sodium-terrain v=m418 i=12 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=12 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1323.0 fps (0.756 ms/frame, 2774 Mtris/s) cpu=0.375 ms/frame
+sodium-terrain v=wip i=13 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=13 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1252.4 fps (0.798 ms/frame, 2626 Mtris/s) cpu=0.370 ms/frame
+sodium-terrain v=m418 i=13 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=13 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1319.5 fps (0.758 ms/frame, 2767 Mtris/s) cpu=0.373 ms/frame
+sodium-terrain v=wip i=14 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=14 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1235.5 fps (0.809 ms/frame, 2591 Mtris/s) cpu=0.406 ms/frame
+sodium-terrain v=m418 i=14 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=14 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1320.7 fps (0.757 ms/frame, 2770 Mtris/s) cpu=0.379 ms/frame
+sodium-terrain v=wip i=15 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=wip i=15 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1248.9 fps (0.801 ms/frame, 2619 Mtris/s) cpu=0.385 ms/frame
+sodium-terrain v=m418 i=15 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-terrain v=m418 i=15 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1312.0 fps (0.762 ms/frame, 2752 Mtris/s) cpu=0.393 ms/frame

@@ -1,0 +1,423 @@
+rgba8-d24 v=m420 i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=m420 i=1 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=1 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=1 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=1 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.293 ms/frame wall, gpu 2.138 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=mc2x i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=mc2x i=1 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=1 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=1 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=1 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.152 ms/frame wall, gpu 1.029 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=m420 i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=m420 i=2 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=2 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=2 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=2 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.297 ms/frame wall, gpu 2.145 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=mc2x i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=mc2x i=2 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=2 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=2 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=2 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.155 ms/frame wall, gpu 1.030 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=m420 i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=m420 i=3 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=3 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=3 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=3 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.302 ms/frame wall, gpu 2.145 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=mc2x i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=mc2x i=3 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=3 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=3 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=3 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.154 ms/frame wall, gpu 1.027 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=m420 i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=m420 i=4 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=4 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=4 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=4 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.302 ms/frame wall, gpu 2.146 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=mc2x i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=mc2x i=4 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=4 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=4 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=4 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.156 ms/frame wall, gpu 1.032 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=m420 i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=m420 i=5 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=5 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=5 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=5 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.305 ms/frame wall, gpu 2.149 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=mc2x i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=mc2x i=5 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=5 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=5 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=5 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.159 ms/frame wall, gpu 1.035 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=m420 i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=m420 i=6 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=6 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=6 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=6 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.304 ms/frame wall, gpu 2.149 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=mc2x i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=mc2x i=6 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=6 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=6 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=6 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.155 ms/frame wall, gpu 1.032 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=m420 i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=m420 i=7 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=7 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=7 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=m420 i=7 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.297 ms/frame wall, gpu 2.141 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=mc2x i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=mc2x i=7 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=7 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=7 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=mc2x i=7 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.164 ms/frame wall, gpu 1.036 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba16f-d24 v=m420 i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=m420 i=1 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=1 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=1 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=1 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.273 ms/frame wall, gpu 3.113 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=mc2x i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=mc2x i=1 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=1 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=1 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=1 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.247 ms/frame wall, gpu 1.119 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=m420 i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=m420 i=2 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=2 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=2 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=2 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.267 ms/frame wall, gpu 3.112 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=mc2x i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=mc2x i=2 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=2 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=2 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=2 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.238 ms/frame wall, gpu 1.112 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=m420 i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=m420 i=3 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=3 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=3 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=3 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.263 ms/frame wall, gpu 3.106 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=mc2x i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=mc2x i=3 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=3 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=3 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=3 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.239 ms/frame wall, gpu 1.113 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=m420 i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=m420 i=4 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=4 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=4 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=4 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.261 ms/frame wall, gpu 3.099 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=mc2x i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=mc2x i=4 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=4 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=4 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=4 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.239 ms/frame wall, gpu 1.115 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=m420 i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=m420 i=5 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=5 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=5 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=5 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.256 ms/frame wall, gpu 3.101 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=mc2x i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=mc2x i=5 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=5 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=5 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=5 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.236 ms/frame wall, gpu 1.111 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=m420 i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=m420 i=6 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=6 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=6 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=6 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.261 ms/frame wall, gpu 3.099 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=mc2x i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=mc2x i=6 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=6 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=6 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=6 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 2.195 ms/frame wall, gpu 1.596 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=m420 i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=m420 i=7 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=7 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=7 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=m420 i=7 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.260 ms/frame wall, gpu 3.102 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=mc2x i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=mc2x i=7 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=7 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=7 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=mc2x i=7 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.234 ms/frame wall, gpu 1.110 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba8-d200 v=m420 i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=m420 i=1 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=1 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=1 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=1 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.122 ms/frame wall, gpu 2.959 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=mc2x i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=mc2x i=1 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=1 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=1 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=1 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.617 ms/frame wall, gpu 1.489 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=m420 i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=m420 i=2 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=2 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=2 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=2 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.113 ms/frame wall, gpu 2.951 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=mc2x i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=mc2x i=2 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=2 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=2 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=2 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.616 ms/frame wall, gpu 1.486 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=m420 i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=m420 i=3 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=3 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=3 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=3 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.117 ms/frame wall, gpu 2.959 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=mc2x i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=mc2x i=3 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=3 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=3 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=3 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.607 ms/frame wall, gpu 1.483 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=m420 i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=m420 i=4 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=4 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=4 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=4 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.116 ms/frame wall, gpu 2.954 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=mc2x i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=mc2x i=4 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=4 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=4 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=4 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.610 ms/frame wall, gpu 1.486 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=m420 i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=m420 i=5 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=5 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=5 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=5 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.128 ms/frame wall, gpu 2.965 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=mc2x i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=mc2x i=5 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=5 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=5 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=5 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.619 ms/frame wall, gpu 1.494 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=m420 i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=m420 i=6 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=6 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=6 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=6 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.124 ms/frame wall, gpu 2.959 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=mc2x i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=mc2x i=6 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=6 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=6 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=6 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.621 ms/frame wall, gpu 1.495 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=m420 i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-67f4306d29), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=m420 i=7 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=7 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=7 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=m420 i=7 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.124 ms/frame wall, gpu 2.962 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=mc2x i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=mc2x i=7 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=7 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=7 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=mc2x i=7 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.625 ms/frame wall, gpu 1.498 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image resolved   3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image res-depth  3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image post       3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.548 ms/frame wall, gpu 2.387 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image resolved   3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image res-depth  3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image post       3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.534 ms/frame wall, gpu 2.372 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image resolved   3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image res-depth  3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image post       3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.537 ms/frame wall, gpu 2.373 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=4 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=4 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=4 rc=0 | image resolved   3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=4 rc=0 | image res-depth  3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=4 rc=0 | image post       3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=4 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.539 ms/frame wall, gpu 2.374 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-db2a2b3b69), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=5 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=5 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=5 rc=0 | image resolved   3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=5 rc=0 | image res-depth  3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=5 rc=0 | image post       3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=mc2x+ASAHI_MESA_DEBUG=1queue,nocompress i=5 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.531 ms/frame wall, gpu 2.376 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612

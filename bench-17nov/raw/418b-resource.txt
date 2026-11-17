@@ -1,0 +1,4 @@
+gldepthbench default wip: 0 Z32F images created compressed, 0 decompressed by the feedback-loop rule
+gldepthbench composite wip: 0 Z32F images created compressed, 0 decompressed by the feedback-loop rule
+gldepthbench default m418: 2 Z32F images created compressed, 1 decompressed by the feedback-loop rule
+gldepthbench composite m418: 2 Z32F images created compressed, 0 decompressed by the feedback-loop rule

@@ -1,0 +1,22 @@
+22:36:49 info
+22:37:01 417: shader stats
+22:37:14 gltxf-K1: 28 lines with rc=0
+22:37:31 gltxf-K2: 28 lines with rc=0
+22:37:40 gltxf-K1-robust: 20 lines with rc=0
+22:38:02 gldepthbench: 42 lines with rc=0
+22:38:12 sodium-terrain: 28 lines with rc=0
+22:38:21 sodium-game: 28 lines with rc=0
+22:38:39 rgba8-d24: 126 lines with rc=0
+22:38:53 rgba16f-d24: 126 lines with rc=0
+22:39:04 rgba8-d200: 126 lines with rc=0
+22:39:09 rgba8-d24-nocompress: 45 lines with rc=0
+22:39:09 t41 m420
+22:39:58 t41 mc2x
+22:40:58 DONE, GPU trouble lines new: 0
+22:43:45 418b
+22:44:06 gldepthbench: 42 lines with rc=0
+22:44:29 gldepthbench-composite: 63 lines with rc=0
+22:44:30 418b DONE, GPU trouble lines new: 0
+22:45:05 418c
+22:45:26 sodium-terrain: 60 lines with rc=0
+22:45:26 418c DONE, GPU trouble lines new: 0
