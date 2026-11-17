@@ -1,0 +1,72 @@
+
+### bench-depth: gldepthbench
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip | 7 | 3.721 | 3.719-3.729 | 0.3 % |  | n/a |
+| fix | 7 | 3.719 | 3.716-3.722 | 0.2 % | -0.1 % | n/a |
+| m418 | 7 | 3.693 | 3.689-3.709 | 0.5 % | -0.8 % | n/a |
+| m418fix | 7 | 3.687 | 3.682-3.689 | 0.2 % | -0.9 % | n/a |
+
+image hashes: identical across all runs and variants: wip: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; fix: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; m418: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; m418fix: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1
+
+per-run ms/frame (run order): wip: 3.725 3.729 3.719 3.721 3.719 3.723 3.720; fix: 3.720 3.722 3.719 3.718 3.720 3.716 3.719; m418: 3.709 3.694 3.692 3.697 3.693 3.691 3.689; m418fix: 3.687 3.683 3.684 3.689 3.688 3.688 3.682
+
+### bench-depth: gldepthbench-composite
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip | 7 | 3.831 | 3.823-3.870 | 1.2 % |  | n/a |
+| fix | 7 | 3.828 | 3.820-3.830 | 0.3 % | -0.1 % | n/a |
+| m418 | 7 | 3.808 | 3.806-3.809 | 0.1 % | -0.6 % | n/a |
+| m418fix | 7 | 3.809 | 3.806-3.815 | 0.2 % | -0.6 % | n/a |
+
+image hashes: identical across all runs and variants: wip: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; fix: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; m418: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; m418fix: colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1
+
+per-run ms/frame (run order): wip: 3.836 3.828 3.870 3.831 3.823 3.829 3.834; fix: 3.829 3.826 3.820 3.828 3.830 3.824 3.829; m418: 3.808 3.809 3.806 3.808 3.808 3.808 3.809; m418fix: 3.810 3.809 3.806 3.815 3.811 3.807 3.807
+
+### bench-depth: gldepthbench-shadow4096
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| m418 | 7 | 6.466 | 6.459-6.474 | 0.2 % |  | n/a |
+| m418fix | 7 | 6.473 | 6.468-6.484 | 0.2 % | +0.1 % | n/a |
+
+image hashes: identical across all runs and variants: m418: colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1; m418fix: colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1
+
+per-run ms/frame (run order): m418: 6.459 6.474 6.466 6.468 6.470 6.465 6.462; m418fix: 6.473 6.475 6.484 6.483 6.469 6.471 6.468
+
+### bench-feedback: glfeedback-fs
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip | 7 | 2.716 | 2.715-2.740 | 0.9 % |  | n/a |
+| fix | 7 | 2.716 | 2.714-2.765 | 1.9 % | +0.0 % | n/a |
+
+image hashes: identical across all runs and variants: wip: colour=1d672075c5a57e91 depth=e080976862db64c1 samples=6206c3011a6772ab; fix: colour=1d672075c5a57e91 depth=e080976862db64c1 samples=6206c3011a6772ab
+
+per-run ms/frame (run order): wip: 2.717 2.718 2.740 2.716 2.715 2.715 2.715; fix: 2.714 2.714 2.716 2.726 2.716 2.715 2.765
+
+### bench-feedback: glfeedback-cs
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip | 7 | 2.277 | 2.272-2.296 | 1.1 % |  | n/a |
+| fix | 7 | 2.141 | 2.134-2.161 | 1.3 % | -6.0 % | n/a |
+
+image hashes: identical across all runs and variants: wip: image=818b4ee11a05ec0b colour=9f9f819f6eb00e02 depth=e080976862db64c1 post=ac5d9c2a1bb4204f; fix: image=818b4ee11a05ec0b colour=9f9f819f6eb00e02 depth=e080976862db64c1 post=ac5d9c2a1bb4204f
+
+per-run ms/frame (run order): wip: 2.272 2.278 2.281 2.296 2.277 2.276 2.275; fix: 2.140 2.141 2.134 2.161 2.143 2.140 2.141
+
+### bench-sodium: sodium-game
+
+| variant | runs | median ms/frame | min-max | spread | change vs first | GPU ms (median) |
+|---|---|---|---|---|---|---|
+| wip+SB_GAME=1 | 7 | 0.717 | 0.713-0.717 | 0.6 % |  | n/a |
+| fix+SB_GAME=1 | 7 | 0.717 | 0.713-0.721 | 1.1 % | +0.0 % | n/a |
+| m418+SB_GAME=1 | 7 | 0.674 | 0.672-0.678 | 0.9 % | -6.0 % | n/a |
+| m418fix+SB_GAME=1 | 7 | 0.673 | 0.670-0.674 | 0.6 % | -6.1 % | n/a |
+
+image hashes: identical across all runs and variants: wip+SB_GAME=1: hash=f44c81fdb3fca783; fix+SB_GAME=1: hash=f44c81fdb3fca783; m418+SB_GAME=1: hash=f44c81fdb3fca783; m418fix+SB_GAME=1: hash=f44c81fdb3fca783
+
+per-run ms/frame (run order): wip+SB_GAME=1: 0.716 0.717 0.713 0.715 0.717 0.717 0.717; fix+SB_GAME=1: 0.718 0.717 0.718 0.715 0.713 0.717 0.721; m418+SB_GAME=1: 0.672 0.674 0.674 0.673 0.678 0.672 0.675; m418fix+SB_GAME=1: 0.673 0.673 0.673 0.670 0.672 0.673 0.674

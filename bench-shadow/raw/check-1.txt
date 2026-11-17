@@ -1,0 +1,59 @@
+glfeedback check 256 256 wip rc=0 md5=72c43169 | decompressions: loop-colour=1 loop-depth=0 loop-vs=1 switch=1 switch: sampling program=0 stale-fs=1 stale-vs=1 stale-cs=1 
+    wip: loop-colour target=b68c8e1ada20d6af
+    wip: loop-depth colour=9ff00e712720c8ec depth=c5a337553863d256
+    wip: loop-vs target=f261a7402e10a9f7
+    wip: switch target=e7faca10f51ac832 other=103e32eaaf13936c
+    wip: stale-fs map=e893f353a8ba95a7 colour=68a8332bda4627e7
+    wip: stale-vs image=dc5647bdb8be0b1b colour=023288f9f3d32ffd
+    wip: stale-cs image=06c3d9a941a83c39 colour=35d95f8f47a17412 sums=deacd542c65071ed
+    wip: glfeedback check 256x256 glerr=0x0
+glfeedback check 256 256 fix rc=0 md5=72c43169 | decompressions: loop-colour=1 loop-depth=0 loop-vs=1 switch=0 switch: sampling program=1 stale-fs=0 stale-vs=0 stale-cs=0 
+    fix: loop-colour target=b68c8e1ada20d6af
+    fix: loop-depth colour=9ff00e712720c8ec depth=c5a337553863d256
+    fix: loop-vs target=f261a7402e10a9f7
+    fix: switch target=e7faca10f51ac832 other=103e32eaaf13936c
+    fix: stale-fs map=e893f353a8ba95a7 colour=68a8332bda4627e7
+    fix: stale-vs image=dc5647bdb8be0b1b colour=023288f9f3d32ffd
+    fix: stale-cs image=06c3d9a941a83c39 colour=35d95f8f47a17412 sums=deacd542c65071ed
+    fix: glfeedback check 256x256 glerr=0x0
+glfeedback check 256 256 m418 rc=0 md5=72c43169 | decompressions: loop-colour=1 loop-depth=1 loop-vs=1 switch=1 switch: sampling program=0 stale-fs=1 stale-vs=1 stale-cs=1 
+    m418: loop-colour target=b68c8e1ada20d6af
+    m418: loop-depth colour=9ff00e712720c8ec depth=c5a337553863d256
+    m418: loop-vs target=f261a7402e10a9f7
+    m418: switch target=e7faca10f51ac832 other=103e32eaaf13936c
+    m418: stale-fs map=e893f353a8ba95a7 colour=68a8332bda4627e7
+    m418: stale-vs image=dc5647bdb8be0b1b colour=023288f9f3d32ffd
+    m418: stale-cs image=06c3d9a941a83c39 colour=35d95f8f47a17412 sums=deacd542c65071ed
+    m418: glfeedback check 256x256 glerr=0x0
+glfeedback check 256 256 m418fix rc=0 md5=72c43169 | decompressions: loop-colour=1 loop-depth=1 loop-vs=1 switch=0 switch: sampling program=1 stale-fs=0 stale-vs=0 stale-cs=0 
+    m418fix: loop-colour target=b68c8e1ada20d6af
+    m418fix: loop-depth colour=9ff00e712720c8ec depth=c5a337553863d256
+    m418fix: loop-vs target=f261a7402e10a9f7
+    m418fix: switch target=e7faca10f51ac832 other=103e32eaaf13936c
+    m418fix: stale-fs map=e893f353a8ba95a7 colour=68a8332bda4627e7
+    m418fix: stale-vs image=dc5647bdb8be0b1b colour=023288f9f3d32ffd
+    m418fix: stale-cs image=06c3d9a941a83c39 colour=35d95f8f47a17412 sums=deacd542c65071ed
+    m418fix: glfeedback check 256x256 glerr=0x0
+glfeedback check 256 256 m418fix+nocompress rc=0 md5=f28364a3 | decompressions: loop-colour=0 loop-depth=0 loop-vs=0 switch=0 switch: sampling program=0 stale-fs=0 stale-vs=0 stale-cs=0 
+    m418fix+nocompress: loop-colour target=b68c8e1ada20d6af
+    m418fix+nocompress: loop-depth colour=9ff00e712720c8ec depth=c5a337553863d256
+    m418fix+nocompress: loop-vs target=34574ab3d7e5cf7c
+    m418fix+nocompress: switch target=e7faca10f51ac832 other=103e32eaaf13936c
+    m418fix+nocompress: stale-fs map=e893f353a8ba95a7 colour=68a8332bda4627e7
+    m418fix+nocompress: stale-vs image=dc5647bdb8be0b1b colour=023288f9f3d32ffd
+    m418fix+nocompress: stale-cs image=06c3d9a941a83c39 colour=35d95f8f47a17412 sums=deacd542c65071ed
+    m418fix+nocompress: glfeedback check 256x256 glerr=0x0
+glfeedback check 1920 1080 wip rc=0 md5=2423d795 | decompressions: loop-colour=1 loop-depth=0 loop-vs=1 switch=1 switch: sampling program=0 stale-fs=1 stale-vs=1 stale-cs=1 
+glfeedback check 1920 1080 fix rc=0 md5=2423d795 | decompressions: loop-colour=1 loop-depth=0 loop-vs=1 switch=0 switch: sampling program=1 stale-fs=0 stale-vs=0 stale-cs=0 
+glfeedback check 1920 1080 m418 rc=0 md5=2423d795 | decompressions: loop-colour=1 loop-depth=1 loop-vs=1 switch=1 switch: sampling program=0 stale-fs=1 stale-vs=1 stale-cs=1 
+glfeedback check 1920 1080 m418fix rc=0 md5=2423d795 | decompressions: loop-colour=1 loop-depth=1 loop-vs=1 switch=0 switch: sampling program=1 stale-fs=0 stale-vs=0 stale-cs=0 
+glfeedback check 1920 1080 m418fix+nocompress rc=0 md5=ee776dd2 | decompressions: loop-colour=0 loop-depth=0 loop-vs=0 switch=0 switch: sampling program=0 stale-fs=0 stale-vs=0 stale-cs=0 
+glfeedback check 3456 2234 wip rc=0 md5=c6f87068 | decompressions: loop-colour=1 loop-depth=0 loop-vs=1 switch=1 switch: sampling program=0 stale-fs=1 stale-vs=1 stale-cs=1 
+glfeedback check 3456 2234 fix rc=0 md5=c6f87068 | decompressions: loop-colour=1 loop-depth=0 loop-vs=1 switch=0 switch: sampling program=1 stale-fs=0 stale-vs=0 stale-cs=0 
+glfeedback check 3456 2234 m418 rc=0 md5=c6f87068 | decompressions: loop-colour=1 loop-depth=1 loop-vs=1 switch=1 switch: sampling program=0 stale-fs=1 stale-vs=1 stale-cs=1 
+glfeedback check 3456 2234 m418fix rc=0 md5=c6f87068 | decompressions: loop-colour=1 loop-depth=1 loop-vs=1 switch=0 switch: sampling program=1 stale-fs=0 stale-vs=0 stale-cs=0 
+glfeedback check 3456 2234 m418fix+nocompress rc=0 md5=e649ecf7 | decompressions: loop-colour=0 loop-depth=0 loop-vs=0 switch=0 switch: sampling program=0 stale-fs=0 stale-vs=0 stale-cs=0 
+gldepthcomp 17 33: wip f8490ce6 (z32 compressed 0, loop decompressions 0) fix f8490ce6 (z32 compressed 0, loop decompressions 0) m418 f8490ce6 (z32 compressed 2, loop decompressions 1) m418fix f8490ce6 (z32 compressed 2, loop decompressions 0) m418fix+nocompress f8490ce6 (z32 compressed 0, loop decompressions 0)
+gldepthcomp 1920 1080: wip 7d68757b (z32 compressed 0, loop decompressions 0) fix 7d68757b (z32 compressed 0, loop decompressions 0) m418 7d68757b (z32 compressed 2, loop decompressions 1) m418fix 7d68757b (z32 compressed 2, loop decompressions 0) m418fix+nocompress 7d68757b (z32 compressed 0, loop decompressions 0)
+gldepthcomp 3456 2234: wip 18c08ae5 (z32 compressed 0, loop decompressions 0) fix 18c08ae5 (z32 compressed 0, loop decompressions 0) m418 18c08ae5 (z32 compressed 2, loop decompressions 1) m418fix 18c08ae5 (z32 compressed 2, loop decompressions 0) m418fix+nocompress 18c08ae5 (z32 compressed 0, loop decompressions 0)
+gldepthcomp 2048 2048: wip a1729ca4 (z32 compressed 0, loop decompressions 0) fix a1729ca4 (z32 compressed 0, loop decompressions 0) m418 a1729ca4 (z32 compressed 2, loop decompressions 1) m418fix a1729ca4 (z32 compressed 2, loop decompressions 0) m418fix+nocompress a1729ca4 (z32 compressed 0, loop decompressions 0)

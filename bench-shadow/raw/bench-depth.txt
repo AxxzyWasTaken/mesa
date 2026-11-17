@@ -1,0 +1,168 @@
+gldepthbench v=wip i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench v=wip i=1 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.725 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=fix i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench v=fix i=1 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.720 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418 i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench v=m418 i=1 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.709 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418fix i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench v=m418fix i=1 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.687 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=wip i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench v=wip i=2 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.729 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=fix i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench v=fix i=2 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.722 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418 i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench v=m418 i=2 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.694 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418fix i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench v=m418fix i=2 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.683 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=wip i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench v=wip i=3 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.719 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=fix i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench v=fix i=3 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.719 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418 i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench v=m418 i=3 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.692 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418fix i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench v=m418fix i=3 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.684 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=wip i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench v=wip i=4 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.721 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=fix i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench v=fix i=4 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.718 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418 i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench v=m418 i=4 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.697 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418fix i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench v=m418fix i=4 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.689 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=wip i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench v=wip i=5 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.719 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=fix i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench v=fix i=5 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.720 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418 i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench v=m418 i=5 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.693 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418fix i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench v=m418fix i=5 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.688 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=wip i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench v=wip i=6 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.723 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=fix i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench v=fix i=6 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.716 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418 i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench v=m418 i=6 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.691 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418fix i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench v=m418fix i=6 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.688 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=wip i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench v=wip i=7 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.720 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=fix i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench v=fix i=7 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.719 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418 i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench v=m418 i=7 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.689 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench v=m418fix i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench v=m418fix i=7 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.682 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=wip i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench-composite v=wip i=1 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=wip i=1 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.836 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=fix i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench-composite v=fix i=1 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=fix i=1 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.829 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418 i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-composite v=m418 i=1 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418 i=1 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.808 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418fix i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-composite v=m418fix i=1 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418fix i=1 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.810 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=wip i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench-composite v=wip i=2 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=wip i=2 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.828 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=fix i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench-composite v=fix i=2 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=fix i=2 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.826 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418 i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-composite v=m418 i=2 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418 i=2 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.809 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418fix i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-composite v=m418fix i=2 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418fix i=2 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.809 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=wip i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench-composite v=wip i=3 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=wip i=3 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.870 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=fix i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench-composite v=fix i=3 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=fix i=3 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.820 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418 i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-composite v=m418 i=3 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418 i=3 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.806 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418fix i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-composite v=m418fix i=3 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418fix i=3 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.806 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=wip i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench-composite v=wip i=4 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=wip i=4 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.831 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=fix i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench-composite v=fix i=4 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=fix i=4 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.828 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418 i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-composite v=m418 i=4 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418 i=4 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.808 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418fix i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-composite v=m418fix i=4 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418fix i=4 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.815 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=wip i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench-composite v=wip i=5 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=wip i=5 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.823 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=fix i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench-composite v=fix i=5 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=fix i=5 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.830 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418 i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-composite v=m418 i=5 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418 i=5 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.808 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418fix i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-composite v=m418fix i=5 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418fix i=5 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.811 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=wip i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench-composite v=wip i=6 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=wip i=6 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.829 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=fix i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench-composite v=fix i=6 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=fix i=6 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.824 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418 i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-composite v=m418 i=6 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418 i=6 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.808 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418fix i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-composite v=m418fix i=6 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418fix i=6 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.807 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=wip i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+gldepthbench-composite v=wip i=7 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=wip i=7 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.834 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=fix i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+gldepthbench-composite v=fix i=7 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=fix i=7 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.829 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418 i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-composite v=m418 i=7 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418 i=7 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.809 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-composite v=m418fix i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-composite v=m418fix i=7 rc=0 | composite=7864e81f336c7b31
+gldepthbench-composite v=m418fix i=7 rc=0 | gldepthbench 3456x2234 shadow 2048^2 tris 3000+3000+750 frames=200: 3.807 ms/frame colour=d5c774376055ade9 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418 i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-shadow4096 v=m418 i=1 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.459 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418fix i=1 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-shadow4096 v=m418fix i=1 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.473 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418 i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-shadow4096 v=m418 i=2 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.474 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418fix i=2 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-shadow4096 v=m418fix i=2 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.475 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418 i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-shadow4096 v=m418 i=3 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.466 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418fix i=3 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-shadow4096 v=m418fix i=3 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.484 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418 i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-shadow4096 v=m418 i=4 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.468 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418fix i=4 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-shadow4096 v=m418fix i=4 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.483 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418 i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-shadow4096 v=m418 i=5 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.470 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418fix i=5 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-shadow4096 v=m418fix i=5 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.469 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418 i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-shadow4096 v=m418 i=6 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.465 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418fix i=6 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-shadow4096 v=m418fix i=6 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.471 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418 i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+gldepthbench-shadow4096 v=m418 i=7 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.462 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0
+gldepthbench-shadow4096 v=m418fix i=7 rc=0 | driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)
+gldepthbench-shadow4096 v=m418fix i=7 rc=0 | gldepthbench 3456x2234 shadow 4096^2 tris 3000+3000+750 frames=200: 6.468 ms/frame colour=61fe1861f94e03e4 ao=e4c28d6a72d4a3c0 depth=e080976862db64c1 glerr=0x0

@@ -1,0 +1,13 @@
+date 2026-11-17T23:12:31+00:00
+7.3.0-j616c-ia2
+Apple MacBook Pro (16-inch, M4 Max)
+AC online 0, battery Discharging 84%
+mode macos: fans 0/0 rpm, SMC automatic, SoC die 60.5 C
+ 23:12:31 up  5:20,  2 users,  load average: 0.92, 3.08, 2.21
+  client drm-engine-fragment 1936 11.4%
+  client drm-engine-fragment 73746 41.5%
+engine drm-engine-fragment 53.0%
+wip GL: driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-57df4db849)
+fix GL: driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-2e2647c414)
+m418 GL: driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-1752a4d936)
+m418fix GL: driver Apple M4 Max (G16C B1) | 4.6 (Core Profile) Mesa 26.3.0-devel (git-c719e0d894)

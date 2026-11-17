@@ -1,0 +1,56 @@
+sodium-game v=wip+SB_GAME=1 i=1 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=wip+SB_GAME=1 i=1 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1396.2 fps (0.716 ms/frame, 2928 Mtris/s) cpu=0.695 ms/frame
+sodium-game v=fix+SB_GAME=1 i=1 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=fix+SB_GAME=1 i=1 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1392.6 fps (0.718 ms/frame, 2920 Mtris/s) cpu=0.693 ms/frame
+sodium-game v=m418+SB_GAME=1 i=1 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418+SB_GAME=1 i=1 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1489.2 fps (0.672 ms/frame, 3123 Mtris/s) cpu=0.652 ms/frame
+sodium-game v=m418fix+SB_GAME=1 i=1 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418fix+SB_GAME=1 i=1 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1486.7 fps (0.673 ms/frame, 3118 Mtris/s) cpu=0.653 ms/frame
+sodium-game v=wip+SB_GAME=1 i=2 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=wip+SB_GAME=1 i=2 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1393.8 fps (0.717 ms/frame, 2923 Mtris/s) cpu=0.696 ms/frame
+sodium-game v=fix+SB_GAME=1 i=2 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=fix+SB_GAME=1 i=2 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1395.6 fps (0.717 ms/frame, 2927 Mtris/s) cpu=0.695 ms/frame
+sodium-game v=m418+SB_GAME=1 i=2 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418+SB_GAME=1 i=2 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1484.5 fps (0.674 ms/frame, 3113 Mtris/s) cpu=0.653 ms/frame
+sodium-game v=m418fix+SB_GAME=1 i=2 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418fix+SB_GAME=1 i=2 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1485.2 fps (0.673 ms/frame, 3115 Mtris/s) cpu=0.651 ms/frame
+sodium-game v=wip+SB_GAME=1 i=3 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=wip+SB_GAME=1 i=3 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1402.0 fps (0.713 ms/frame, 2940 Mtris/s) cpu=0.693 ms/frame
+sodium-game v=fix+SB_GAME=1 i=3 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=fix+SB_GAME=1 i=3 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1392.5 fps (0.718 ms/frame, 2920 Mtris/s) cpu=0.697 ms/frame
+sodium-game v=m418+SB_GAME=1 i=3 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418+SB_GAME=1 i=3 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1482.8 fps (0.674 ms/frame, 3110 Mtris/s) cpu=0.649 ms/frame
+sodium-game v=m418fix+SB_GAME=1 i=3 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418fix+SB_GAME=1 i=3 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1486.3 fps (0.673 ms/frame, 3117 Mtris/s) cpu=0.653 ms/frame
+sodium-game v=wip+SB_GAME=1 i=4 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=wip+SB_GAME=1 i=4 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1398.1 fps (0.715 ms/frame, 2932 Mtris/s) cpu=0.695 ms/frame
+sodium-game v=fix+SB_GAME=1 i=4 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=fix+SB_GAME=1 i=4 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1399.0 fps (0.715 ms/frame, 2934 Mtris/s) cpu=0.695 ms/frame
+sodium-game v=m418+SB_GAME=1 i=4 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418+SB_GAME=1 i=4 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1485.8 fps (0.673 ms/frame, 3116 Mtris/s) cpu=0.654 ms/frame
+sodium-game v=m418fix+SB_GAME=1 i=4 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418fix+SB_GAME=1 i=4 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1492.5 fps (0.670 ms/frame, 3130 Mtris/s) cpu=0.651 ms/frame
+sodium-game v=wip+SB_GAME=1 i=5 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=wip+SB_GAME=1 i=5 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1395.1 fps (0.717 ms/frame, 2926 Mtris/s) cpu=0.695 ms/frame
+sodium-game v=fix+SB_GAME=1 i=5 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=fix+SB_GAME=1 i=5 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1401.8 fps (0.713 ms/frame, 2940 Mtris/s) cpu=0.693 ms/frame
+sodium-game v=m418+SB_GAME=1 i=5 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418+SB_GAME=1 i=5 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1475.0 fps (0.678 ms/frame, 3093 Mtris/s) cpu=0.658 ms/frame
+sodium-game v=m418fix+SB_GAME=1 i=5 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418fix+SB_GAME=1 i=5 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1488.1 fps (0.672 ms/frame, 3121 Mtris/s) cpu=0.652 ms/frame
+sodium-game v=wip+SB_GAME=1 i=6 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=wip+SB_GAME=1 i=6 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1395.6 fps (0.717 ms/frame, 2927 Mtris/s) cpu=0.694 ms/frame
+sodium-game v=fix+SB_GAME=1 i=6 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=fix+SB_GAME=1 i=6 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1395.5 fps (0.717 ms/frame, 2927 Mtris/s) cpu=0.695 ms/frame
+sodium-game v=m418+SB_GAME=1 i=6 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418+SB_GAME=1 i=6 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1488.4 fps (0.672 ms/frame, 3121 Mtris/s) cpu=0.652 ms/frame
+sodium-game v=m418fix+SB_GAME=1 i=6 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418fix+SB_GAME=1 i=6 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1485.3 fps (0.673 ms/frame, 3115 Mtris/s) cpu=0.652 ms/frame
+sodium-game v=wip+SB_GAME=1 i=7 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=wip+SB_GAME=1 i=7 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1394.9 fps (0.717 ms/frame, 2925 Mtris/s) cpu=0.696 ms/frame
+sodium-game v=fix+SB_GAME=1 i=7 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=fix+SB_GAME=1 i=7 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1386.6 fps (0.721 ms/frame, 2908 Mtris/s) cpu=0.698 ms/frame
+sodium-game v=m418+SB_GAME=1 i=7 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418+SB_GAME=1 i=7 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1482.0 fps (0.675 ms/frame, 3108 Mtris/s) cpu=0.655 ms/frame
+sodium-game v=m418fix+SB_GAME=1 i=7 rc=0 | image hash=f44c81fdb3fca783 non-sky pixels=7720704
+sodium-game v=m418fix+SB_GAME=1 i=7 rc=0 | real sections=4096 quads=256 tris/frame=2.10M verts/frame=4.19M 3456x2234: 1483.8 fps (0.674 ms/frame, 3112 Mtris/s) cpu=0.651 ms/frame

@@ -1,0 +1,143 @@
+  1/138 asahi - mesa:agx2_disasm                     OK              0.02s
+  2/138 asahi - mesa:agx3_native_corpus_disasm       OK              0.02s
+  3/138 asahi - mesa:agx3_subgroup_core              OK              0.01s
+  4/138 asahi - mesa:agx3_tex_core                   OK              0.01s
+  5/138 asahi - mesa:agx3_falu_mod_core              OK              0.01s
+  6/138 asahi - mesa:agx3_vary_core                  OK              0.01s
+  7/138 asahi - mesa:agx3_cf_core                    OK              0.01s
+  8/138 asahi - mesa:agx3_mem_core                   OK              0.01s
+  9/138 asahi - mesa:agx3_g17p_producers             OK              0.00s
+ 10/138 asahi - mesa:agx3_compose_corpus             OK              0.00s
+ 11/138 asahi - mesa:agx3_slot_core                  OK              0.00s
+ 12/138 asahi - mesa:asahi-agx3-packing              OK              0.03s
+ 13/138 asahi - mesa:agx3_iadd_core                  OK              0.02s
+ 14/138 asahi - mesa:agx3_isel_core                  OK              0.02s
+ 15/138 asahi - mesa:agx3_cmat_mixed_mma8            OK              0.01s
+ 16/138 asahi - mesa:agx3_wide_imad                  OK              0.01s
+ 17/138 asahi - mesa:agx3_pixel_core                 OK              0.00s
+ 18/138 asahi - mesa:agx3_funop_core                 OK              0.00s
+ 19/138 asahi - mesa:agx3_copy_core                  OK              0.02s
+ 20/138 asahi - mesa:agx3_ioto_uniform_program       OK              0.02s
+ 21/138 asahi - mesa:agx3_rt_core                    OK              0.01s
+ 22/138 asahi - mesa:agx3_gen1_traversal             OK              0.01s
+ 23/138 asahi - mesa:agx3_rt_gen1_entry              OK              0.01s
+ 24/138 asahi - mesa:agx3_int64                      OK              0.02s
+ 25/138 asahi - mesa:agx2_python_disasm              OK              0.06s
+ 26/138 asahi - mesa:agx3_compile_fail_closed        OK              0.03s
+ 27/138 asahi - mesa:agx3_scs_touch                  OK              0.01s
+ 28/138 asahi - mesa:agx3_gen1_ray_query             OK              0.01s
+ 29/138 asahi - mesa:agx3_gen1_null_as               OK              0.01s
+ 30/138 asahi - mesa:agx3_gen1_control               OK              0.01s
+ 31/138 asahi - mesa:agx3_gen1_scs_nir               OK              0.01s
+ 32/138 asahi - mesa:agx_nir_sink_loop_sample_uses   OK              0.01s
+ 33/138 asahi - mesa:agx3_gen1_hit_commit            OK              0.01s
+ 34/138 asahi - mesa:agx3_gen1_status                OK              0.01s
+ 35/138 asahi - mesa:agx3_gen1_position_fetch        OK              0.01s
+ 36/138 asahi - mesa:agx3_ray_query_prerequisites    OK              0.01s
+ 37/138 asahi - mesa:asahi-rt-ift                    OK              0.01s
+ 38/138 asahi - mesa:asahi-scs-layout                OK              0.01s
+ 39/138 asahi - mesa:asahi-chip-admission            OK              0.01s
+ 40/138 asahi - mesa:asahi_layout_tests              OK              0.02s
+ 41/138 asahi - mesa:agx3_gen1_wait                  OK              0.03s
+ 42/138 asahi - mesa:asahi-i386-layout               OK              0.01s
+ 43/138 asahi - mesa:asahi-usc-base-page             OK              0.01s
+ 44/138 asahi - mesa:asahi-agx-chip                  OK              0.01s
+ 45/138 asahi - mesa:agx3_gen1_terminate             OK              0.04s
+ 46/138 asahi - mesa:asahi-agx-g17g-tile-format-gate OK              0.01s
+ 47/138 asahi - mesa:asahi-agx-linker-container      OK              0.01s
+ 48/138 asahi - mesa:asahi-g17p-mrt-epilog           OK              0.01s
+ 49/138 asahi - mesa:asahi-g17p-mrt-quad             OK              0.01s
+ 50/138 asahi - mesa:asahi-agx-va-runtime-hole       OK              0.01s
+ 51/138 asahi - mesa:asahi-agx-m5-va                 OK              0.01s
+ 52/138 asahi - mesa:asahi-g17p-srgb-epilog          OK              0.02s
+ 53/138 asahi - mesa:asahi-agx-ioto-load-core        OK              0.01s
+ 54/138 asahi - mesa:asahi-agx-ioto-preshader-core   OK              0.01s
+ 55/138 asahi - mesa:asahi-agx-ioto-program-core     OK              0.01s
+ 56/138 asahi - mesa:asahi-vdm-decode-core           OK              0.01s
+ 57/138 asahi - mesa:agx3_graphics_program           OK              0.08s
+ 58/138 asahi - mesa:asahi-g18g-capture-vectors      OK              0.01s
+ 59/138 asahi - mesa:asahi-ppp-hal300-g18g           OK              0.01s
+ 60/138 asahi - mesa:asahi-rt-bvh                    OK              0.05s
+ 61/138 asahi - mesa:asahi-agx3-compute-program-core OK              0.02s
+ 62/138 asahi - mesa:asahi-vdm-index-list-core       OK              0.02s
+ 63/138 asahi - mesa:asahi-ppp-hal300-graphics-core  OK              0.01s
+ 64/138 asahi - mesa:asahi-pbe-agx3-core             OK              0.02s
+ 65/138 asahi - mesa:asahi-vdm-state-update-core     OK              0.01s
+ 66/138 asahi - mesa:asahi-rt-payload-gen1           OK              0.01s
+ 67/138 asahi - mesa:agx_rt_envelope                 OK              0.01s
+ 68/138 asahi - mesa:agx_rt_blas_gen3                OK              0.01s
+ 69/138 asahi - mesa:agx_m5_layout                   OK              0.01s
+ 70/138 asahi - mesa:agx3_m5_programs                OK              0.01s
+ 71/138 asahi - mesa:agx3_m5_instructions            OK              0.01s
+ 72/138 asahi - mesa:agx3-m5-mesh-program            OK              0.01s
+ 73/138 asahi - mesa:agx_scs_layout                  OK              0.01s
+ 74/138 asahi - mesa:asahi-g17p-mrt-mixed            OK              0.05s
+ 75/138 asahi - mesa:agx_rt_ift                      OK              0.01s
+ 76/138 asahi - mesa:hk_execution_allowance          OK              0.01s
+ 77/138 asahi - mesa:hk_memory_budget                OK              0.01s
+ 78/138 asahi - mesa:hk_barrier                      OK              0.01s
+ 79/138 asahi - mesa:hk_g17p_storage_image           OK              0.01s
+ 80/138 asahi - mesa:vbo_robustness                  OK              0.03s
+ 81/138 asahi - mesa:agx_rt_bvh                      OK              0.03s
+ 82/138 asahi - mesa:hk_gen1_query_state             OK              0.01s
+ 83/138 asahi - mesa:hk_image_store_forward          OK              0.01s
+ 84/138 asahi - mesa:hk_root_size                    OK              0.01s
+ 85/138 asahi - mesa:hk_tess_batch                   OK              0.01s
+ 86/138 asahi - mesa:hk_query_reset                  OK              0.01s
+ 87/138 asahi - mesa:hk_query_oq                     OK              0.01s
+ 88/138 asahi - mesa:hk_render_resource_span         OK              0.01s
+ 89/138 asahi - mesa:agx_scs_query                   OK              0.04s
+ 90/138 asahi - mesa:hk_query_program                OK              0.01s
+ 91/138 asahi - mesa:hk_drm_render_core              OK              0.01s
+ 92/138 asahi - mesa:hk_agx3_ioto_program_core       OK              0.01s
+ 93/138 asahi - mesa:hk_agx3_vdm_decode              OK              0.01s
+ 94/138 asahi - mesa:hk_zls_stride                   OK              0.01s
+ 95/138 asahi - mesa:hk_sampler_index                OK              0.01s
+ 96/138 asahi - mesa:hk_g17p_compression             OK              0.01s
+ 97/138 asahi - mesa:hk_g16s_compression             OK              0.01s
+ 98/138 asahi - mesa:agx3_ioto_load_packer           OK              0.16s
+ 99/138 asahi - mesa:hk_g17p_restart_state           OK              0.01s
+100/138 asahi - mesa:hk_g17p_zls                     OK              0.01s
+101/138 asahi - mesa:hk_image_layout_core            OK              0.01s
+102/138 asahi - mesa:hk_native_descriptor            OK              0.01s
+103/138 asahi - mesa:hk_native_sampler               OK              0.00s
+104/138 asahi - mesa:hk_vertex_preamble_shift        OK              0.00s
+105/138 asahi - mesa:hk_sampler_bias                 OK              0.00s
+106/138 asahi - mesa:hk_sparse_alias                 OK              0.00s
+107/138 asahi - mesa:hk_gs_ray_query                 OK              0.01s
+108/138 asahi - mesa:hk_rt_inlining                  OK              0.01s
+109/138 asahi - mesa:hk_coherent_image               OK              0.01s
+110/138 asahi - mesa:hk_m5_store_window              OK              0.00s
+111/138 asahi - mesa:hk_query_copy                   OK              0.04s
+112/138 asahi - mesa:hk_tes_query                    OK              0.01s
+113/138 asahi - mesa:hk_memory_oom                   OK              0.01s
+114/138 asahi - mesa:hk_rt_pipeline_executable       OK              0.01s
+115/138 asahi - mesa:hk_sparse_formats               OK              0.01s
+116/138 asahi - mesa:hk_agx3_as_format               OK              0.01s
+117/138 asahi - mesa:hk_native_feature_defaults      OK              0.00s
+118/138 asahi - mesa:libasahi_tests                  OK              0.11s
+119/138 asahi - mesa:hk_rt_pipeline_binary           OK              0.01s
+120/138 asahi - mesa:hk_rt_on_demand                 OK              0.02s
+121/138 asahi - mesa:hk_g17p_metadata_grid           OK              0.06s
+122/138 asahi - mesa:hk_cpu_upload                   OK              0.01s
+123/138 asahi - mesa:hk_host_as                      OK              0.04s
+124/138 asahi - mesa:hk_submit_admission             OK              0.01s
+125/138 asahi - mesa:agx_scs_nir                     OK              0.12s
+126/138 asahi - mesa:asahi-native-descriptor         OK              0.00s
+127/138 asahi - mesa:hk_queue_sharing                OK              0.03s
+128/138 asahi - mesa:hk_sync_prior                   OK              0.15s
+129/138 asahi - mesa:hk_rt_cache_control             OK              0.09s
+130/138 asahi - mesa:agx3_graphics_compile           OK              0.28s
+131/138 asahi - mesa:hk_sparse_submit_wait           OK              0.13s
+132/138 asahi - mesa:hk_host_as_lifetime             OK              0.16s
+133/138 asahi - mesa:hk_as_registry                  OK              0.57s
+134/138 asahi - mesa:agx3_alu_core                   OK              0.83s
+135/138 asahi - mesa:hk_lost_object_submit           OK              0.62s
+136/138 asahi - mesa:hk_root_fragment                OK              1.26s
+137/138 asahi - mesa:agx_tests                       OK              1.88s
+138/138 asahi - mesa:agx3_gen1_scs_sweep             OK              7.28s
+
+Ok:                138 
+Fail:              0   
+
+Full log written to /root/gpu/build-fbl/meson-logs/testlog.txt

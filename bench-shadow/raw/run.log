@@ -1,0 +1,20 @@
+23:12:31 info
+23:12:38 check
+23:12:48 PAUSE: game running, recheck in 300 s
+23:17:49 check: 15 glfeedback runs rc=0
+23:17:49 log
+23:18:01 log done
+23:18:12 DONE, GPU trouble lines new: 0
+23:19:17 bench
+23:19:46 gldepthbench: 56 lines with rc=0
+23:20:16 gldepthbench-composite: 84 lines with rc=0
+23:20:39 gldepthbench-shadow4096: 28 lines with rc=0
+23:20:57 sodium-game: 56 lines with rc=0
+23:21:09 glfeedback-fs: 28 lines with rc=0
+23:21:21 glfeedback-cs: 28 lines with rc=0
+23:21:31 DONE, GPU trouble lines new: 0
+23:21:54 check
+23:22:05 check: 15 glfeedback runs rc=0
+23:22:05 repeat
+23:22:20 repeat:  40 md5=a1729ca4 
+23:22:31 DONE, GPU trouble lines new: 0
