@@ -1,0 +1,10 @@
+PASS rt0
+PASS triangle
+PASS resolve
+PASS resolve-nostore
+PASS triangle-resolve-nostore
+PASS resolve-all
+  none: rt0 sample 1 changed
+FAIL none
+PASS two-draws
+FAIL

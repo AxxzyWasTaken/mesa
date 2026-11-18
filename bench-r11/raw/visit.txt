@@ -1,0 +1,52 @@
+visit-ms-2_fmts-r11f v=base i=1 rc=1 | PASS rt0
+visit-ms-2_fmts-r11f v=base i=1 rc=1 | PASS triangle
+visit-ms-2_fmts-r11f v=base i=1 rc=1 | PASS resolve
+visit-ms-2_fmts-r11f v=base i=1 rc=1 |   resolve-nostore: resolved rt0 wrong
+visit-ms-2_fmts-r11f v=base i=1 rc=1 | FAIL resolve-nostore
+visit-ms-2_fmts-r11f v=base i=1 rc=1 |   triangle-resolve-nostore: resolved rt0 wrong
+visit-ms-2_fmts-r11f v=base i=1 rc=1 | FAIL triangle-resolve-nostore
+visit-ms-2_fmts-r11f v=base i=1 rc=1 | PASS resolve-all
+visit-ms-2_fmts-r11f v=base i=1 rc=1 | PASS none
+visit-ms-2_fmts-r11f v=base i=1 rc=1 | FAIL
+visit-ms-2_fmts-r11f v=fix i=1 rc=0 | PASS rt0
+visit-ms-2_fmts-r11f v=fix i=1 rc=0 | PASS triangle
+visit-ms-2_fmts-r11f v=fix i=1 rc=0 | PASS resolve
+visit-ms-2_fmts-r11f v=fix i=1 rc=0 | PASS resolve-nostore
+visit-ms-2_fmts-r11f v=fix i=1 rc=0 | PASS triangle-resolve-nostore
+visit-ms-2_fmts-r11f v=fix i=1 rc=0 | PASS resolve-all
+visit-ms-2_fmts-r11f v=fix i=1 rc=0 | PASS none
+visit-ms-2_fmts-r11f v=fix i=1 rc=0 | PASS
+visit-ms-4_fmts-r11f v=base i=1 rc=1 | PASS rt0
+visit-ms-4_fmts-r11f v=base i=1 rc=1 | PASS triangle
+visit-ms-4_fmts-r11f v=base i=1 rc=1 | PASS resolve
+visit-ms-4_fmts-r11f v=base i=1 rc=1 |   resolve-nostore: resolved rt0 wrong
+visit-ms-4_fmts-r11f v=base i=1 rc=1 | FAIL resolve-nostore
+visit-ms-4_fmts-r11f v=base i=1 rc=1 |   triangle-resolve-nostore: resolved rt0 wrong
+visit-ms-4_fmts-r11f v=base i=1 rc=1 | FAIL triangle-resolve-nostore
+visit-ms-4_fmts-r11f v=base i=1 rc=1 | PASS resolve-all
+visit-ms-4_fmts-r11f v=base i=1 rc=1 | PASS none
+visit-ms-4_fmts-r11f v=base i=1 rc=1 | FAIL
+visit-ms-4_fmts-r11f v=fix i=1 rc=0 | PASS rt0
+visit-ms-4_fmts-r11f v=fix i=1 rc=0 | PASS triangle
+visit-ms-4_fmts-r11f v=fix i=1 rc=0 | PASS resolve
+visit-ms-4_fmts-r11f v=fix i=1 rc=0 | PASS resolve-nostore
+visit-ms-4_fmts-r11f v=fix i=1 rc=0 | PASS triangle-resolve-nostore
+visit-ms-4_fmts-r11f v=fix i=1 rc=0 | PASS resolve-all
+visit-ms-4_fmts-r11f v=fix i=1 rc=0 | PASS none
+visit-ms-4_fmts-r11f v=fix i=1 rc=0 | PASS
+visit-ms-2_fmts-rgba16f v=base i=1 rc=0 | PASS rt0
+visit-ms-2_fmts-rgba16f v=base i=1 rc=0 | PASS triangle
+visit-ms-2_fmts-rgba16f v=base i=1 rc=0 | PASS resolve
+visit-ms-2_fmts-rgba16f v=base i=1 rc=0 | PASS resolve-nostore
+visit-ms-2_fmts-rgba16f v=base i=1 rc=0 | PASS triangle-resolve-nostore
+visit-ms-2_fmts-rgba16f v=base i=1 rc=0 | PASS resolve-all
+visit-ms-2_fmts-rgba16f v=base i=1 rc=0 | PASS none
+visit-ms-2_fmts-rgba16f v=base i=1 rc=0 | PASS
+visit-ms-2_fmts-rgba16f v=fix i=1 rc=0 | PASS rt0
+visit-ms-2_fmts-rgba16f v=fix i=1 rc=0 | PASS triangle
+visit-ms-2_fmts-rgba16f v=fix i=1 rc=0 | PASS resolve
+visit-ms-2_fmts-rgba16f v=fix i=1 rc=0 | PASS resolve-nostore
+visit-ms-2_fmts-rgba16f v=fix i=1 rc=0 | PASS triangle-resolve-nostore
+visit-ms-2_fmts-rgba16f v=fix i=1 rc=0 | PASS resolve-all
+visit-ms-2_fmts-rgba16f v=fix i=1 rc=0 | PASS none
+visit-ms-2_fmts-rgba16f v=fix i=1 rc=0 | PASS

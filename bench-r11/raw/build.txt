@@ -1,0 +1,13 @@
+base 57df4db849aac8f3a2815bb0875ed65868b01246 fix d2408a65fa2aace38d56d93b5a5d2437e9857fa5 18:53:22
+df: 42G free before clc
+CLC-DONE 18:54:33
+df: 42G free before build
+== base 57df4db8 Merge pull request #425 from aurora-silicon/feat/g17p-shared-load-reuse 18:54:38
+base libvulkan_asahi.so 134fa79387d21d69
+Ok:                196 
+Fail:              0   
+== fix d2408a65 hk: store R11G11B10F through its own class on the M4 Max 18:57:31
+fix libvulkan_asahi.so 05a57e0d51abc72c
+Ok:                196 
+Fail:              0   
+ALL-DONE 18:57:45

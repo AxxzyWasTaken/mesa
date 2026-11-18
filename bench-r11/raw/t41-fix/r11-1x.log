@@ -1,0 +1,18 @@
+  word 2: compressed fc320020 plain fc320020
+values      1152 of 6144 words differ, 6144 set, 1152 with NaN, plain 33f0e17721833ae5
+  word 24: compressed 083f07bf plain 083f07bf
+reload       900 of 6144 words differ, 6144 set, 900 with NaN, plain ef7df183b656d265
+clear          0 of 6144 words differ, 6144 set, 0 with NaN, plain 1c754865c98c0325
+  word 2: compressed fc320020 plain fc320020
+copy        1152 of 6144 words differ, 6144 set, 1152 with NaN, plain 33f0e17721833ae5
+  word 2: compressed fc320020 plain fc320020
+mip 0       1152 of 6144 words differ, 6144 set, 1152 with NaN, plain 33f0e17721833ae5
+  word 2: compressed fc320020 plain fc320020
+mip 1        288 of 1536 words differ, 1536 set, 288 with NaN, plain c767fbb3575a6b85
+  word 2: compressed fc320020 plain fc320020
+mip 2         72 of 384 words differ, 384 set, 72 with NaN, plain 54d988740627f3f9
+  word 2: compressed fc320020 plain fc320020
+mip 3         16 of 96 words differ, 96 set, 16 with NaN, plain 6919edf382b87f5b
+  word 2: compressed fc320020 plain fc320020
+mip 4          4 of 24 words differ, 24 set, 4 with NaN, plain e5d5e5b0980e15ac
+FAIL

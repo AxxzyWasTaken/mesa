@@ -1,0 +1,18 @@
+18:59:30 PAUSE: game running, recheck in 300 s
+19:00:31 info
+19:00:39 r11-2x: 0 lines with rc=0
+19:00:39 r11-1x: 0 lines with rc=0
+19:00:42 visit-ms-2_fmts-r11f: 8 lines with rc=0
+19:00:46 visit-ms-4_fmts-r11f: 8 lines with rc=0
+19:00:49 visit-ms-2_fmts-rgba16f: 16 lines with rc=0
+19:00:49 t41 base
+19:01:08 t41 base: 55 runs, nonzero: r11-1x(rc=1) r11-2x(rc=1) visit-2x-rgba16f_r11f(rc=1) visit-2x-rgba16f_rgba16f_rgba8(rc=1) visit-2x-rgba16f_r11f_rgba8(rc=1) 
+19:01:08 t41 fix
+19:01:27 t41 fix: 55 runs, nonzero: r11-1x(rc=1) r11-2x(rc=1) visit-2x-rgba16f_r11f(rc=1) visit-2x-rgba16f_rgba16f_rgba8(rc=1) visit-2x-rgba16f_r11f_rgba8(rc=1) 
+19:01:28 t41 compare: 54 logs identical, different: r11-2x.log 
+19:01:34 r11-d24: 114 lines with rc=0
+19:01:41 r11-d24-eot: 114 lines with rc=0
+19:01:43 rgba8-d24: 38 lines with rc=0
+19:01:46 rgba16f-d24-eot: 38 lines with rc=0
+19:01:46 end
+19:01:53 RUN-DONE

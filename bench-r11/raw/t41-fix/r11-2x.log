@@ -1,0 +1,14 @@
+  word 2: compressed fc3c0380 plain fc3c0380
+values      2304 of 6144 words differ, 6144 set, 2304 with NaN, plain 0fa6071460d81705
+  word 21: compressed 043f077f plain 043f077f
+reload      1800 of 6144 words differ, 6144 set, 1800 with NaN, plain ad92a3e3d13c58e5
+clear          0 of 6144 words differ, 6144 set, 0 with NaN, plain 1c754865c98c0325
+  word 2: compressed fc3c0380 plain fc3c0380
+copy        2304 of 6144 words differ, 6144 set, 2304 with NaN, plain 0fa6071460d81705
+res-eot        0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+res-eot        0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+res-store      0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+res-store      0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+res-image      0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+res-image      0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+FAIL
