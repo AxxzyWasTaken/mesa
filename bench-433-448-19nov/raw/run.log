@@ -1,0 +1,30 @@
+18:19:57 info
+18:20:06 r11-2x: 0 lines with rc=0
+18:20:07 r11-1x: 0 lines with rc=0
+18:20:09 visit-ms-2_fmts-r11f: 8 lines with rc=0
+18:20:14 visit-ms-4_fmts-r11f: 8 lines with rc=0
+18:20:16 visit-ms-2_fmts-rgba16f: 16 lines with rc=0
+18:20:21 r11-d24: 76 lines with rc=0
+18:20:26 r11-d24-eot: 76 lines with rc=0
+18:20:28 rgba8-d24: 38 lines with rc=0
+18:20:28 probe
+18:20:43 rgba8-d24: 266 lines with rc=0
+18:20:57 rgba16f-d24: 266 lines with rc=0
+18:21:09 rgba8-d200: 266 lines with rc=0
+18:21:12 rgba8-d24-nocompress: 57 lines with rc=0
+18:21:12 t41 base pass 1
+18:21:36 t41 base pass 1: 55 runs, nonzero: r11-1x(rc=1) r11-2x(rc=1) 
+18:21:36 t41 r11 pass 1
+18:21:59 t41 r11 pass 1: 55 runs, nonzero: r11-1x(rc=1) r11-2x(rc=1) 
+18:21:59 t41 c2x pass 1
+18:22:23 t41 c2x pass 1: 55 runs, nonzero: r11-1x(rc=1) r11-2x(rc=1) 
+18:22:23 t41 base pass 2
+18:22:46 t41 base pass 2: 55 runs, nonzero: r11-1x(rc=1) r11-2x(rc=1) 
+18:22:46 t41 c2x pass 2
+18:23:10 t41 c2x pass 2: 55 runs, nonzero: r11-1x(rc=1) r11-2x(rc=1) 
+18:23:10 t41 compare against base pass 1: 216 logs identical, different: r11-1:r11-2x.log c2x-1:r11-2x.log base-2:r11-2x.log c2x-2:r11-2x.log 
+18:23:10 end
+18:23:19 RUN-DONE
+18:23:19 rerun rgba8-d24 (uptime:  18:23:19 up 20:47,  3 users,  load average: 0.81, 1.09, 1.37)
+18:23:34 rgba8-d24-rerun: 266 lines with rc=0
+18:23:34 RERUN-DONE, GPU trouble lines new: 0

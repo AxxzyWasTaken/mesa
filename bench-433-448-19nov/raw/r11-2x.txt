@@ -1,0 +1,58 @@
+r11-2x v=base i=1 rc=1 |   word 2: compressed fc3c0380 plain fc3c0380
+r11-2x v=base i=1 rc=1 | values      2304 of 6144 words differ, 6144 set, 2304 with NaN, plain 0fa6071460d81705
+r11-2x v=base i=1 rc=1 |   word 21: compressed 043f077f plain 043f077f
+r11-2x v=base i=1 rc=1 | reload      1800 of 6144 words differ, 6144 set, 1800 with NaN, plain ad92a3e3d13c58e5
+r11-2x v=base i=1 rc=1 | clear          0 of 6144 words differ, 6144 set, 0 with NaN, plain 1c754865c98c0325
+r11-2x v=base i=1 rc=1 |   word 2: compressed fc3c0380 plain fc3c0380
+r11-2x v=base i=1 rc=1 | copy        2304 of 6144 words differ, 6144 set, 2304 with NaN, plain 0fa6071460d81705
+r11-2x v=base i=1 rc=1 |   word 0: compressed 4c5743f0 plain 0c5703f0
+r11-2x v=base i=1 rc=1 | res-eot     2560 of 6144 words differ, 6144 set, 1024 with NaN, plain bdf3fd8791a98325
+r11-2x v=base i=1 rc=1 | res-eot     6144 of 6144 pixels are not the mean, first 4c5743f0 want 701e0400
+r11-2x v=base i=1 rc=1 | res-store      0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+r11-2x v=base i=1 rc=1 | res-store      0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+r11-2x v=base i=1 rc=1 | res-image      0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+r11-2x v=base i=1 rc=1 | res-image      0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+r11-2x v=base i=1 rc=1 | FAIL
+r11-2x v=r11 i=1 rc=1 |   word 2: compressed fc3c0380 plain fc3c0380
+r11-2x v=r11 i=1 rc=1 | values      2304 of 6144 words differ, 6144 set, 2304 with NaN, plain 0fa6071460d81705
+r11-2x v=r11 i=1 rc=1 |   word 21: compressed 043f077f plain 043f077f
+r11-2x v=r11 i=1 rc=1 | reload      1800 of 6144 words differ, 6144 set, 1800 with NaN, plain ad92a3e3d13c58e5
+r11-2x v=r11 i=1 rc=1 | clear          0 of 6144 words differ, 6144 set, 0 with NaN, plain 1c754865c98c0325
+r11-2x v=r11 i=1 rc=1 |   word 2: compressed fc3c0380 plain fc3c0380
+r11-2x v=r11 i=1 rc=1 | copy        2304 of 6144 words differ, 6144 set, 2304 with NaN, plain 0fa6071460d81705
+r11-2x v=r11 i=1 rc=1 | res-eot        0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+r11-2x v=r11 i=1 rc=1 | res-eot        0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+r11-2x v=r11 i=1 rc=1 | res-store      0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+r11-2x v=r11 i=1 rc=1 | res-store      0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+r11-2x v=r11 i=1 rc=1 | res-image      0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+r11-2x v=r11 i=1 rc=1 | res-image      0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+r11-2x v=r11 i=1 rc=1 | FAIL
+r11-2x v=base i=2 rc=1 |   word 2: compressed fc3c0380 plain fc3c0380
+r11-2x v=base i=2 rc=1 | values      2304 of 6144 words differ, 6144 set, 2304 with NaN, plain 0fa6071460d81705
+r11-2x v=base i=2 rc=1 |   word 21: compressed 043f077f plain 043f077f
+r11-2x v=base i=2 rc=1 | reload      1800 of 6144 words differ, 6144 set, 1800 with NaN, plain ad92a3e3d13c58e5
+r11-2x v=base i=2 rc=1 | clear          0 of 6144 words differ, 6144 set, 0 with NaN, plain 1c754865c98c0325
+r11-2x v=base i=2 rc=1 |   word 2: compressed fc3c0380 plain fc3c0380
+r11-2x v=base i=2 rc=1 | copy        2304 of 6144 words differ, 6144 set, 2304 with NaN, plain 0fa6071460d81705
+r11-2x v=base i=2 rc=1 |   word 1: compressed 447f03f0 plain 447f03f0
+r11-2x v=base i=2 rc=1 | res-eot     1024 of 6144 words differ, 6144 set, 1024 with NaN, plain 2b3dff0896320325
+r11-2x v=base i=2 rc=1 | res-eot     6144 of 6144 pixels are not the mean, first 085703f0 want 701e0400
+r11-2x v=base i=2 rc=1 | res-store      0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+r11-2x v=base i=2 rc=1 | res-store      0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+r11-2x v=base i=2 rc=1 | res-image      0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+r11-2x v=base i=2 rc=1 | res-image      0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+r11-2x v=base i=2 rc=1 | FAIL
+r11-2x v=r11 i=2 rc=1 |   word 2: compressed fc3c0380 plain fc3c0380
+r11-2x v=r11 i=2 rc=1 | values      2304 of 6144 words differ, 6144 set, 2304 with NaN, plain 0fa6071460d81705
+r11-2x v=r11 i=2 rc=1 |   word 21: compressed 043f077f plain 043f077f
+r11-2x v=r11 i=2 rc=1 | reload      1800 of 6144 words differ, 6144 set, 1800 with NaN, plain ad92a3e3d13c58e5
+r11-2x v=r11 i=2 rc=1 | clear          0 of 6144 words differ, 6144 set, 0 with NaN, plain 1c754865c98c0325
+r11-2x v=r11 i=2 rc=1 |   word 2: compressed fc3c0380 plain fc3c0380
+r11-2x v=r11 i=2 rc=1 | copy        2304 of 6144 words differ, 6144 set, 2304 with NaN, plain 0fa6071460d81705
+r11-2x v=r11 i=2 rc=1 | res-eot        0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+r11-2x v=r11 i=2 rc=1 | res-eot        0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+r11-2x v=r11 i=2 rc=1 | res-store      0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+r11-2x v=r11 i=2 rc=1 | res-store      0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+r11-2x v=r11 i=2 rc=1 | res-image      0 of 6144 words differ, 6144 set, 0 with NaN, plain c10c9bc9b2140325
+r11-2x v=r11 i=2 rc=1 | res-image      0 of 6144 pixels are not the mean, first 701e0400 want 701e0400
+r11-2x v=r11 i=2 rc=1 | FAIL

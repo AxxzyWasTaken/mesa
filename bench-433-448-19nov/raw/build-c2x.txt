@@ -1,0 +1,45 @@
+base e66c01e737a8cc286195f62d6261e6129bd32f62 r11 47273442c5f36695683c5fcd2548ff64bed4ff61 c2x 68a70dc1c5d0c80b1a84916fb5755a8706266978 18:19:38
+df: 25G free before build
+== c2x 68a70dc1 hk: compress 2x colour and 2x depth wherever a 2x reload keeps the sample 18:19:38
+c2x libvulkan_asahi.so a5b3528269c89a19
+Ok:                201 
+Fail:              0   
+  c2x 9 sampler bias scope/idempotence/handle checks passed
+  c2x G17P compression policy: 4099 checks passed
+  c2x G17P compression policy: 7153 checks passed
+  c2x G17P sparse query, block addressing and mip-tail checks passed
+  c2x G18G HAL300 records: all 2129 checks passed
+  c2x G18G raster state emission checks passed (no GPU execution)
+  c2x Gallium AGX native descriptors: 448 checks passed
+  c2x Honeykrisp AGX3 Ioto program core: 13248 checks passed
+  c2x Honeykrisp AGX3 VDM decode: 2872 checks passed
+  c2x Honeykrisp DRM render resource specs: all checks passed
+  c2x agx3 layout: all 28 checks passed
+  c2x agx3 packing: all 26052002 checks passed
+  c2x agx3 texture core: 5060 checks passed
+  c2x agx3_alu_core: 70 checks passed (14 unsupported forms skipped)
+  c2x agx3_cf_core: all 403 checks passed
+  c2x agx3_compute_program_core: 575 checks passed
+  c2x agx3_funop_core: 106 checks passed
+  c2x agx3_g17p_producers: all 126 checks passed
+  c2x agx3_ioto_load_packer: 2413001 checks passed
+  c2x agx3_ioto_uniform_program: 32122 checks passed
+  c2x agx3_pixel_core: all 44 checks passed
+  c2x agx3_ray_query_prerequisites: 555 exact committed-result and witness-gate checks passed
+  c2x agx3_rt_core: all 611 checks passed
+  c2x agx3_scs_touch: 395 checks passed
+  c2x agx3_slot_core: all 1287 checks passed
+  c2x agx_chip: all 534 checks passed
+  c2x agx_ioto_load_core: 3326 checks passed
+  c2x agx_ioto_preshader_core: 2184 checks passed
+  c2x agx_ioto_program_core: 1135 checks passed
+  c2x agx_nir_opt_sink_loop_sample_uses: all checks passed
+  c2x agx_pbe_agx3_core: 309483 checks passed
+  c2x agx_vdm_decode_core: 79529 checks passed
+  c2x agx_vdm_index_list_core: 13413 checks passed
+  c2x agx_vdm_state_update_core: 79677 checks passed
+  c2x hk_g17p_zls: 3246833 checks passed
+  c2x hk_rt_on_demand: all checks passed
+  c2x root fragment: 412582947 checks passed
+  c2x test-agx-g17g-tile-format-gate: 533 checks passed
+ALL-DONE 18:19:48

@@ -1,0 +1,34 @@
+date 2026-11-19T18:19:57+00:00
+7.3.0-j616c-ia2
+Apple MacBook Pro (16-inch, M4 Max)
+AC online 1, battery Charging 77%
+mode macos: fans 0/0 rpm, SMC automatic, SoC die 56.1 C
+ 18:19:57 up 20:43,  3 users,  load average: 0.63, 1.32, 1.50
+engine drm-engine-fragment 0.1%
+vkmsaa2x: creating ms-colour
+vkmsaa2x: creating ms-depth
+vkmsaa2x: creating resolved
+vkmsaa2x: creating resolved-2
+vkmsaa2x: creating res-depth
+vkmsaa2x: creating post
+vkmsaa2x: creating verify-c
+vkmsaa2x: creating verify-z
+base: 859243f79c691d8e driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+vkmsaa2x: creating ms-colour
+vkmsaa2x: creating ms-depth
+vkmsaa2x: creating resolved
+vkmsaa2x: creating resolved-2
+vkmsaa2x: creating res-depth
+vkmsaa2x: creating post
+vkmsaa2x: creating verify-c
+vkmsaa2x: creating verify-z
+r11: 75c60786cc698b4f driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-47273442c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+vkmsaa2x: creating ms-colour
+vkmsaa2x: creating ms-depth
+vkmsaa2x: creating resolved
+vkmsaa2x: creating resolved-2
+vkmsaa2x: creating res-depth
+vkmsaa2x: creating post
+vkmsaa2x: creating verify-c
+vkmsaa2x: creating verify-z
+c2x: a5b3528269c89a19 driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns

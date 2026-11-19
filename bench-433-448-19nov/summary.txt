@@ -1,0 +1,154 @@
+
+### r11-2x.txt
+
+label build run rc result | step differing-words/plain-hash ... ; resolve steps: pixels not the mean
+r11-2x base 1 rc=1 FAIL | values 2304w/0fa60714 reload 1800w/ad92a3e3 clear 0w/1c754865 copy 2304w/0fa60714 res-eot 2560w/bdf3fd87 res-eot 6144px-not-mean(first 4c5743f0) res-store 0w/c10c9bc9 res-store 0px-not-mean(first 701e0400) res-image 0w/c10c9bc9 res-image 0px-not-mean(first 701e0400)
+r11-2x r11 1 rc=1 FAIL | values 2304w/0fa60714 reload 1800w/ad92a3e3 clear 0w/1c754865 copy 2304w/0fa60714 res-eot 0w/c10c9bc9 res-eot 0px-not-mean(first 701e0400) res-store 0w/c10c9bc9 res-store 0px-not-mean(first 701e0400) res-image 0w/c10c9bc9 res-image 0px-not-mean(first 701e0400)
+r11-2x base 2 rc=1 FAIL | values 2304w/0fa60714 reload 1800w/ad92a3e3 clear 0w/1c754865 copy 2304w/0fa60714 res-eot 1024w/2b3dff08 res-eot 6144px-not-mean(first 085703f0) res-store 0w/c10c9bc9 res-store 0px-not-mean(first 701e0400) res-image 0w/c10c9bc9 res-image 0px-not-mean(first 701e0400)
+r11-2x r11 2 rc=1 FAIL | values 2304w/0fa60714 reload 1800w/ad92a3e3 clear 0w/1c754865 copy 2304w/0fa60714 res-eot 0w/c10c9bc9 res-eot 0px-not-mean(first 701e0400) res-store 0w/c10c9bc9 res-store 0px-not-mean(first 701e0400) res-image 0w/c10c9bc9 res-image 0px-not-mean(first 701e0400)
+
+### r11-1x.txt
+
+label build run rc result | step differing-words/plain-hash ... ; resolve steps: pixels not the mean
+r11-1x base 1 rc=1 FAIL | values 1152w/33f0e177 reload 900w/ef7df183 clear 0w/1c754865 copy 1152w/33f0e177 mip 0 1152w/33f0e177 mip 1 288w/c767fbb3 mip 2 72w/54d98874 mip 3 16w/6919edf3 mip 4 4w/e5d5e5b0
+r11-1x r11 1 rc=1 FAIL | values 1152w/33f0e177 reload 900w/ef7df183 clear 0w/1c754865 copy 1152w/33f0e177 mip 0 1152w/33f0e177 mip 1 288w/c767fbb3 mip 2 72w/54d98874 mip 3 16w/6919edf3 mip 4 4w/e5d5e5b0
+
+### visit.txt
+
+visit-ms-2_fmts-r11f base 1 rc=1: 5 shapes pass, fail: resolve-nostore, triangle-resolve-nostore | resolve-nostore: resolved rt0 wrong; triangle-resolve-nostore: resolved rt0 wrong
+visit-ms-2_fmts-r11f r11 1 rc=0: 7 shapes pass, fail: -
+visit-ms-4_fmts-r11f base 1 rc=1: 5 shapes pass, fail: resolve-nostore, triangle-resolve-nostore | resolve-nostore: resolved rt0 wrong; triangle-resolve-nostore: resolved rt0 wrong
+visit-ms-4_fmts-r11f r11 1 rc=0: 7 shapes pass, fail: -
+visit-ms-2_fmts-rgba16f base 1 rc=0: 7 shapes pass, fail: -
+visit-ms-2_fmts-rgba16f r11 1 rc=0: 7 shapes pass, fail: -
+
+### vk-r11.txt: r11-d24
+
+| build | runs | median ms/frame wall (GPU) | min-max wall | spread wall / GPU | change wall (GPU) vs first |
+|---|---|---|---|---|---|
+| base | 2 | 2.415 (2.247) | 2.412-2.418 | 0.2 % / 0.1 % |  |
+| r11 | 2 | 2.413 (2.248) | 2.411-2.415 | 0.2 % / 0.0 % | -0.1 % (+0.0 %) |
+
+base: 1 distinct hash set(s) in 2 runs: samples=916bf8c7e6abe1dc depth-samples=52189de92ad5f0bf resolved=baa035375bdf6d95 depth-resolve=bfd6dec59c8384ff post=1516a5659b42825a
+base resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0
+base resolve after the pass: 1 distinct: baa035375bdf6d95
+
+r11: 1 distinct hash set(s) in 2 runs: samples=916bf8c7e6abe1dc depth-samples=52189de92ad5f0bf resolved=baa035375bdf6d95 depth-resolve=bfd6dec59c8384ff post=1516a5659b42825a
+r11 resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0
+r11 resolve after the pass: 1 distinct: baa035375bdf6d95
+
+per-run ms/frame wall (GPU), run order: base: 2.412 (2.246) 2.418 (2.248); r11: 2.411 (2.247) 2.415 (2.248)
+
+### vk-r11.txt: r11-d24-eot
+
+| build | runs | median ms/frame wall (GPU) | min-max wall | spread wall / GPU | change wall (GPU) vs first |
+|---|---|---|---|---|---|
+| base+VKM_EOT=1 | 2 | 2.454 (2.290) | 2.454-2.454 | 0.0 % / 0.2 % |  |
+| r11+VKM_EOT=1 | 2 | 2.438 (2.278) | 2.437-2.439 | 0.1 % / 0.0 % | -0.7 % (-0.5 %) |
+
+base+VKM_EOT=1: 2 distinct hash set(s) in 2 runs: samples=916bf8c7e6abe1dc depth-samples=52189de92ad5f0bf resolved=30c46757a3e2cf74 depth-resolve=bfd6dec59c8384ff post=9df1da9e619449df || samples=916bf8c7e6abe1dc depth-samples=52189de92ad5f0bf resolved=e42a9946a4f0e364 depth-resolve=bfd6dec59c8384ff post=d454d7037609849b
+base+VKM_EOT=1 resolve check: 7720704/7720704 px differ (38770 edge, 7681934 interior), max 52223.8; 7720704/7720704 px differ (38770 edge, 7681934 interior), max 34.8008
+base+VKM_EOT=1 resolve after the pass: 1 distinct: baa035375bdf6d95
+
+r11+VKM_EOT=1: 1 distinct hash set(s) in 2 runs: samples=916bf8c7e6abe1dc depth-samples=52189de92ad5f0bf resolved=c325e976bdedeb04 depth-resolve=bfd6dec59c8384ff post=882eee43f8dd1ea8
+r11+VKM_EOT=1 resolve check: 24157/7720704 px differ (24157 edge, 0 interior), max 0.015625; 24157/7720704 px differ (24157 edge, 0 interior), max 0.015625
+r11+VKM_EOT=1 resolve after the pass: 1 distinct: baa035375bdf6d95
+
+per-run ms/frame wall (GPU), run order: base+VKM_EOT=1: 2.454 (2.292) 2.454 (2.288); r11+VKM_EOT=1: 2.439 (2.278) 2.437 (2.278)
+
+### vk-other.txt: rgba8-d24
+
+| build | runs | median ms/frame wall (GPU) | min-max wall | spread wall / GPU | change wall (GPU) vs first |
+|---|---|---|---|---|---|
+| base | 1 | 2.290 (2.133) | 2.290-2.290 | 0.0 % / 0.0 % |  |
+| r11 | 1 | 2.292 (2.132) | 2.292-2.292 | 0.0 % / 0.0 % | +0.1 % (-0.0 %) |
+
+base: 1 distinct hash set(s) in 1 runs: samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b
+base resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0
+base resolve after the pass: 1 distinct: b8a1c9beab99c324
+
+r11: 1 distinct hash set(s) in 1 runs: samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b
+r11 resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0
+r11 resolve after the pass: 1 distinct: b8a1c9beab99c324
+
+per-run ms/frame wall (GPU), run order: base: 2.290 (2.133); r11: 2.292 (2.132)
+
+### vk-2x.txt: rgba8-d24
+
+| build | runs | median ms/frame wall (GPU) | min-max wall | spread wall / GPU | change wall (GPU) vs first |
+|---|---|---|---|---|---|
+| base | 7 | 2.303 (2.142) | 2.294-2.306 | 0.5 % / 0.5 % |  |
+| c2x | 7 | 1.595 (1.245) | 1.167-2.178 | 63.4 % / 41.3 % | -30.7 % (-41.9 %) |
+
+base: 1 distinct hash set(s) in 7 runs: samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b
+base resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0
+base resolve after the pass: 1 distinct: b8a1c9beab99c324
+
+c2x: 1 distinct hash set(s) in 7 runs: samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b
+c2x resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0
+c2x resolve after the pass: 1 distinct: b8a1c9beab99c324
+
+per-run ms/frame wall (GPU), run order: base: 2.294 (2.134) 2.302 (2.142) 2.306 (2.144) 2.305 (2.142) 2.303 (2.143) 2.303 (2.140) 2.300 (2.139); c2x: 1.595 (1.245) 2.178 (1.549) 1.593 (1.245) 1.167 (1.035) 1.910 (1.404) 1.776 (1.338) 1.502 (1.195)
+
+### vk-2x.txt: rgba16f-d24
+
+| build | runs | median ms/frame wall (GPU) | min-max wall | spread wall / GPU | change wall (GPU) vs first |
+|---|---|---|---|---|---|
+| base | 7 | 3.276 (3.103) | 3.265-3.279 | 0.4 % / 0.5 % |  |
+| c2x | 7 | 1.239 (1.107) | 1.232-1.246 | 1.1 % / 0.9 % | -62.2 % (-64.3 %) |
+
+base: 1 distinct hash set(s) in 7 runs: samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7
+base resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0
+base resolve after the pass: 1 distinct: ff12ad5d9b149e41
+
+c2x: 1 distinct hash set(s) in 7 runs: samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7
+c2x resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0
+c2x resolve after the pass: 1 distinct: ff12ad5d9b149e41
+
+per-run ms/frame wall (GPU), run order: base: 3.278 (3.107) 3.267 (3.101) 3.279 (3.108) 3.265 (3.094) 3.268 (3.095) 3.278 (3.103) 3.276 (3.106); c2x: 1.246 (1.114) 1.239 (1.107) 1.244 (1.109) 1.239 (1.104) 1.242 (1.111) 1.235 (1.104) 1.232 (1.104)
+
+### vk-2x.txt: rgba8-d200
+
+| build | runs | median ms/frame wall (GPU) | min-max wall | spread wall / GPU | change wall (GPU) vs first |
+|---|---|---|---|---|---|
+| base | 7 | 3.124 (2.952) | 3.111-3.128 | 0.5 % / 0.4 % |  |
+| c2x | 7 | 1.614 (1.482) | 1.596-1.618 | 1.4 % / 1.4 % | -48.3 % (-49.8 %) |
+
+base: 1 distinct hash set(s) in 7 runs: samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1
+base resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0
+base resolve after the pass: 1 distinct: f95f3d0c16b17a9f
+
+c2x: 1 distinct hash set(s) in 7 runs: samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1
+c2x resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0
+c2x resolve after the pass: 1 distinct: f95f3d0c16b17a9f
+
+per-run ms/frame wall (GPU), run order: base: 3.111 (2.946) 3.128 (2.952) 3.126 (2.953) 3.124 (2.945) 3.124 (2.952) 3.116 (2.950) 3.127 (2.958); c2x: 1.611 (1.482) 1.606 (1.471) 1.618 (1.486) 1.616 (1.482) 1.614 (1.482) 1.614 (1.482) 1.596 (1.465)
+
+### vk-2x.txt: rgba8-d24-nocompress
+
+| build | runs | median ms/frame wall (GPU) | min-max wall | spread wall / GPU | change wall (GPU) vs first |
+|---|---|---|---|---|---|
+| c2x+ASAHI_MESA_DEBUG=1queue,nocompress | 3 | 2.542 (2.372) | 2.538-2.548 | 0.4 % / 0.3 % |  |
+
+c2x+ASAHI_MESA_DEBUG=1queue,nocompress: 1 distinct hash set(s) in 3 runs: samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b
+c2x+ASAHI_MESA_DEBUG=1queue,nocompress resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0
+c2x+ASAHI_MESA_DEBUG=1queue,nocompress resolve after the pass: 1 distinct: b8a1c9beab99c324
+
+per-run ms/frame wall (GPU), run order: c2x+ASAHI_MESA_DEBUG=1queue,nocompress: 2.548 (2.377) 2.538 (2.370) 2.542 (2.372)
+
+### vk-2x.txt: rgba8-d24-rerun
+
+| build | runs | median ms/frame wall (GPU) | min-max wall | spread wall / GPU | change wall (GPU) vs first |
+|---|---|---|---|---|---|
+| base | 7 | 2.303 (2.143) | 2.297-2.312 | 0.7 % / 0.7 % |  |
+| c2x | 7 | 2.039 (1.469) | 1.158-2.165 | 49.4 % / 34.7 % | -11.5 % (-31.5 %) |
+
+base: 1 distinct hash set(s) in 7 runs: samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b
+base resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0
+base resolve after the pass: 1 distinct: b8a1c9beab99c324
+
+c2x: 1 distinct hash set(s) in 7 runs: samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b
+c2x resolve check: 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0; 0/7720704 px differ (0 edge, 0 interior), max 0
+c2x resolve after the pass: 1 distinct: b8a1c9beab99c324
+
+per-run ms/frame wall (GPU), run order: base: 2.297 (2.133) 2.306 (2.143) 2.299 (2.134) 2.302 (2.143) 2.307 (2.145) 2.312 (2.147) 2.303 (2.139); c2x: 2.165 (1.537) 1.158 (1.027) 2.039 (1.469) 1.160 (1.027) 1.834 (1.372) 2.149 (1.528) 2.134 (1.524)

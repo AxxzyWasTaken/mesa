@@ -1,0 +1,4 @@
+6 attachments (rgba16f,rgba32f,rgba32f,rgba32f,rgba32f,rgba16f), 2x, 1 layers, pass 2 loadOp LOAD, vkCmdClearAttachments
+device: Apple M4 Max (G16C B1)
+vkEndCommandBuffer = 0
+PASS

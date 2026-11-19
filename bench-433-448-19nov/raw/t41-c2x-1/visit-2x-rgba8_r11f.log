@@ -1,0 +1,9 @@
+PASS rt0
+PASS triangle
+PASS resolve
+PASS resolve-nostore
+PASS triangle-resolve-nostore
+PASS resolve-all
+PASS none
+PASS two-draws
+PASS

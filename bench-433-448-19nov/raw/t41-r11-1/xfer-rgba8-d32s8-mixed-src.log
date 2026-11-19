@@ -1,0 +1,3 @@
+2x rgba8 + D32S8, 64x64, mixed-src, copied rectangle (9,5) 37x40
+wrong pixels: colour 0, depth 0, stencil 0 of 4096
+PASS

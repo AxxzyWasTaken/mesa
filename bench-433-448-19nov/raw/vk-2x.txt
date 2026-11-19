@@ -1,0 +1,1121 @@
+rgba8-d24 v=base i=1 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=base i=1 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=base i=1 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=base i=1 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=base i=1 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=base i=1 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=base i=1 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=base i=1 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=base i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=base i=1 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=1 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=1 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=1 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=1 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.294 ms/frame wall, gpu 2.134 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=base i=1 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=c2x i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=c2x i=1 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=1 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=1 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=1 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=1 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.595 ms/frame wall, gpu 1.245 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=c2x i=1 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=base i=2 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=base i=2 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=base i=2 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=base i=2 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=base i=2 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=base i=2 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=base i=2 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=base i=2 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=base i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=base i=2 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=2 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=2 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=2 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=2 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.302 ms/frame wall, gpu 2.142 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=base i=2 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=c2x i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=c2x i=2 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=2 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=2 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=2 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=2 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.178 ms/frame wall, gpu 1.549 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=c2x i=2 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=base i=3 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=base i=3 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=base i=3 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=base i=3 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=base i=3 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=base i=3 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=base i=3 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=base i=3 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=base i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=base i=3 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=3 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=3 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=3 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=3 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.306 ms/frame wall, gpu 2.144 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=base i=3 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=c2x i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=c2x i=3 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=3 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=3 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=3 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=3 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.593 ms/frame wall, gpu 1.245 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=c2x i=3 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=base i=4 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=base i=4 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=base i=4 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=base i=4 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=base i=4 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=base i=4 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=base i=4 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=base i=4 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=base i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=base i=4 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=4 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=4 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=4 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=4 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.305 ms/frame wall, gpu 2.142 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=base i=4 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=c2x i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=c2x i=4 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=4 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=4 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=4 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=4 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.167 ms/frame wall, gpu 1.035 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=c2x i=4 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=base i=5 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=base i=5 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=base i=5 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=base i=5 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=base i=5 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=base i=5 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=base i=5 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=base i=5 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=base i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=base i=5 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=5 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=5 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=5 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=5 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.303 ms/frame wall, gpu 2.143 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=base i=5 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=c2x i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=c2x i=5 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=5 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=5 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=5 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=5 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.910 ms/frame wall, gpu 1.404 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=c2x i=5 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=base i=6 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=base i=6 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=base i=6 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=base i=6 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=base i=6 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=base i=6 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=base i=6 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=base i=6 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=base i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=base i=6 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=6 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=6 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=6 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=6 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.303 ms/frame wall, gpu 2.140 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=base i=6 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=c2x i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=c2x i=6 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=6 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=6 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=6 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=6 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.776 ms/frame wall, gpu 1.338 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=c2x i=6 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=base i=7 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=base i=7 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=base i=7 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=base i=7 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=base i=7 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=base i=7 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=base i=7 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=base i=7 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=base i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=base i=7 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=7 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24 v=base i=7 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=7 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=base i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=base i=7 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.300 ms/frame wall, gpu 2.139 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=base i=7 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating post
+rgba8-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24 v=c2x i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24 v=c2x i=7 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=7 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=7 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=7 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24 v=c2x i=7 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.502 ms/frame wall, gpu 1.195 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24 v=c2x i=7 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=base i=1 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=base i=1 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=base i=1 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=base i=1 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=base i=1 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=base i=1 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=base i=1 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=base i=1 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=base i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=base i=1 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=1 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=base i=1 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=1 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=1 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.278 ms/frame wall, gpu 3.107 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=base i=1 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=c2x i=1 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=c2x i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=c2x i=1 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=1 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=1 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=1 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=1 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.246 ms/frame wall, gpu 1.114 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=c2x i=1 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=base i=2 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=base i=2 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=base i=2 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=base i=2 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=base i=2 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=base i=2 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=base i=2 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=base i=2 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=base i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=base i=2 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=2 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=base i=2 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=2 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=2 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.267 ms/frame wall, gpu 3.101 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=base i=2 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=c2x i=2 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=c2x i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=c2x i=2 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=2 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=2 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=2 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=2 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.239 ms/frame wall, gpu 1.107 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=c2x i=2 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=base i=3 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=base i=3 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=base i=3 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=base i=3 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=base i=3 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=base i=3 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=base i=3 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=base i=3 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=base i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=base i=3 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=3 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=base i=3 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=3 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=3 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.279 ms/frame wall, gpu 3.108 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=base i=3 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=c2x i=3 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=c2x i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=c2x i=3 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=3 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=3 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=3 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=3 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.244 ms/frame wall, gpu 1.109 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=c2x i=3 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=base i=4 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=base i=4 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=base i=4 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=base i=4 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=base i=4 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=base i=4 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=base i=4 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=base i=4 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=base i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=base i=4 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=4 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=base i=4 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=4 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=4 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.265 ms/frame wall, gpu 3.094 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=base i=4 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=c2x i=4 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=c2x i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=c2x i=4 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=4 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=4 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=4 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=4 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.239 ms/frame wall, gpu 1.104 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=c2x i=4 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=base i=5 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=base i=5 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=base i=5 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=base i=5 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=base i=5 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=base i=5 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=base i=5 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=base i=5 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=base i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=base i=5 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=5 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=base i=5 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=5 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=5 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.268 ms/frame wall, gpu 3.095 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=base i=5 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=c2x i=5 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=c2x i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=c2x i=5 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=5 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=5 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=5 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=5 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.242 ms/frame wall, gpu 1.111 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=c2x i=5 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=base i=6 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=base i=6 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=base i=6 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=base i=6 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=base i=6 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=base i=6 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=base i=6 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=base i=6 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=base i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=base i=6 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=6 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=base i=6 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=6 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=6 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.278 ms/frame wall, gpu 3.103 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=base i=6 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=c2x i=6 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=c2x i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=c2x i=6 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=6 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=6 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=6 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=6 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.235 ms/frame wall, gpu 1.104 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=c2x i=6 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=base i=7 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=base i=7 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=base i=7 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=base i=7 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=base i=7 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=base i=7 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=base i=7 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=base i=7 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=base i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=base i=7 rc=0 | image ms-colour  3456x2234 2x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=7 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba16f-d24 v=base i=7 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=7 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=base i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=base i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=base i=7 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 3.276 ms/frame wall, gpu 3.106 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=base i=7 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba16f-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating ms-colour
+rgba16f-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating ms-depth
+rgba16f-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating resolved
+rgba16f-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating resolved-2
+rgba16f-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating res-depth
+rgba16f-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating post
+rgba16f-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating verify-c
+rgba16f-d24 v=c2x i=7 rc=0 | vkmsaa2x: creating verify-z
+rgba16f-d24 v=c2x i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba16f-d24 v=c2x i=7 rc=0 | image ms-colour  3456x2234 2x size=124911616 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=7 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=7 rc=0 | image resolved   3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=7 rc=0 | image resolved-2 3456x2234 1x size=62455808 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba16f-d24 v=c2x i=7 rc=0 | vkmsaa2x 3456x2234 rgba16f 2x passes=4 draws=24 frames=150: 1.232 ms/frame wall, gpu 1.104 ms/frame (147 frames) | samples=0d24bb1b482994d5 depth-samples=52189de92ad5f0bf resolved=ff12ad5d9b149e41 depth-resolve=bfd6dec59c8384ff post=99569e0b41ba62d7 edge-pixels=38770 nonzero-bytes=107113968/60947324/53557389/30473472/30858612
+rgba16f-d24 v=c2x i=7 rc=0 | resolve-check rgba16f: resolved-after-pass=ff12ad5d9b149e41; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=base i=1 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=base i=1 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=base i=1 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=base i=1 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=base i=1 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=base i=1 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=base i=1 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=base i=1 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=base i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=base i=1 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=1 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=1 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=1 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=1 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.111 ms/frame wall, gpu 2.946 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=base i=1 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=c2x i=1 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=c2x i=1 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=c2x i=1 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=c2x i=1 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=c2x i=1 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=c2x i=1 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=c2x i=1 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=c2x i=1 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=c2x i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=c2x i=1 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=1 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=1 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=1 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=1 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.611 ms/frame wall, gpu 1.482 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=c2x i=1 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=base i=2 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=base i=2 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=base i=2 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=base i=2 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=base i=2 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=base i=2 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=base i=2 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=base i=2 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=base i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=base i=2 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=2 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=2 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=2 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=2 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.128 ms/frame wall, gpu 2.952 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=base i=2 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=c2x i=2 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=c2x i=2 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=c2x i=2 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=c2x i=2 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=c2x i=2 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=c2x i=2 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=c2x i=2 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=c2x i=2 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=c2x i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=c2x i=2 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=2 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=2 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=2 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=2 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.606 ms/frame wall, gpu 1.471 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=c2x i=2 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=base i=3 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=base i=3 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=base i=3 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=base i=3 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=base i=3 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=base i=3 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=base i=3 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=base i=3 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=base i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=base i=3 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=3 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=3 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=3 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=3 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.126 ms/frame wall, gpu 2.953 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=base i=3 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=c2x i=3 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=c2x i=3 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=c2x i=3 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=c2x i=3 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=c2x i=3 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=c2x i=3 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=c2x i=3 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=c2x i=3 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=c2x i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=c2x i=3 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=3 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=3 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=3 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=3 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.618 ms/frame wall, gpu 1.486 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=c2x i=3 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=base i=4 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=base i=4 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=base i=4 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=base i=4 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=base i=4 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=base i=4 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=base i=4 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=base i=4 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=base i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=base i=4 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=4 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=4 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=4 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=4 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.124 ms/frame wall, gpu 2.945 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=base i=4 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=c2x i=4 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=c2x i=4 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=c2x i=4 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=c2x i=4 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=c2x i=4 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=c2x i=4 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=c2x i=4 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=c2x i=4 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=c2x i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=c2x i=4 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=4 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=4 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=4 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=4 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.616 ms/frame wall, gpu 1.482 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=c2x i=4 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=base i=5 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=base i=5 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=base i=5 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=base i=5 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=base i=5 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=base i=5 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=base i=5 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=base i=5 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=base i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=base i=5 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=5 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=5 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=5 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=5 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.124 ms/frame wall, gpu 2.952 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=base i=5 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=c2x i=5 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=c2x i=5 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=c2x i=5 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=c2x i=5 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=c2x i=5 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=c2x i=5 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=c2x i=5 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=c2x i=5 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=c2x i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=c2x i=5 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=5 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=5 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=5 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=5 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.614 ms/frame wall, gpu 1.482 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=c2x i=5 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=base i=6 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=base i=6 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=base i=6 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=base i=6 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=base i=6 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=base i=6 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=base i=6 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=base i=6 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=base i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=base i=6 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=6 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=6 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=6 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=6 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.116 ms/frame wall, gpu 2.950 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=base i=6 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=c2x i=6 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=c2x i=6 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=c2x i=6 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=c2x i=6 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=c2x i=6 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=c2x i=6 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=c2x i=6 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=c2x i=6 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=c2x i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=c2x i=6 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=6 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=6 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=6 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=6 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.614 ms/frame wall, gpu 1.482 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=c2x i=6 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=base i=7 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=base i=7 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=base i=7 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=base i=7 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=base i=7 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=base i=7 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=base i=7 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=base i=7 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=base i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=base i=7 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=7 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d200 v=base i=7 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=7 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=base i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=base i=7 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 3.127 ms/frame wall, gpu 2.958 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=base i=7 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d200 v=c2x i=7 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d200 v=c2x i=7 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d200 v=c2x i=7 rc=0 | vkmsaa2x: creating resolved
+rgba8-d200 v=c2x i=7 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d200 v=c2x i=7 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d200 v=c2x i=7 rc=0 | vkmsaa2x: creating post
+rgba8-d200 v=c2x i=7 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d200 v=c2x i=7 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d200 v=c2x i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d200 v=c2x i=7 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=7 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=7 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=7 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d200 v=c2x i=7 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=200 frames=100: 1.596 ms/frame wall, gpu 1.465 ms/frame (97 frames) | samples=dcb7651eed2b2717 depth-samples=2363790389653092 resolved=f95f3d0c16b17a9f depth-resolve=5eb864ebc348dca8 post=71aebf07e972bec1 edge-pixels=100840 nonzero-bytes=116809193/61536666/30532897/30768547/30543449
+rgba8-d200 v=c2x i=7 rc=0 | resolve-check rgba8: resolved-after-pass=f95f3d0c16b17a9f; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | vkmsaa2x: creating post
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image resolved   3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image resolved-2 3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image res-depth  3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image post       3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.548 ms/frame wall, gpu 2.377 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=1 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | vkmsaa2x: creating post
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image resolved   3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image resolved-2 3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image res-depth  3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image post       3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.538 ms/frame wall, gpu 2.370 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=2 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | vkmsaa2x: creating post
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image resolved   3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image resolved-2 3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image res-depth  3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image post       3456x2234 1x size=30965760 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.542 ms/frame wall, gpu 2.372 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-nocompress v=c2x+ASAHI_MESA_DEBUG=1queue,nocompress i=3 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=base i=1 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=base i=1 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=base i=1 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=base i=1 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=base i=1 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=base i=1 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=base i=1 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=base i=1 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=base i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=base i=1 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=1 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=1 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=1 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=1 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.297 ms/frame wall, gpu 2.133 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=base i=1 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=c2x i=1 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=c2x i=1 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=c2x i=1 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=c2x i=1 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=c2x i=1 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=c2x i=1 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=c2x i=1 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=c2x i=1 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=c2x i=1 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=c2x i=1 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=1 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=1 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=1 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=1 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=1 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=1 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=1 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=1 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.165 ms/frame wall, gpu 1.537 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=c2x i=1 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=base i=2 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=base i=2 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=base i=2 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=base i=2 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=base i=2 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=base i=2 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=base i=2 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=base i=2 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=base i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=base i=2 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=2 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=2 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=2 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=2 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.306 ms/frame wall, gpu 2.143 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=base i=2 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=c2x i=2 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=c2x i=2 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=c2x i=2 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=c2x i=2 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=c2x i=2 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=c2x i=2 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=c2x i=2 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=c2x i=2 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=c2x i=2 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=c2x i=2 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=2 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=2 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=2 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=2 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=2 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=2 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=2 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=2 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.158 ms/frame wall, gpu 1.027 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=c2x i=2 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=base i=3 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=base i=3 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=base i=3 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=base i=3 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=base i=3 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=base i=3 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=base i=3 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=base i=3 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=base i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=base i=3 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=3 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=3 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=3 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=3 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.299 ms/frame wall, gpu 2.134 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=base i=3 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=c2x i=3 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=c2x i=3 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=c2x i=3 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=c2x i=3 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=c2x i=3 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=c2x i=3 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=c2x i=3 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=c2x i=3 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=c2x i=3 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=c2x i=3 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=3 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=3 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=3 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=3 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=3 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=3 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=3 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=3 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.039 ms/frame wall, gpu 1.469 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=c2x i=3 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=base i=4 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=base i=4 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=base i=4 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=base i=4 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=base i=4 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=base i=4 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=base i=4 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=base i=4 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=base i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=base i=4 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=4 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=4 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=4 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=4 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.302 ms/frame wall, gpu 2.143 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=base i=4 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=c2x i=4 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=c2x i=4 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=c2x i=4 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=c2x i=4 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=c2x i=4 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=c2x i=4 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=c2x i=4 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=c2x i=4 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=c2x i=4 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=c2x i=4 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=4 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=4 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=4 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=4 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=4 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=4 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=4 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=4 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.160 ms/frame wall, gpu 1.027 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=c2x i=4 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=base i=5 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=base i=5 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=base i=5 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=base i=5 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=base i=5 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=base i=5 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=base i=5 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=base i=5 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=base i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=base i=5 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=5 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=5 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=5 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=5 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.307 ms/frame wall, gpu 2.145 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=base i=5 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=c2x i=5 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=c2x i=5 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=c2x i=5 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=c2x i=5 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=c2x i=5 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=c2x i=5 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=c2x i=5 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=c2x i=5 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=c2x i=5 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=c2x i=5 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=5 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=5 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=5 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=5 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=5 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=5 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=5 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=5 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 1.834 ms/frame wall, gpu 1.372 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=c2x i=5 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=base i=6 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=base i=6 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=base i=6 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=base i=6 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=base i=6 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=base i=6 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=base i=6 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=base i=6 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=base i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=base i=6 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=6 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=6 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=6 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=6 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.312 ms/frame wall, gpu 2.147 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=base i=6 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=c2x i=6 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=c2x i=6 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=c2x i=6 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=c2x i=6 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=c2x i=6 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=c2x i=6 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=c2x i=6 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=c2x i=6 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=c2x i=6 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=c2x i=6 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=6 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=6 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=6 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=6 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=6 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=6 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=6 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=6 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.149 ms/frame wall, gpu 1.528 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=c2x i=6 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=base i=7 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=base i=7 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=base i=7 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=base i=7 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=base i=7 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=base i=7 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=base i=7 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=base i=7 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=base i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-e66c01e737), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=base i=7 rc=0 | image ms-colour  3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=7 rc=0 | image ms-depth   3456x2234 2x size=61931520 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=7 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=7 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=base i=7 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.303 ms/frame wall, gpu 2.139 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=base i=7 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0
+rgba8-d24-rerun v=c2x i=7 rc=0 | vkmsaa2x: creating ms-colour
+rgba8-d24-rerun v=c2x i=7 rc=0 | vkmsaa2x: creating ms-depth
+rgba8-d24-rerun v=c2x i=7 rc=0 | vkmsaa2x: creating resolved
+rgba8-d24-rerun v=c2x i=7 rc=0 | vkmsaa2x: creating resolved-2
+rgba8-d24-rerun v=c2x i=7 rc=0 | vkmsaa2x: creating res-depth
+rgba8-d24-rerun v=c2x i=7 rc=0 | vkmsaa2x: creating post
+rgba8-d24-rerun v=c2x i=7 rc=0 | vkmsaa2x: creating verify-c
+rgba8-d24-rerun v=c2x i=7 rc=0 | vkmsaa2x: creating verify-z
+rgba8-d24-rerun v=c2x i=7 rc=0 | driver Apple M4 Max (G16C B1) | Borealis Mesa 26.3.0-devel (git-68a70dc1c5), Borealis, derived from Honeykrisp | timestamp bits 64 period 1.000 ns
+rgba8-d24-rerun v=c2x i=7 rc=0 | image ms-colour  3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=7 rc=0 | image ms-depth   3456x2234 2x size=62980096 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=7 rc=0 | image resolved   3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=7 rc=0 | image resolved-2 3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=7 rc=0 | image res-depth  3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=7 rc=0 | image post       3456x2234 1x size=31490048 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=7 rc=0 | image verify-c   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=7 rc=0 | image verify-z   3456x2234 1x size=123863040 memtype=0 flags=0xf
+rgba8-d24-rerun v=c2x i=7 rc=0 | vkmsaa2x 3456x2234 rgba8 2x passes=4 draws=24 frames=200: 2.134 ms/frame wall, gpu 1.524 ms/frame (197 frames) | samples=c4dda8ca7aeb6ea3 depth-samples=52189de92ad5f0bf resolved=b8a1c9beab99c324 depth-resolve=bfd6dec59c8384ff post=aefec0558571228b edge-pixels=38770 nonzero-bytes=116811090/60947324/30857908/30473472/30858612
+rgba8-d24-rerun v=c2x i=7 rc=0 | resolve-check rgba8: resolved-after-pass=b8a1c9beab99c324; timed resolve differs on 0 of 7720704 pixels (0 edge, 0 interior), max channel difference 0

@@ -1,0 +1,131 @@
+base e66c01e737a8cc286195f62d6261e6129bd32f62 r11 47273442c5f36695683c5fcd2548ff64bed4ff61 c2x bdef7e78cb6601329d3b8c139dd313f1e1ecdc0f 18:05:26
+df: 28G free before clc
+CLC-DONE 18:06:36
+df: 28G free before build
+== base e66c01e7 Merge pull request #512 from aurora-silicon/mt-mesa/z32f-knob 18:06:44
+base libvulkan_asahi.so 859243f79c691d8e
+Ok:                201 
+Fail:              0   
+  base 9 sampler bias scope/idempotence/handle checks passed
+  base G17P compression policy: 4099 checks passed
+  base G17P compression policy: 7140 checks passed
+  base G17P sparse query, block addressing and mip-tail checks passed
+  base G18G HAL300 records: all 2129 checks passed
+  base G18G raster state emission checks passed (no GPU execution)
+  base Gallium AGX native descriptors: 448 checks passed
+  base Honeykrisp AGX3 Ioto program core: 13248 checks passed
+  base Honeykrisp AGX3 VDM decode: 2872 checks passed
+  base Honeykrisp DRM render resource specs: all checks passed
+  base agx3 layout: all 28 checks passed
+  base agx3 packing: all 26052002 checks passed
+  base agx3 texture core: 5060 checks passed
+  base agx3_alu_core: 70 checks passed (14 unsupported forms skipped)
+  base agx3_cf_core: all 403 checks passed
+  base agx3_compute_program_core: 575 checks passed
+  base agx3_funop_core: 106 checks passed
+  base agx3_g17p_producers: all 126 checks passed
+  base agx3_ioto_load_packer: 2413001 checks passed
+  base agx3_ioto_uniform_program: 32122 checks passed
+  base agx3_pixel_core: all 44 checks passed
+  base agx3_ray_query_prerequisites: 555 exact committed-result and witness-gate checks passed
+  base agx3_rt_core: all 611 checks passed
+  base agx3_scs_touch: 395 checks passed
+  base agx3_slot_core: all 1287 checks passed
+  base agx_chip: all 534 checks passed
+  base agx_ioto_load_core: 3326 checks passed
+  base agx_ioto_preshader_core: 2184 checks passed
+  base agx_ioto_program_core: 1135 checks passed
+  base agx_nir_opt_sink_loop_sample_uses: all checks passed
+  base agx_pbe_agx3_core: 309483 checks passed
+  base agx_vdm_decode_core: 79529 checks passed
+  base agx_vdm_index_list_core: 13413 checks passed
+  base agx_vdm_state_update_core: 79677 checks passed
+  base hk_g17p_zls: 3246833 checks passed
+  base hk_rt_on_demand: all checks passed
+  base root fragment: 412582947 checks passed
+  base test-agx-g17g-tile-format-gate: 533 checks passed
+== r11 47273442 hk: store R11G11B10F through its own class on G17P 18:09:30
+r11 libvulkan_asahi.so 75c60786cc698b4f
+Ok:                201 
+Fail:              0   
+  r11 9 sampler bias scope/idempotence/handle checks passed
+  r11 G17P compression policy: 4099 checks passed
+  r11 G17P compression policy: 7140 checks passed
+  r11 G17P sparse query, block addressing and mip-tail checks passed
+  r11 G18G HAL300 records: all 2129 checks passed
+  r11 G18G raster state emission checks passed (no GPU execution)
+  r11 Gallium AGX native descriptors: 448 checks passed
+  r11 Honeykrisp AGX3 Ioto program core: 13248 checks passed
+  r11 Honeykrisp AGX3 VDM decode: 2872 checks passed
+  r11 Honeykrisp DRM render resource specs: all checks passed
+  r11 agx3 layout: all 28 checks passed
+  r11 agx3 packing: all 26052002 checks passed
+  r11 agx3 texture core: 5060 checks passed
+  r11 agx3_alu_core: 70 checks passed (14 unsupported forms skipped)
+  r11 agx3_cf_core: all 403 checks passed
+  r11 agx3_compute_program_core: 575 checks passed
+  r11 agx3_funop_core: 106 checks passed
+  r11 agx3_g17p_producers: all 126 checks passed
+  r11 agx3_ioto_load_packer: 2413001 checks passed
+  r11 agx3_ioto_uniform_program: 32122 checks passed
+  r11 agx3_pixel_core: all 44 checks passed
+  r11 agx3_ray_query_prerequisites: 555 exact committed-result and witness-gate checks passed
+  r11 agx3_rt_core: all 611 checks passed
+  r11 agx3_scs_touch: 395 checks passed
+  r11 agx3_slot_core: all 1287 checks passed
+  r11 agx_chip: all 534 checks passed
+  r11 agx_ioto_load_core: 3326 checks passed
+  r11 agx_ioto_preshader_core: 2184 checks passed
+  r11 agx_ioto_program_core: 1135 checks passed
+  r11 agx_nir_opt_sink_loop_sample_uses: all checks passed
+  r11 agx_pbe_agx3_core: 309483 checks passed
+  r11 agx_vdm_decode_core: 79529 checks passed
+  r11 agx_vdm_index_list_core: 13413 checks passed
+  r11 agx_vdm_state_update_core: 79677 checks passed
+  r11 hk_g17p_zls: 3246833 checks passed
+  r11 hk_rt_on_demand: all checks passed
+  r11 root fragment: 412582947 checks passed
+  r11 test-agx-g17g-tile-format-gate: 533 checks passed
+== c2x bdef7e78 hk: compress 2x colour and 2x depth wherever a 2x reload keeps the sample 18:09:44
+c2x libvulkan_asahi.so ccf6e4a8cec868ab
+Ok:                201 
+Fail:              0   
+  c2x 9 sampler bias scope/idempotence/handle checks passed
+  c2x G17P compression policy: 4099 checks passed
+  c2x G17P compression policy: 7153 checks passed
+  c2x G17P sparse query, block addressing and mip-tail checks passed
+  c2x G18G HAL300 records: all 2129 checks passed
+  c2x G18G raster state emission checks passed (no GPU execution)
+  c2x Gallium AGX native descriptors: 448 checks passed
+  c2x Honeykrisp AGX3 Ioto program core: 13248 checks passed
+  c2x Honeykrisp AGX3 VDM decode: 2872 checks passed
+  c2x Honeykrisp DRM render resource specs: all checks passed
+  c2x agx3 layout: all 28 checks passed
+  c2x agx3 packing: all 26052002 checks passed
+  c2x agx3 texture core: 5060 checks passed
+  c2x agx3_alu_core: 70 checks passed (14 unsupported forms skipped)
+  c2x agx3_cf_core: all 403 checks passed
+  c2x agx3_compute_program_core: 575 checks passed
+  c2x agx3_funop_core: 106 checks passed
+  c2x agx3_g17p_producers: all 126 checks passed
+  c2x agx3_ioto_load_packer: 2413001 checks passed
+  c2x agx3_ioto_uniform_program: 32122 checks passed
+  c2x agx3_pixel_core: all 44 checks passed
+  c2x agx3_ray_query_prerequisites: 555 exact committed-result and witness-gate checks passed
+  c2x agx3_rt_core: all 611 checks passed
+  c2x agx3_scs_touch: 395 checks passed
+  c2x agx3_slot_core: all 1287 checks passed
+  c2x agx_chip: all 534 checks passed
+  c2x agx_ioto_load_core: 3326 checks passed
+  c2x agx_ioto_preshader_core: 2184 checks passed
+  c2x agx_ioto_program_core: 1135 checks passed
+  c2x agx_nir_opt_sink_loop_sample_uses: all checks passed
+  c2x agx_pbe_agx3_core: 309483 checks passed
+  c2x agx_vdm_decode_core: 79529 checks passed
+  c2x agx_vdm_index_list_core: 13413 checks passed
+  c2x agx_vdm_state_update_core: 79677 checks passed
+  c2x hk_g17p_zls: 3246833 checks passed
+  c2x hk_rt_on_demand: all checks passed
+  c2x root fragment: 412582947 checks passed
+  c2x test-agx-g17g-tile-format-gate: 533 checks passed
+ALL-DONE 18:09:57
