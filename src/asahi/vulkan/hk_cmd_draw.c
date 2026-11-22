@@ -3560,9 +3560,10 @@ hk_tilebuffer_layout(const struct hk_device *dev, const VkFormat *vk_formats,
  * the 4x sample budget (64 bytes) and do not spill when allocated first.
  *
  * G17P cannot spill a compressed MSAA/1-8 B target (no MSAA/1-8 B
- * decompression program), and compresses multisample colour only at 2x on M4
- * Pro. A 2x tile holds 64 bytes a sample (32 KiB over 16x16 pixels), so
- * allocated first they fit too.
+ * decompression program), and by default compresses multisample colour only
+ * at 2x on M4 Pro/Max (plus opt-in 4x under ASAHI_MESA_DEBUG=msaa4xcompress).
+ * A 2x tile holds 64 bytes a sample (32 KiB over 16x16 pixels), so allocated
+ * first they fit too.
  *
  * A multiview pass has an eight-byte budget, so over that it would spill one:
  * 2x colour is not compressed on a device with the multiview feature
@@ -5116,9 +5117,12 @@ hk_begin_rendering(VkCommandBuffer commandBuffer,
                         !read_index ||
                         read_index >= dev->sampled_images.alloc))) {
                      mesa_loge_once("G17P: spilled render pass with a compressed "
-                                    "attachment (%s, %ux) is unsupported",
+                                    "attachment (%s, %ux, sample_size=%uB, "
+                                    "max_sample_size=%uB) is unsupported",
                                     util_format_short_name(layout->format),
-                                    layout->sample_count_sa);
+                                    layout->sample_count_sa,
+                                    render->tilebuffer.sample_size_B,
+                                    render->tilebuffer.max_sample_size_B);
                      vk_command_buffer_set_error(&cmd->vk,
                                                  VK_ERROR_FEATURE_NOT_PRESENT);
                      return;

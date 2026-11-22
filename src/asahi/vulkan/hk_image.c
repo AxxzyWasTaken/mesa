@@ -1338,6 +1338,9 @@ hk_can_compress_create_info(const struct agx_device *dev, unsigned plane,
     * AGX3 chips stay plain until their packets are recovered. */
    const bool m5_storage =
       hk_m5_storage_compression_eligible(dev, plane, info, float_image_atomics);
+   const bool g17p_msaa4x_optin =
+      (dev->debug & AGX_DBG_MSAA4X_COMPRESS) &&
+      hk_g17p_msaa4x_color_compression_eligible(dev->chip, plane, info);
    bool allow_agx3 =
       hk_m5_msaa_color_compression_eligible(dev->chip, plane, info) ||
       hk_m5_depth_msaa_compression_eligible(dev->chip, plane, info,
@@ -1345,8 +1348,9 @@ hk_can_compress_create_info(const struct agx_device *dev, unsigned plane,
       hk_m5_depth_msaa_transfer_eligible(dev->chip, plane, info,
                                          dev->params.features) ||
       m5_storage ||
-      (hk_hal200_compression_eligible(dev->chip, dev->params.chip_id, plane,
-                                      info) &&
+      ((hk_hal200_compression_eligible(dev->chip, dev->params.chip_id, plane,
+                                       info) ||
+        g17p_msaa4x_optin) &&
        !hk_g17p_multiview_spill_risk(info, multiview)) ||
       hk_g17p_shared_compression_eligible(dev->chip, plane, info) ||
       hk_m5_color_compression_eligible(dev->chip, plane, info) ||

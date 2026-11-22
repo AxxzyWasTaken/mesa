@@ -375,6 +375,113 @@ hk_g17p_compression_eligible(enum agx_chip chip, unsigned plane,
    return hk_hal200_compression_eligible(chip, 0, plane, info);
 }
 
+/* Opt-in G17P 4x MSAA colour attachment compression policy (draft prototype).
+ *
+ * Gen9 PBE, texture descriptors, libagx_fast_clear, and direct colour resolve
+ * already encode compressed 4x MSAA colour on G17P. The reason 4x colour
+ * attachments remain plain by default is a Vulkan image-create vs render-pass
+ * mismatch: G17P has no in-place decompressor for a spilled compressed target
+ * (hk_cmd_draw.c fails closed), and at 4x the resident budget on every G17P
+ * SoC is:
+ *  - 32 B/sample on CLEAR/DONT_CARE non-multiview passes (32 KiB / (16x16x4)),
+ *    where clear_wide_multisample covers every tile with a full-area draw;
+ *  - 8 B/sample on stored LOAD_OP_LOAD or multiview passes
+ *    (AGX_G17P_MAX_UNCOVERED_TILE_BYTES_PER_SAMPLE).
+ *
+ * Single-target 4x MSAA colour attachments of 1-8 B/texel (e.g. RGBA8, BGRA8,
+ * RGBA16F) always fit within 8 B/sample when allocated first by
+ * hk_resident_attachments(), so they stay resident and hardware-safe even on
+ * LOAD_OP_LOAD. Multiview-capable devices stay plain via
+ * hk_g17p_multiview_spill_risk() in hk_image.c, and multi-RT passes exceeding
+ * the budget fail closed in hk_cmd_draw.c until G17P gains an in-place
+ * decompressor (see G17P_MSAA4X_COMPRESSION.md).
+ */
+static inline bool
+hk_g17p_msaa4x_color_compression_eligible(enum agx_chip chip, unsigned plane,
+                                          const VkImageCreateInfo *info)
+{
+   if (chip != AGX_CHIP_G17P || plane != 0 || !info)
+      return false;
+
+   if (!hk_g17p_compression_color_format(info->format))
+      return false;
+
+   for (const void *next = info->pNext; next;) {
+      VkStructureType type;
+      const void *following;
+      memcpy(&type, next, sizeof(type));
+      memcpy(&following, (const char *)next + offsetof(VkBaseInStructure, pNext),
+             sizeof(following));
+      if (type == VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO) {
+         VkExternalMemoryImageCreateInfo external;
+         memcpy(&external, next, sizeof(external));
+         if (external.handleTypes)
+            return false;
+      }
+      if (type == HK_G17P_WSI_IMAGE_CREATE_INFO_MESA)
+         return false;
+      next = following;
+   }
+
+   const VkImageCreateFlags allowed_flags =
+      VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_EXTENDED_USAGE_BIT |
+      VK_IMAGE_CREATE_ALIAS_BIT;
+   const VkImageUsageFlags allowed_usage =
+      VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+      VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+
+   return info->imageType == VK_IMAGE_TYPE_2D && info->extent.depth == 1 &&
+          info->extent.width >= 16 && info->extent.height >= 16 &&
+          info->mipLevels == 1 && info->arrayLayers == 1 &&
+          info->samples == VK_SAMPLE_COUNT_4_BIT &&
+          info->tiling == VK_IMAGE_TILING_OPTIMAL &&
+          !(info->flags & ~allowed_flags) &&
+          (info->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) &&
+          !(info->usage & ~allowed_usage);
+}
+
+/* Resident bytes-per-sample budget for a 4x MSAA colour pass on G17P.
+ * On stored LOAD_OP_LOAD or multiview passes, the uncovered-tile defect caps
+ * residency at AGX_G17P_MAX_UNCOVERED_TILE_BYTES_PER_SAMPLE (8 B/sample).
+ * Otherwise, the 32 KiB tilebuffer at 16x16x4 holds 32 B/sample, and
+ * clear_wide_multisample covers every tile with a full-area clear draw. */
+static inline uint32_t
+hk_g17p_msaa4x_render_pass_budget_B(bool view_mask_nonzero,
+                                    bool has_stored_load)
+{
+   if (view_mask_nonzero || has_stored_load)
+      return AGX_G17P_MAX_UNCOVERED_TILE_BYTES_PER_SAMPLE;
+   return 32768u / (16u * 16u * 4u);
+}
+
+/* Whether a 4x MSAA G17P render pass can keep all compressed colour
+ * attachments resident without hitting the unsupported compressed-spill path.
+ * Because hk_resident_attachments() allocates compressed targets first, the
+ * pass is spill-free iff the sum of compressed attachment texel sizes fits
+ * within hk_g17p_msaa4x_render_pass_budget_B() (or has_decompress is true). */
+static inline bool
+hk_g17p_msaa4x_render_pass_safe(uint32_t nr_samples, uint32_t view_mask,
+                                uint32_t color_att_count,
+                                uint8_t compressed_mask,
+                                const uint8_t *format_bytes,
+                                bool has_stored_load, bool has_decompress)
+{
+   if (nr_samples != 4 || !compressed_mask || has_decompress)
+      return true;
+   if (!format_bytes)
+      return false;
+
+   uint32_t compressed_bytes = 0;
+   for (uint32_t i = 0; i < color_att_count && i < 8; ++i) {
+      if (compressed_mask & (1u << i))
+         compressed_bytes += format_bytes[i];
+   }
+
+   return compressed_bytes <=
+          hk_g17p_msaa4x_render_pass_budget_B(view_mask != 0, has_stored_load);
+}
+
 /* G17P and M5 colour images shared through
  * DRM_FORMAT_MOD_APPLE_GPU_TILED_COMPRESSED.
  *

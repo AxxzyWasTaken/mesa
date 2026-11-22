@@ -82,6 +82,12 @@ enum agx_dbg {
    /* Check cached native launch programs and root snapshots against a fresh
     * computation. */
    AGX_DBG_VERIFY = BITFIELD_BIT(25),
+   /* Opt-in prototype: compress single-layer 4x MSAA colour attachments on
+    * G17P (excluding multiview-capable devices via hk_g17p_multiview_spill_risk).
+    * Safe while compressed footprint fits the pass's resident budget (8 B/sample
+    * on LOAD/multiview, 32 B/sample on CLEAR/DONT_CARE); fails closed on
+    * compressed spill until G17P gains an in-place decompressor. */
+   AGX_DBG_MSAA4X_COMPRESS = BITFIELD_BIT(26),
 };
 
 /* How many power-of-two levels in the BO cache do we want? 2^14 minimum chosen

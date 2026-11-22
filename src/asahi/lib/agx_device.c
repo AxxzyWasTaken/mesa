@@ -116,6 +116,7 @@ static const struct debug_named_value agx_debug_options[] = {
    {"faulttrace",AGX_DBG_FAULTTRACE,"Retain G18 failure diagnostics"},
    {"asynctrace",AGX_DBG_ASYNCTRACE,"Trace command streams without waiting"},
    {"verify",    AGX_DBG_VERIFY,   "Check cached launch programs against fresh ones"},
+   {"msaa4xcompress", AGX_DBG_MSAA4X_COMPRESS, "Prototype G17P 4x MSAA colour attachment compression"},
    {"bodumpverbose", AGX_DBG_BODUMPVERBOSE,   "Include extra info with dumps"},
    DEBUG_NAMED_VALUE_END
 };

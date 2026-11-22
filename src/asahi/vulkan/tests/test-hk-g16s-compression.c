@@ -878,6 +878,106 @@ check_color_16b(void)
    }
 }
 
+static void
+check_g17p_msaa4x_color_prototype(void)
+{
+   const VkImageUsageFlags rt =
+      VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+   VkImageCreateInfo c = image(VK_FORMAT_R8G8B8A8_UNORM, 1728, 1117, 1, rt);
+   c.samples = VK_SAMPLE_COUNT_4_BIT;
+
+   /* Admitted across G17P (plane 0 only), refused on non-G17P chips. */
+   CHECK(hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 0, &c));
+   CHECK(!hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17S, 0, &c));
+   CHECK(!hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G14G, 0, &c));
+   CHECK(!hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 1, &c));
+
+   /* 8-byte formats (RGBA16F) admitted; B10G11R11 and 16-byte formats refused. */
+   VkImageCreateInfo x = c;
+   x.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+   CHECK(hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 0, &x));
+   x.format = VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+   CHECK(!hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 0, &x));
+   x.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+   CHECK(!hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 0, &x));
+
+   /* Only 4x, single-layer, single-level, non-input-attachment colour targets. */
+   x = c;
+   x.samples = VK_SAMPLE_COUNT_2_BIT;
+   CHECK(!hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 0, &x));
+   x = c;
+   x.arrayLayers = 2;
+   CHECK(!hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 0, &x));
+   x = c;
+   x.mipLevels = 2;
+   CHECK(!hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 0, &x));
+   x = c;
+   x.usage |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+   CHECK(!hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 0, &x));
+   x = c;
+   x.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+   CHECK(!hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 0, &x));
+   x = c;
+   x.usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+   CHECK(hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 0, &x));
+
+   /* External / WSI refused. */
+   VkExternalMemoryImageCreateInfo external = {
+      .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO,
+      .handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,
+   };
+   x = c;
+   x.pNext = &external;
+   CHECK(!hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 0, &x));
+   VkBaseInStructure wsi = {.sType = HK_G17P_WSI_IMAGE_CREATE_INFO_MESA};
+   x.pNext = &wsi;
+   CHECK(!hk_g17p_msaa4x_color_compression_eligible(AGX_CHIP_G17P, 0, &x));
+
+   /* Render-pass budget & residency safety math. */
+   CHECK(hk_g17p_msaa4x_render_pass_budget_B(false, false) == 32);
+   CHECK(hk_g17p_msaa4x_render_pass_budget_B(false, true) == 8);
+   CHECK(hk_g17p_msaa4x_render_pass_budget_B(true, false) == 8);
+   CHECK(hk_g17p_msaa4x_render_pass_budget_B(true, true) == 8);
+
+   /* Single-target 4 B (RGBA8) and 8 B (RGBA16F): safe even on LOAD_OP_LOAD. */
+   const uint8_t one_rgba8[1] = {4};
+   const uint8_t one_rgba16f[1] = {8};
+   CHECK(hk_g17p_msaa4x_render_pass_safe(4, 0, 1, 0x1, one_rgba8, true, false));
+   CHECK(hk_g17p_msaa4x_render_pass_safe(4, 0, 1, 0x1, one_rgba16f, true, false));
+
+   /* 2x RGBA8 (8 B) fits LOAD; 3x RGBA8 (12 B) and 2x RGBA16F (16 B) spill
+    * on LOAD without a decompressor, but fit on CLEAR (32 B budget). */
+   const uint8_t three_rgba8[3] = {4, 4, 4};
+   const uint8_t two_rgba16f[2] = {8, 8};
+   CHECK(hk_g17p_msaa4x_render_pass_safe(4, 0, 2, 0x3, three_rgba8, true, false));
+   CHECK(!hk_g17p_msaa4x_render_pass_safe(4, 0, 3, 0x7, three_rgba8, true, false));
+   CHECK(hk_g17p_msaa4x_render_pass_safe(4, 0, 3, 0x7, three_rgba8, false, false));
+   CHECK(!hk_g17p_msaa4x_render_pass_safe(4, 0, 2, 0x3, two_rgba16f, true, false));
+   CHECK(hk_g17p_msaa4x_render_pass_safe(4, 0, 2, 0x3, two_rgba16f, false, false));
+   CHECK(hk_g17p_msaa4x_render_pass_safe(4, 0, 2, 0x3, two_rgba16f, true, true));
+
+   /* 8x RGBA8 (32 B) and 4x RGBA16F (32 B) fit CLEAR; 5x RGBA16F (40 B)
+    * exceeds 32 KiB / (16x16x4) even on CLEAR without a decompressor. */
+   const uint8_t eight_rgba8[8] = {4, 4, 4, 4, 4, 4, 4, 4};
+   const uint8_t five_rgba16f[5] = {8, 8, 8, 8, 8};
+   CHECK(hk_g17p_msaa4x_render_pass_safe(4, 0, 8, 0xff, eight_rgba8, false, false));
+   CHECK(hk_g17p_msaa4x_render_pass_safe(4, 0, 4, 0x0f, five_rgba16f, false, false));
+   CHECK(!hk_g17p_msaa4x_render_pass_safe(4, 0, 5, 0x1f, five_rgba16f, false, false));
+   CHECK(hk_g17p_msaa4x_render_pass_safe(4, 0, 5, 0x1f, five_rgba16f, false, true));
+
+   /* Mixed compressed (1x 8B) + uncompressed (2x 16B): hk_resident_attachments()
+    * allocates compressed first, so compressed stays in [0, 8) even on LOAD. */
+   const uint8_t mixed[3] = {16, 8, 16};
+   CHECK(hk_g17p_msaa4x_render_pass_safe(4, 0, 3, 0x2, mixed, true, false));
+
+   /* Multiview forces 8 B budget even on CLEAR. */
+   CHECK(hk_g17p_msaa4x_render_pass_safe(4, 0x3, 1, 0x1, one_rgba16f, false, false));
+   CHECK(!hk_g17p_msaa4x_render_pass_safe(4, 0x3, 2, 0x3, two_rgba16f, false, false));
+   CHECK(hk_g17p_msaa4x_render_pass_safe(4, 0x3, 2, 0x3, two_rgba16f, false, true));
+}
+
 int
 main(void)
 {
@@ -897,6 +997,7 @@ main(void)
    check_shared();
    check_m4_max();
    check_color_16b();
+   check_g17p_msaa4x_color_prototype();
    printf("G17P compression policy: %u checks passed\n", checks);
    return 0;
 }
